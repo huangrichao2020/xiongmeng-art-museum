@@ -8033,7 +8033,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     }
     g.userData.keep=true;
     amusement.band={drum,voc,gtrL,gtrR,woofers,spotHeads,cymbals,fans};
-    amusement.dyn.add(g);
+    // 不加入 amusement.dyn，避免被 mergeStatic(d) 拆成静态雕塑而冻结动画
     pool(g,6.8,.03,.24,0xffa6c9);
     OUTDOOR_OBS.push([-20.0,25.5,4.2]);
   }
