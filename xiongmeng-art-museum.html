@@ -640,9 +640,11 @@ const animeOutlineShader={
       float edgeMask=smoothstep(0.05,0.16,centerL)*(1.0-smoothstep(0.72,1.02,centerL));
       vec3 ink=vec3(0.06,0.08,0.16);
       vec3 col=mix(base.rgb,ink,edge*edgeMask*0.36);
-      // 清澈动漫色彩微调：不加灰雾底色，保持夜景高对比通透感
+      // 新海诚雪夜冷暖调色分级：暗部钴蓝通透、亮部暖琥珀、色彩纯净统一
       float g=luma(col);
-      col=mix(vec3(g),col,1.10);
+      vec3 shinkaiShadow=mix(col,col*vec3(0.84,0.92,1.16),0.45*(1.0-smoothstep(0.05,0.45,g)));
+      vec3 shinkaiWarm=mix(shinkaiShadow,shinkaiShadow*vec3(1.06,1.01,0.92),smoothstep(0.45,0.95,g)*0.45);
+      col=mix(vec3(g),shinkaiWarm,1.12);
       gl_FragColor=vec4(col,base.a);
     }
   `
@@ -1334,6 +1336,14 @@ function paintSky(top,mid,bot,glow){
     const rg=g.createRadialGradient(256,150,0,256,150,230);
     rg.addColorStop(0,glow);rg.addColorStop(1,'rgba(0,0,0,0)');
     g.fillStyle=rg;g.fillRect(0,0,512,256);
+    // 新海诚斜向银河星云微光带
+    g.save();g.translate(256,95);g.rotate(-.28);
+    const mg=g.createLinearGradient(0,-34,0,34);
+    mg.addColorStop(0,'rgba(120,165,240,0)');
+    mg.addColorStop(.5,'rgba(155,195,255,.14)');
+    mg.addColorStop(1,'rgba(120,165,240,0)');
+    g.fillStyle=mg;g.fillRect(-300,-34,600,68);
+    g.restore();
   }
   skyTex.needsUpdate=true;
 }
@@ -6729,22 +6739,9 @@ const skylineMats=[];
   }
   // 将教堂与大剧院静态建筑、雪堆与小熊人合批（保留 PointLight 光源，大幅削减 Draw Call）
   mergeStatic(lmGroup);
-  // 环路外侧：覆雪人行道 + 精选 4 棵璀璨圣诞树（保留光晕贴片，去掉冗余高消耗 PointLight）
+  // 环路外侧：洁净覆雪人行道（移除杂乱大发光圈孤立树，保持视野通透大气）
   const farWalk=add(scene,BX(92,.14,2.2),M(0xd9e4ee,{roughness:.78,metalness:.06,flatShading:false}),0,.07,-23.8);
   farWalk.castShadow=false;
-  const farGlowMat=new THREE.MeshBasicMaterial({
-    map:glowTex,color:0xffd480,transparent:true,opacity:.36,blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
-  const farAuraMat=new THREE.MeshBasicMaterial({
-    map:glowTex,color:0xffca6b,transparent:true,opacity:.24,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false});
-  const outerTrees=[[-36,-27.0],[36,-27.0],[-60.4,9.5],[60.4,9.5]];
-  for(const [x,z] of outerTrees){
-    const bt=buildChristmasTree({scale:.92,layers:6,gifts:true});
-    bt.position.set(x,.02,z);bt.rotation.y=R(0,Math.PI);street.add(bt);
-    const pool=new THREE.Mesh(new THREE.PlaneGeometry(7.2,7.2),farGlowMat);
-    pool.rotation.x=-Math.PI/2;pool.position.set(x,.035,z);street.add(pool);
-    const aura=new THREE.Mesh(new THREE.PlaneGeometry(5.6,6.4),farAuraMat);
-    aura.position.set(x,2.8,z);street.add(aura);
-  }
 }
 /* 空中巡游圣诞老人与三驯鹿雪橇队 + 金色魔法星尘拖尾 */
 const flyingSleigh=new THREE.Group();scene.add(flyingSleigh);
@@ -6786,8 +6783,8 @@ const clouds=[];
 /* ════════════════════════════════════════════════════════════
    10. 圣诞飘雪天气与冬夜星空系统（全天候下雪 + 24h 昼夜变化）
    ════════════════════════════════════════════════════════════ */
-const WINTER_SKY=['#07101d','#102034','#1c324c','rgba(155,190,235,.15)'];
-const WINTER_FOG=0x111d2b, WINTER_FOG_D=.0115;
+const WINTER_SKY=['#071226','#12294e','#264b7c','rgba(135,175,240,.22)'];
+const WINTER_FOG=0x162b4c, WINTER_FOG_D=.0068;
 
 /* 建筑占地（随馆体适当扩展 x:-9.6..12.1, z:-11.6..7.6 + 门廊雨棚），雪花不能落进室内 */
 function inBuildingXZ(x,z){
@@ -7585,7 +7582,8 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
   const rndM=M(0xd23b32,{roughness:.7}),grnM=M(0x2f8f6b,{roughness:.7});
   const gldM=M(0xe0a33c,{roughness:.55,metalness:.35});
   const snowM=M(0xf2f7fc,{roughness:.9});
-  const glowCols=[0xff4d4d,0xffe078,0x48e58b,0xfff2cc,0xff94d2,0x6bd4ff];
+  // 新海诚雪夜高级灯光色板：暖香槟金、琥珀橘、奶白微光、淡冰蓝、柔樱粉（告别杂乱红绿跑马灯）
+  const glowCols=[0xffe29a,0xffc06e,0xfff3d4,0x99ccff,0xffb3c8,0xffd27d];
   const bulb=(parent,x,y,z,r,ci)=>{
     const b=add(parent,new THREE.SphereGeometry(r,6,4),getBulbMat(glowCols[ci%glowCols.length],ci),x,y,z);
     b.castShadow=false;return b;};
@@ -8268,42 +8266,19 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     }
   }
 
-  /* ── 雪人阵：全部复用 buildSnowman ── */
+  /* ── 精选雪人（精简冗余杂物，只保留核心拍照点位，给园内留白呼吸感） ── */
   {
-    const spots=[[-11.5,27.5],[-14,32],[-18,39],[-9,38],[-2,44],[-24,46],[14,50],[24,30],[38,28]];
+    const spots=[[-11.5,27.5],[14,50],[24,30]];
     const hats=['santa','beanie','top'];
-    const scarves=[0xdc2f2f,0x1f8a4c,0x2563eb,0xeab308,0xc026d3,0xe11d48];
+    const scarves=[0xdc2f2f,0x2563eb,0xeab308];
     spots.forEach(([sx,sz],i)=>{
-      const sm=buildSnowman(R(.85,1.15),{
+      const sm=buildSnowman(R(.92,1.08),{
         scarf:scarves[i%scarves.length],hat:hats[i%hats.length],
-        wave:i%3===0,tilt:(i%2?-.12:.12)});
+        wave:i===0,tilt:(i%2?-.10:.10)});
       sm.position.set(sx,0,sz);sm.rotation.y=R(0,6.28);
       fair.add(sm);
       OUTDOOR_OBS.push([sx,sz,.85]);
     });
-  }
-
-  /* ── 糖果拐杖 + 礼物堆 ── */
-  {
-    const candySpots=[[-6,23],[2,26],[10,29],[34,26],[38,32],[30,44],[18,50],[-8,47],[-20,44],[-27,34],[36,50],[-16,20]];
-    for(const cs of candySpots){
-      const g2=new THREE.Group();g2.position.set(cs[0],0,cs[1]);fair.add(g2);
-      const cc=buildCandyCane(2.8);
-      cc.position.set(0,0,0);cc.rotation.y=R(0,6.28);g2.add(cc);
-      for(let i=0;i<3;i++)bulb(g2,0,2.9+i*.14,0,.09,i);
-      pool(g2,1.6,.03,.14);
-    }
-    const giftSpots=[[-16,22],[-7,30],[10,34],[24,28],[-24,52],[16,48],[30,38],[38,42]];
-    for(const gs of giftSpots){
-      for(let i=0;i<5;i++){
-        const a=i*1.6,r=.5+((i*29)%5)*.35;
-        const gb=buildGiftBox(R(.55,.8),R(.45,.68),R(.55,.8),
-          [0xd92e2e,0x1f8a4c,0x3b82f6,0xf2b84b][i%4],[0xf7d05c,0xf44336,0xffe082][i%3]);
-        gb.position.set(gs[0]+Math.cos(a)*r,0,gs[1]+Math.sin(a)*r);
-        gb.rotation.y=R(0,6.28);
-        fair.add(gb);
-      }
-    }
   }
 
   /* ── 游乐园路灯柱 + 广域主照明 ── */
