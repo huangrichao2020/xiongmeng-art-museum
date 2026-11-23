@@ -11272,7 +11272,18 @@ function updateWheelRide(dt){
     }else if(wheelSys.kind==='ship'&&amusement.ship){
       wp.set(2.1,-3.65,0).applyMatrix4(amusement.ship.matrixWorld);
     }else if(wheelSys.kind==='coaster'&&amusement.coaster){
-      wp.set(0,.88,.18).applyMatrix4(amusement.coaster.cars[0].matrixWorld);
+      const co=amusement.coaster, car0=co.cars[0];
+      wp.set(0,.70,.24).applyMatrix4(car0.matrixWorld);
+      fp.x=wp.x;fp.z=wp.z;fp.y=wp.y-FP_EYE;
+      camera.position.copy(wp);
+      const lookTgt=new THREE.Vector3(0,.56,8.0).applyMatrix4(car0.matrixWorld);
+      camera.up.set(0,1,0);
+      camera.lookAt(lookTgt);
+      trainHud.classList.add('show');
+      trainMsgEl.textContent='正在乘坐 '+wheelSys.label+'（车头锁定第一视角 · 高度 '+wp.y.toFixed(1)+'m）';
+      trainBtnEl.textContent='下来 (E)';
+      trainBtnEl.onclick=stopFacilityRide;
+      return;
     }else if(wheelSys.kind==='bumper'&&(wheelSys.car||amusement.bumper.length)){
       const car=wheelSys.car||amusement.bumper[0];
       wp.set(0,1.55,-.15).applyMatrix4(car.matrixWorld);
