@@ -6164,32 +6164,32 @@ const skylineMats=[];
 
   // ══ 3. 游乐园左侧璀璨圣诞教堂 (-49, 0, 36) + 右侧百老汇圣诞大剧院 (55.5, 0, 36) ══
   const lmGroup=new THREE.Group();scene.add(lmGroup);
-  // 绚丽高饱和彩色琉璃窗 & 发光玫瑰花窗贴图
+  // 新海诚冬夜暖金烛光哥特花窗 & 圣洁玫瑰花窗贴图（告别花哨彩色格子，呈现柔和暖琥珀透光质感）
   const stainedTex=(()=>{
     const c=document.createElement('canvas');c.width=128;c.height=256;
     const x=c.getContext('2d');
-    x.fillStyle='#141824';x.fillRect(0,0,128,256);
-    const cols=['#ffbe55','#ff5e7e','#38e8b0','#4cc9f0','#ffe66d','#ff9f43'];
-    for(let r=0;r<10;r++)for(let cl=0;cl<4;cl++){
-      x.fillStyle=cols[(r*3+cl)%cols.length];
-      x.fillRect(cl*30+6,r*24+8,24,18);
-    }
-    x.strokeStyle='#d4af37';x.lineWidth=4;x.strokeRect(3,3,122,250);
+    const g=x.createLinearGradient(0,256,0,0);
+    g.addColorStop(0,'#ffb85c');g.addColorStop(.45,'#e88b48');g.addColorStop(.82,'#34568b');g.addColorStop(1,'#182946');
+    x.fillStyle=g;x.fillRect(0,0,128,256);
+    x.strokeStyle='#1c2536';x.lineWidth=3;
+    for(let y=28;y<256;y+=32){x.beginPath();x.moveTo(0,y);x.lineTo(128,y);x.stroke();}
+    for(let cx=32;cx<128;cx+=32){x.beginPath();x.moveTo(cx,0);x.lineTo(cx,256);x.stroke();}
+    x.strokeStyle='#c9a35e';x.lineWidth=4;x.strokeRect(2,2,124,252);
     const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;
   })();
   const roseTex=(()=>{
     const c=document.createElement('canvas');c.width=256;c.height=256;
     const x=c.getContext('2d');
-    x.fillStyle='#121622';x.fillRect(0,0,256,256);
-    const cols=['#ffcf5c','#ff4d6d','#2ec4b6','#ffd166','#4ea8de','#ff9f1c'];
+    const rg=x.createRadialGradient(128,128,10,128,128,120);
+    rg.addColorStop(0,'#fff3c4');rg.addColorStop(.42,'#ffbe5c');rg.addColorStop(.78,'#43689c');rg.addColorStop(1,'#18253c');
+    x.fillStyle=rg;x.fillRect(0,0,256,256);
+    x.strokeStyle='rgba(26,34,48,.75)';x.lineWidth=3.5;
     for(let i=0;i<16;i++){
-      const a0=i*(Math.PI*2/16), a1=(i+1)*(Math.PI*2/16);
-      x.fillStyle=cols[i%cols.length];
-      x.beginPath();x.moveTo(128,128);x.arc(128,128,114,a0,a1);x.closePath();x.fill();
-      x.strokeStyle='#ffe6a3';x.lineWidth=3;x.stroke();
+      const a=i*(Math.PI*2/16);
+      x.beginPath();x.moveTo(128,128);x.lineTo(128+Math.cos(a)*118,128+Math.sin(a)*118);x.stroke();
     }
-    x.fillStyle='#fff6d1';x.beginPath();x.arc(128,128,34,0,Math.PI*2);x.fill();
-    x.strokeStyle='#ffd166';x.lineWidth=7;x.beginPath();x.arc(128,128,116,0,Math.PI*2);x.stroke();
+    x.strokeStyle='#e0b868';x.lineWidth=6;x.beginPath();x.arc(128,128,116,0,Math.PI*2);x.stroke();
+    x.beginPath();x.arc(128,128,58,0,Math.PI*2);x.stroke();
     const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;
   })();
   const stainedM=new THREE.MeshBasicMaterial({map:stainedTex});
@@ -6225,12 +6225,13 @@ const skylineMats=[];
     return g;
   };
 
-  // ── 1. 游乐园左侧：象牙白哥特大教堂（正门敞开，内部正在举办盛大圣诞婚礼） (-49, 0, 36) ──
+  // ── 1. 游乐园左侧：新海诚冬夜雪顶圣夜大教堂 (-49, 0, 36) ──
   {
     const ch=new THREE.Group();ch.position.set(-49,0,36);ch.rotation.y=Math.PI;lmGroup.add(ch);
-    const gothicStoneM=M(0xe6dfd3,{roughness:.84,metalness:0,envMapIntensity:.16});
-    const gothicTrimM=M(0xc6bdb0,{roughness:.80,metalness:0,envMapIntensity:.16});
-    const churchSlateM=M(0x283a54,{roughness:.68,metalness:.14,envMapIntensity:.28});
+    const gothicStoneM=M(0xded5c6,{roughness:.90,metalness:0,envMapIntensity:.16});
+    const gothicTrimM=M(0xb8ab9b,{roughness:.86,metalness:0,envMapIntensity:.16});
+    const churchSlateM=M(0x23344a,{roughness:.74,metalness:.10,envMapIntensity:.22});
+    const churchSnowM=M(0xeff4fa,{roughness:.92,metalness:0,envMapIntensity:.18});
     const makePointedWimperg=(w,h,depth)=>{
       const sh=new THREE.Shape();
       sh.moveTo(-w/2,0);sh.lineTo(w/2,0);sh.lineTo(0,h);sh.closePath();
@@ -6271,30 +6272,34 @@ const skylineMats=[];
       for(let z=-6.2;z<=4.6;z+=2.7)add(ch,BX(.35,4.8,.42),gothicTrimM,sx*6.15,2.5,z); // 侧廊壁柱
       add(ch,BX(3.2,9.2,4.8),gothicStoneM,sx*6.0,4.7,-1.8).receiveShadow=true;  // 十字耳堂左右横翼
       add(ch,BX(3.4,.26,5.0),gothicTrimM,sx*6.0,9.32,-1.8);                     // 耳堂檐口石线脚
-      // 耳堂双坡人字屋顶 + 端头三角形石山墙
+      // 耳堂双坡人字屋顶 + 厚实冬夜积雪覆盖 + 端头三角形石山墙
       for(const sz of [-1,1]){
         const tr=add(ch,BX(3.4,.22,3.1),churchSlateM,sx*6.0,10.35,-1.8+sz*1.22);
         tr.rotation.x=sz*.72;
+        const trS=addNS(ch,BX(3.32,.12,2.95),churchSnowM,sx*6.0,10.48,-1.8+sz*1.22);
+        trS.rotation.x=sz*.72;
       }
       const tg=new THREE.Mesh(makeGableGeo(4.8,2.2,.45),gothicStoneM);
       tg.rotation.y=sx*Math.PI/2;tg.position.set(sx*7.42,9.3,-1.8);tg.castShadow=true;ch.add(tg);
     }
     add(ch,BX(6.4,10.2,.75),gothicStoneM,0,5.2,-8.4).receiveShadow=true;        // 圣坛后墙
     add(ch,BX(6.4,2.4,16.4),gothicStoneM,0,9.1,-.5);                             // 大厅顶部封顶板
-    // 侧廊单坡屋顶 + 主殿陡坡人字石板屋顶（取消重叠 Z-fighting 雪片，保留干净石板脊线）
+    // 侧廊单坡雪顶 + 主殿陡坡人字雪覆屋顶（比石板抬高 0.14m 绝无闪烁，融入冬夜雪景）
     for(const sx of [-1,1]){
       const ar=add(ch,BX(3.25,.22,14.9),churchSlateM,sx*4.6,5.28,-.8);ar.rotation.z=-sx*.38;
+      const arS=addNS(ch,BX(3.16,.12,14.6),churchSnowM,sx*4.6,5.42,-.8);arS.rotation.z=-sx*.38;
     }
     const roofLen=16.8, halfSpan=3.4, roofH=3.8;
     const slopeAng=Math.atan2(roofH,halfSpan), slopeLen=Math.hypot(halfSpan,roofH);
     for(const sx of [-1,1]){
       const sl=add(ch,BX(slopeLen,.26,roofLen),churchSlateM,sx*halfSpan/2,10.2+roofH/2,-.5);sl.rotation.z=-sx*slopeAng;
+      const slS=addNS(ch,BX(slopeLen*.96,.12,roofLen-.25),churchSnowM,sx*halfSpan/2,10.35+roofH/2,-.5);slS.rotation.z=-sx*slopeAng;
       for(let z=-5.5;z<=4.5;z+=2.5){
         add(ch,BX(.16,2.8,1.15),stainedM,sx*3.26,7.8,z);
         add(ch,BX(.22,3.0,1.30),gothicTrimM,sx*3.20,7.8,z);
       }
     }
-    add(ch,BX(.44,.38,roofLen+.1),gothicTrimM,0,10.2+roofH+.04,-.5); // 主殿屋脊压条
+    add(ch,BX(.44,.38,roofLen+.1),churchSnowM,0,10.2+roofH+.08,-.5); // 主殿屋脊积雪脊线
     { // 补齐主殿圣坛后方三角形山墙，避免屋顶后部悬空露洞
       const gSh=new THREE.Shape();
       gSh.moveTo(-halfSpan+.15,10.15);gSh.lineTo(halfSpan-.15,10.15);gSh.lineTo(0,10.2+roofH);gSh.closePath();
@@ -6372,8 +6377,6 @@ const skylineMats=[];
         const wr=buildWreath(.44);wr.position.set(pt.x,pt.h-.45,9.44);ch.add(wr);
       }
       add(ch,makePointedWimperg(pt.w+.8,1.9,.35),gothicStoneM,pt.x,pt.h+.55,9.15);
-      addLightString(ch,pt.x-(pt.w+.8)/2,pt.h+.6,9.38,pt.x,pt.h+2.45,9.38,5,[warmGlowM,goldGlowM]);
-      addLightString(ch,pt.x+(pt.w+.8)/2,pt.h+.6,9.38,pt.x,pt.h+2.45,9.38,5,[warmGlowM,goldGlowM]);
     }
     // 国王长廊 + 发光玫瑰花窗 + 中央尖山墙
     add(ch,BX(11.8,.45,.45),gothicTrimM,0,5.8,8.95);
@@ -6382,8 +6385,6 @@ const skylineMats=[];
     const rw=addNS(ch,new THREE.CylinderGeometry(1.75,1.75,.18,24),roseM,0,9.6,8.85);rw.rotation.x=Math.PI/2;
     add(ch,new THREE.TorusGeometry(1.82,.12,8,24),goldTrimM,0,9.6,8.90);
     add(ch,makePointedWimperg(5.0,3.6,.5),gothicStoneM,0,12.1,7.3);
-    addLightString(ch,-2.5,12.2,7.62,0,15.7,7.62,7,[warmGlowM,goldGlowM]);
-    addLightString(ch,2.5,12.2,7.62,0,15.7,7.62,7,[warmGlowM,goldGlowM]);
 
     // ★★★ 教堂内部：电影级写实哥特大教堂圣诞婚礼现场（可从敞开大门直接走入观礼） ★★★
     // 1. 大理石拼花地板 + 刺绣金边红毯 + 撒落玫瑰花瓣
@@ -6398,14 +6399,9 @@ const skylineMats=[];
       x.strokeStyle='rgba(150,138,120,.35)';x.lineWidth=2;x.strokeRect(0,0,256,256);
       return ctex(c,[3,8]);
     })();
-    add(ch,BX(5.4,.12,16.2),M(0xffffff,{map:marbleFloorTex,roughness:.35,metalness:.08}),0,.60,-.4).receiveShadow=true;
+    add(ch,BX(5.4,.12,16.2),M(0xffffff,{map:marbleFloorTex,roughness:.45,metalness:.04}),0,.60,-.4).receiveShadow=true;
     add(ch,BX(1.85,.14,15.6),goldTrimM,0,.61,.4);
     add(ch,BX(1.68,.15,15.5),carpetM,0,.62,.4).receiveShadow=true;
-    const petalCols=[0xff4d6d,0xff8fa3,0xfff0f5,0xd92638];
-    for(let i=0;i<42;i++){
-      const px=(rng()-.5)*1.45, pz=-4.5+rng()*13.0;
-      addNS(ch,new THREE.CircleGeometry(.045+rng()*.03,5),M(petalCols[i%4],{roughness:.7,side:THREE.DoubleSide}),px,.70,pz).rotation.x=-Math.PI/2;
-    }
 
     // 2. 教堂内部哥特集束柱廊 + 交叉尖拱肋穹顶 + 内墙彩绘花窗与壁灯
     for(const sx of [-1,1]){
@@ -6461,27 +6457,10 @@ const skylineMats=[];
     addNS(ch,BX(.14,1.35,.14),goldGlowM,0,3.6,-7.78);
     addNS(ch,BX(.78,.14,.14),goldGlowM,0,3.82,-7.78);
 
-    // 5. 繁花锦簇的双层婚礼鲜花拱门 + 垂坠白纱帷幔 + 圣坛圣诞树与大型花柱
-    const archM=M(0xfaf3f6,{roughness:.65});
-    const rosePinkM=M(0xff758f,{roughness:.6});
-    const roseWhiteM=M(0xfff5f7,{roughness:.6});
-    const foliageM=M(0x235c36,{roughness:.85});
-    const veilM=new THREE.MeshPhysicalMaterial({color:0xffffff,transparent:true,opacity:.68,roughness:.35,side:THREE.DoubleSide,depthWrite:false});
+    // 5. 平安夜圣坛祈愿圣诞树（去掉粉红玫瑰球婚庆拱门，营造庄严浪漫的平安夜氛围）
+    const rosePinkM=M(0xff758f,{roughness:.75});
     for(const sx of [-1,1]){
-      add(ch,new THREE.CylinderGeometry(.08,.09,3.0,8),goldTrimM,sx*1.55,2.65,-4.9);
-      // 圣坛两侧大型花柱与豪华圣诞树
-      add(ch,new THREE.CylinderGeometry(.18,.22,1.2,8),ivoryStoneM,sx*2.15,1.72,-5.6);
-      add(ch,new THREE.SphereGeometry(.42,8,6),rosePinkM,sx*2.15,2.42,-5.6);
-      add(ch,new THREE.SphereGeometry(.32,8,6),roseWhiteM,sx*2.02,2.55,-5.45);
-      const st=buildChristmasTree({scale:.42,layers:5,gifts:true});st.position.set(sx*2.25,1.14,-6.8);ch.add(st);
-      // 垂坠浪漫白纱帷幔
-      const dr=add(ch,new THREE.PlaneGeometry(.55,2.6),veilM,sx*1.38,2.6,-4.86);dr.rotation.z=sx*.12;
-    }
-    add(ch,new THREE.TorusGeometry(1.55,.10,8,18,Math.PI),foliageM,0,4.15,-4.9);
-    for(let i=0;i<=14;i++){
-      const a=i*(Math.PI/14), fx=Math.cos(a)*1.55, fy=4.15+Math.sin(a)*1.55;
-      add(ch,new THREE.SphereGeometry(.16+(i%3)*.04,7,5),i%3===0?rosePinkM:i%3===1?roseWhiteM:foliageM,fx,fy,-4.9);
-      if(i%2===0)addNS(ch,new THREE.SphereGeometry(.055,5,4),warmGlowM,fx,fy+.10,-4.78);
+      const st=buildChristmasTree({scale:.55,layers:5,gifts:true});st.position.set(sx*2.15,1.14,-6.2);ch.add(st);
     }
 
     // 6. 写实多关节小熊人婚礼群像：小熊神父 + 燕尾服小熊新郎 + 拖尾白纱小熊新娘 + 小熊伴郎伴娘 + 小熊花童
