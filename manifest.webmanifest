@@ -1,0 +1,26 @@
+{
+  "name": "熊萌艺术馆 · 圣诞冰雪特展",
+  "short_name": "熊萌艺术馆",
+  "description": "冬夜雪景 3D 交互艺术馆与星夜极光游乐园",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#060c14",
+  "theme_color": "#060c14",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
