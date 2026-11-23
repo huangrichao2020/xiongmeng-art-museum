@@ -8209,48 +8209,57 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     pool(g,14,.03,.18,0x9fe8ff);
   }
 
-  /* ── 世界一流星夜极光双环云霄飞车（独占整个西半区 26m×35m：14.5m 大爬坡 + 360° 垂直大回环 + 立体双螺旋） ── */
+  /* ── 世界一流星夜极光云霄飞车（独占西半区 26m×35m：多段连续冲高回落零倾斜驼峰 + 360° 垂直大回环） ── */
   {
     const cg=new THREE.Group();fair.add(cg);
     const pts=[
       new THREE.Vector3( -7.5,  1.60, 22.8), // 北侧发车直道
-      new THREE.Vector3(-15.5,  7.20, 21.8), // 链条爬升段
-      new THREE.Vector3(-23.5, 14.40, 21.8), // 西北 14.4m 水平观景段
-      new THREE.Vector3(-28.8, 14.50, 22.6),
-      new THREE.Vector3(-29.8, 14.20, 27.0),
-      new THREE.Vector3(-29.8,  7.20, 31.8), // 极速俯冲下坠
-      new THREE.Vector3(-29.2,  2.10, 36.2), // 谷底拉起准备入环
+      new THREE.Vector3(-15.5,  7.60, 22.0), // 1. 北侧链条大爬坡
+      new THREE.Vector3(-23.8, 15.20, 22.0), // 15.2m 最高峰
+      new THREE.Vector3(-28.8, 15.10, 23.0),
+      new THREE.Vector3(-29.6,  8.40, 28.2), // 极速俯冲回落
+      new THREE.Vector3(-29.2,  2.10, 34.5), // 谷底拉起入环
       // ★ 360° 垂直大回环
-      new THREE.Vector3(-28.4,  6.20, 39.2),
-      new THREE.Vector3(-27.8, 12.60, 37.8),
-      new THREE.Vector3(-27.2,  6.20, 35.4),
-      new THREE.Vector3(-26.8,  2.20, 39.8),
-      // ★ 立体双螺旋
-      new THREE.Vector3(-25.8,  2.40, 52.8),
-      new THREE.Vector3(-17.5,  9.20, 54.4),
-      new THREE.Vector3(-13.8,  6.80, 47.2),
-      new THREE.Vector3(-19.5,  3.20, 43.4),
-      new THREE.Vector3(-21.8,  4.80, 49.8),
-      new THREE.Vector3(-12.2,  2.30, 54.6), // 南侧 S 弯贴地冲刺
-      new THREE.Vector3( -6.8,  8.20, 53.6), // 拉起攀升向北
-      // ★ 正北方向 12.2m 高空水平观景段（水平不倾斜，正对满天烟花与北街夜景）
-      new THREE.Vector3( -6.2, 12.20, 49.5),
-      new THREE.Vector3( -5.8, 12.20, 43.5),
-      new THREE.Vector3( -6.0, 12.00, 37.5),
-      new THREE.Vector3( -6.4,  5.20, 30.0), // 俯冲返程
+      new THREE.Vector3(-28.4,  6.40, 38.8),
+      new THREE.Vector3(-27.8, 12.80, 37.6),
+      new THREE.Vector3(-27.2,  6.40, 35.4),
+      new THREE.Vector3(-26.8,  2.20, 40.2),
+      // ★ 2. 西南大驼峰冲高回落（全程不倾斜）
+      new THREE.Vector3(-26.2, 11.80, 48.2),
+      new THREE.Vector3(-23.0,  2.40, 54.4),
+      // ★ 3. 南侧抛射高驼峰冲高回落
+      new THREE.Vector3(-16.5, 12.80, 54.2),
+      new THREE.Vector3(-12.0,  2.30, 48.5),
+      // ★ 4. 中腹跃升驼峰冲高回落
+      new THREE.Vector3(-14.8, 10.80, 40.5),
+      new THREE.Vector3(-11.2,  2.20, 33.8),
+      // ★ 5. 东侧高空双峰连续冲高回落（正对烟花夜空）
+      new THREE.Vector3( -6.4, 13.40, 40.2),
+      new THREE.Vector3( -6.0,  4.40, 48.2),
+      new THREE.Vector3( -6.2, 11.80, 53.6),
+      new THREE.Vector3( -6.8,  2.60, 31.0), // 俯冲返程回起点
     ];
     const curve=new THREE.CatmullRomCurve3(pts,true,'catmullrom',.40);
-    // 预计算无万向锁的连续平行传输法向：平缓高架段强力回正水平，仅垂直回环允许倒立
+    // 预计算无万向锁的连续法向：仅 360° 垂直回环区允许倒立翻滚，其余全部冲高回落与弯道保持水平零倾斜
     const NSEG=240;
     const trackUps=[];
     let prevUp=new THREE.Vector3(0,1,0);
-    const _t0=new THREE.Vector3(), _n0=new THREE.Vector3();
+    const _t0=new THREE.Vector3(), _p0=new THREE.Vector3(), _zb=new THREE.Vector3();
     for(let i=0;i<NSEG;i++){
-      curve.getTangentAt(i/NSEG,_t0);
+      const u=i/NSEG;
+      curve.getPointAt(u,_p0);
+      curve.getTangentAt(u,_t0);
       const proj=prevUp.clone().addScaledVector(_t0,-prevUp.dot(_t0));
       if(proj.lengthSq()<1e-5)proj.set(0,1,0);
       proj.normalize();
-      if(Math.abs(_t0.y)<0.45&&proj.y>0.30)proj.lerp(_n0.set(0,1,0),0.65).normalize();
+      const inLoop=(_p0.x<-25.8&&_p0.z>35.0&&_p0.z<41.2);
+      if(!inLoop){
+        _zb.set(0,1,0).addScaledVector(_t0,-_t0.y);
+        if(_zb.lengthSq()>1e-4){
+          _zb.normalize();
+          proj.lerp(_zb,0.88).normalize();
+        }
+      }
       trackUps.push(proj);
       prevUp=proj;
     }
@@ -10584,11 +10593,10 @@ function animate(){
     const co=amusement.coaster;
     if(!co._vP){co._vP=new THREE.Vector3();co._vT=new THREE.Vector3();co._vL=new THREE.Vector3();co._vU=new THREE.Vector3();}
     co.curve.getPointAt(co.t%1,co._vP);
-    const onHighCrest=(co._vP.y>11.4&&!(co._vP.z>33.0&&co._vP.x<-25.0)); // 覆盖西北高峰与正北向高空水平观景段（排除垂直回环顶部）
-    const spd=onHighCrest?.012:Math.max(.024,.052+(6.5-co._vP.y)*.0048); // 高空水平段延迟停留，尽赏漫天烟花
-    if(onHighCrest&&wheelSys.riding&&wheelSys.kind==='coaster'){
+    const spd=Math.max(.028,.058+(7.0-co._vP.y)*.0048); // 正常物理高低势能变速，高处自然略慢、下坡加速，不刻意延迟
+    if(co._vP.y>10.5&&wheelSys.riding&&wheelSys.kind==='coaster'){
       co._fwCd=(co._fwCd||0)-dt;
-      if(co._fwCd<=0&&window._triggerFwSalvo){window._triggerFwSalvo();co._fwCd=.65;}
+      if(co._fwCd<=0&&window._triggerFwSalvo){window._triggerFwSalvo();co._fwCd=.85;}
     }
     co.t=(co.t+spd*dt)%1;
     for(let ci=0;ci<co.cars.length;ci++){
