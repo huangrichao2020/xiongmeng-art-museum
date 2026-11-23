@@ -1484,15 +1484,15 @@ function noiseTex(base,spec,dens){
 const asphaltTex=noiseTex('#1e242b','150,170,190',2600);asphaltTex.repeat.set(14,4);
 const concreteTex=noiseTex('#3a4048','180,195,210',2200);concreteTex.repeat.set(18,3);
 // 室内展厅地板改用纯净均匀的微水泥亚光肌理（绝不画重复椭圆，避免像蜂窝）
-// 室内展厅地板改用纯净明亮的暖米白美术馆大方砖肌理（告别暗灰斑点与赛璐璐光圈）
 const floorTex=(()=>{
   const [c,g]=cv(256,256);
-  g.fillStyle='#dbd6cd';g.fillRect(0,0,256,256);
-  g.strokeStyle='rgba(145,138,128,.18)';g.lineWidth=2;
-  g.strokeRect(1,1,126,126);g.strokeRect(129,1,126,126);
-  g.strokeRect(1,129,126,126);g.strokeRect(129,129,126,126);
+  g.fillStyle='#2a3038';g.fillRect(0,0,256,256);
+  for(let i=0;i<320;i++){
+    g.fillStyle=`rgba(190,205,220,${R(.006,.018).toFixed(3)})`;
+    g.fillRect(R(0,256),R(0,256),R(2,6),R(2,6));
+  }
   const t=new THREE.CanvasTexture(c);
-  t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;t.repeat.set(6,5);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;t.repeat.set(4,3);
   return t;
 })();
 
@@ -2226,36 +2226,31 @@ const D={
 add(shop,BX(22.4,.4,19.9),M(0x3d444b,{roughness:.82}),1.25,.2,-2.0);
 {
   // 二层楼板挖出楼梯洞 (x: 9.45..12.0, z: -0.45..+5.15)，南侧留出 2.35m 宽敞入口回转空间
-  const slabM=M(0xf2efe9,{roughness:.76,metalness:0,envMapIntensity:0});
-  slabM.userData.noToon=true;
-  add(shop,BX(19.15,.3,19.4),slabM,-.125,4.52,-2.0).receiveShadow=false;
-  add(shop,BX(2.55,.3,11.05),slabM,10.725,4.52,-5.975).receiveShadow=false;
-  add(shop,BX(2.55,.3,2.35),slabM,10.725,4.52,6.325).receiveShadow=false;
+  const slabM=M(0x2b3138,{roughness:.9});
+  add(shop,BX(19.15,.3,19.4),slabM,-.125,4.52,-2.0);
+  add(shop,BX(2.55,.3,11.05),slabM,10.725,4.52,-5.975);
+  add(shop,BX(2.55,.3,2.35),slabM,10.725,4.52,6.325);
 }
 {
   // 屋顶楼板同样挖出二楼到天台的楼梯洞 (x: 9.70..12.05, z: -5.20..+0.40)
-  // 二楼天花板采用干净哑光暖象牙白（noToon + roughness:.76 彻底消除发霉噪点与色阶光环）
-  const roofSlabM=M(0xf2efe9,{roughness:.76,metalness:0,envMapIntensity:0});
-  roofSlabM.userData.noToon=true;
-  add(shop,BX(19.6,.34,19.8),roofSlabM,-.10,8.78,-2.0).receiveShadow=false;
-  add(shop,BX(2.65,.34,6.7),roofSlabM,11.025,8.78,-8.55).receiveShadow=false;
-  add(shop,BX(2.65,.34,7.5),roofSlabM,11.025,8.78,4.15).receiveShadow=false;
+  const roofSlabM=M(0x39404a,{roughness:.8});
+  add(shop,BX(19.6,.34,19.8),roofSlabM,-.10,8.78,-2.0);
+  add(shop,BX(2.65,.34,6.7),roofSlabM,11.025,8.78,-8.55);
+  add(shop,BX(2.65,.34,7.5),roofSlabM,11.025,8.78,4.15);
 }
 
-/* 内部地板（完全哑光零反光的现代美术馆大方砖地坪，跳过赛璐璐色阶避免光环斑驳） */
-const floor1Mat=M(0xffffff,{roughness:.98,metalness:0,map:floorTex,flatShading:false,envMapIntensity:0});
-floor1Mat.userData.noToon=true;
+/* 内部地板（纯净平整的现代美术馆微水泥地坪，带真实 PBR 环境反射光影） */
+const floor1Mat=M(0xffffff,{roughness:.38,metalness:.12,map:floorTex,flatShading:false,envMapIntensity:.85});
 const floor1=add(shop,BX(21.5,0.06,19),floor1Mat,1.25,D.f1top,-2.0);
-floor1.castShadow=false;floor1.receiveShadow=false;
+floor1.castShadow=false;
 {
-  const f2m=M(0xffffff,{roughness:.98,metalness:0,map:floorTex,flatShading:false,envMapIntensity:0});
-  f2m.userData.noToon=true;
+  const f2m=M(0xffffff,{roughness:.36,metalness:.10,map:floorTex,flatShading:false,envMapIntensity:.8});
   const floor2=add(shop,BX(18.95,0.06,19),f2m,-.025,D.f2top,-2.0);
-  floor2.castShadow=false;floor2.receiveShadow=false;
+  floor2.castShadow=false;
   const f2b=add(shop,BX(2.55,0.06,11.05),f2m,10.725,D.f2top,-5.975);
-  f2b.castShadow=false;f2b.receiveShadow=false;
+  f2b.castShadow=false;
   const f2c=add(shop,BX(2.55,0.06,2.35),f2m,10.725,D.f2top,6.325);
-  f2c.castShadow=false;f2c.receiveShadow=false;
+  f2c.castShadow=false;
 }
 
 /* 后墙 / 侧墙实体部分 */
@@ -12611,6 +12606,24 @@ function updateTrain(dt){
     return {ntx,rtx};
   }
   const snowPBR=makeNormalAndRough('snow'), woodPBR=makeNormalAndRough('wood'), stonePBR=makeNormalAndRough('stone');
+  // 艺术馆内部 (shop / shop1 / shop2，不含天台室外展区 roofExpo) 独占写实 PBR 微缩沙盘光影（克隆共享材质并标记 noToon）
+  const museumPbrClones=new Map();
+  shop.traverse(o=>{
+    if(o===roofExpo)return;
+    let p=o.parent;while(p){if(p===roofExpo)return;p=p.parent;}
+    if(!o.isMesh||!o.material)return;
+    const cloneMat=m=>{
+      if(!m)return m;
+      if(m.userData&&m.userData.isMuseumPBR)return m;
+      if(!museumPbrClones.has(m)){
+        const cm=m.clone();
+        cm.userData=Object.assign({},m.userData,{noToon:true,isMuseumPBR:true});
+        museumPbrClones.set(m,cm);
+      }
+      return museumPbrClones.get(m);
+    };
+    o.material=Array.isArray(o.material)?o.material.map(cloneMat):cloneMat(o.material);
+  });
   const seen=new Set();
   scene.traverse(o=>{
     if(!o.isMesh||!o.material)return;
@@ -12618,6 +12631,7 @@ function updateTrain(dt){
     for(const m of mats){
       if(!m||seen.has(m))continue;seen.add(m);
       if(m.isMeshStandardMaterial||m.isMeshPhysicalMaterial){
+        const isMP=!!(m.userData&&m.userData.isMuseumPBR);
         if(m.metalness>=.45||m.roughness<=.42){
           m.envMapIntensity=Math.max(m.envMapIntensity||1,1.55);m.needsUpdate=true;continue;
         }
@@ -12625,13 +12639,13 @@ function updateTrain(dt){
         const c=m.color;if(!c)continue;
         const lum=c.r*.3+c.g*.59+c.b*.11;
         if(lum>.78&&m.roughness>=.86){
-          m.normalMap=snowPBR.ntx;m.normalScale=new THREE.Vector2(.14,.14);
+          m.normalMap=snowPBR.ntx;m.normalScale=new THREE.Vector2(isMP?.42:.14,isMP?.42:.14);
           m.roughnessMap=snowPBR.rtx;m.needsUpdate=true;
         }else if(c.r>c.b*1.25&&m.roughness>=.70&&lum<.55){
-          m.normalMap=woodPBR.ntx;m.normalScale=new THREE.Vector2(.20,.20);
+          m.normalMap=woodPBR.ntx;m.normalScale=new THREE.Vector2(isMP?.52:.20,isMP?.52:.20);
           m.roughnessMap=woodPBR.rtx;m.needsUpdate=true;
         }else if(m.roughness>=.80){
-          m.normalMap=stonePBR.ntx;m.normalScale=new THREE.Vector2(.14,.14);
+          m.normalMap=stonePBR.ntx;m.normalScale=new THREE.Vector2(isMP?.36:.14,isMP?.36:.14);
           m.roughnessMap=stonePBR.rtx;m.needsUpdate=true;
         }
       }
