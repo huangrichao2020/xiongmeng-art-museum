@@ -10269,7 +10269,7 @@ function animate(){
   /* NPC 维尼小熊群物理运动引擎（视距+室内外剔除、避障分离、礼让玩家与车流、弹性跳跃） */
   const camX=camera.position.x, camZ=camera.position.z;
   const camNearMuseum=Math.abs(camX)<18&&camZ>-15&&camZ<15;
-  const maxNpcD2=((wheelSys.riding&&wheelSys.kind==='coaster')||trainSys.riding)?1936:3025; // 乘车44m / 常态55m
+  const maxNpcD2=((wheelSys.riding&&wheelSys.kind==='coaster')||trainSys.riding)?1444:1681; // 全局41m / 乘车38m视距裁剪
   for(let ni=0;ni<npcs.length;ni++){
     const n=npcs[ni];
     const cdx=n.p.position.x-camX, cdz=n.p.position.z-camZ;
@@ -10510,17 +10510,31 @@ function animate(){
   updateAerialHaze(dt,t);
   updateOuterCrowd(dt,t);
   _reflTick++;
-  const shPeriod=(wheelSys.riding&&wheelSys.kind==='coaster')?24:6;
+  const shPeriod=((wheelSys.riding&&wheelSys.kind==='coaster')||trainSys.riding)?24:18;
   if((_reflTick%shPeriod)===0)renderer.shadowMap.needsUpdate=true;
 
   composer.render();
 
-  /* FPS */
+  /* FPS + 全局自适应 DPR 稳帧控制器（任意视角掉帧自动降像素比保流畅，回稳后自动恢复高清） */
   fpsFrames++;
   const nowMs=performance.now();
   if(nowMs-fpsT0>500){
     const f=Math.round(fpsFrames*1000/(nowMs-fpsT0));
     fpsEl.textContent=f+' FPS';
+    const ridingFast=(wheelSys.riding&&wheelSys.kind==='coaster')||trainSys.riding;
+    if(!ridingFast){
+      if(f<44){
+        window._lowFpsStreak=(window._lowFpsStreak||0)+1;window._hiFpsStreak=0;
+        if(window._lowFpsStreak>=2&&renderer.getPixelRatio()>1.02){
+          renderer.setPixelRatio(1);composer.setPixelRatio(1);
+        }
+      }else if(f>=54){
+        window._hiFpsStreak=(window._hiFpsStreak||0)+1;window._lowFpsStreak=0;
+        if(window._hiFpsStreak>=3&&renderer.getPixelRatio()<HI_DPR-.05){
+          renderer.setPixelRatio(HI_DPR);composer.setPixelRatio(HI_DPR);
+        }
+      }
+    }
     fpsFrames=0;fpsT0=nowMs;
   }
 }
