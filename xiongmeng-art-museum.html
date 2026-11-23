@@ -6225,11 +6225,25 @@ const skylineMats=[];
     return g;
   };
 
-  // ── 1. 游乐园左侧：新海诚冬夜雪顶圣夜大教堂 (-49, 0, 36) ──
+  // ── 1. 游乐园左侧：新海诚冬夜·巴黎圣母院风艺术雪顶大教堂 (-49, 0, 36) ──
   {
     const ch=new THREE.Group();ch.position.set(-49,0,36);ch.rotation.y=Math.PI;lmGroup.add(ch);
-    const gothicStoneM=M(0xded5c6,{roughness:.90,metalness:0,envMapIntensity:.16});
-    const gothicTrimM=M(0xb8ab9b,{roughness:.86,metalness:0,envMapIntensity:.16});
+    // 精细哥特砂岩细砖石肌理贴图，告别大面积纯色塑料方块感
+    const cathedralStoneTex=(()=>{
+      const [c,x]=cv(256,256);
+      x.fillStyle='#ded4c3';x.fillRect(0,0,256,256);
+      for(let r=0;r<16;r++){
+        const y=r*16, off=(r%2)*16;
+        for(let cl=-1;cl<9;cl++){
+          const bx=cl*32+off, sh=212+((r*7+cl*13)%16);
+          x.fillStyle=`rgb(${sh},${sh-9},${sh-24})`;
+          x.fillRect(bx+1,y+1,30,14);
+        }
+      }
+      return ctex(c,[3,5]);
+    })();
+    const gothicStoneM=M(0xffffff,{map:cathedralStoneTex,roughness:.92,metalness:0,envMapIntensity:.14});
+    const gothicTrimM=M(0xb8a894,{roughness:.88,metalness:0,envMapIntensity:.16});
     const churchSlateM=M(0x23344a,{roughness:.74,metalness:.10,envMapIntensity:.22});
     const churchSnowM=M(0xeff4fa,{roughness:.92,metalness:0,envMapIntensity:.18});
     const makePointedWimperg=(w,h,depth)=>{
@@ -6338,14 +6352,23 @@ const skylineMats=[];
       add(ch,BX(3.38,.26,3.28),gothicTrimM,tx,16.2,tz);
       for(const cx of [-1,1])for(const cz of [-1,1])add(ch,BX(.42,15.8,.42),gothicTrimM,tx+cx*1.68,7.9,tz+cz*1.62);
       for(const wx of [-.68,.68]){
-        add(ch,makePointedArchGeo(.88,3.4,.18),stainedM,tx+wx,8.8,tz+1.75);
-        add(ch,makePointedArchGeo(.80,2.4,.18),warmGlowM,tx+wx,13.4,tz+1.55);
+        add(ch,makePointedArchGeo(1.06,3.62,.24),gothicTrimM,tx+wx,8.7,tz+1.70);
+        add(ch,makePointedArchGeo(.84,3.36,.18),stainedM,tx+wx,8.8,tz+1.78);
+        add(ch,makePointedArchGeo(.96,2.58,.24),gothicTrimM,tx+wx,13.3,tz+1.50);
+        add(ch,makePointedArchGeo(.76,2.34,.18),warmGlowM,tx+wx,13.4,tz+1.58);
+      }
+      // 钟楼侧面也补齐哥特窗框，打破侧面大白墙单调感
+      for(const wz of [-.62,.62]){
+        add(ch,makePointedArchGeo(.24,3.2,.92),gothicTrimM,tx+sx*1.74,8.8,tz+wz);
+        add(ch,makePointedArchGeo(.16,2.9,.72),stainedM,tx+sx*1.80,8.9,tz+wz);
       }
       for(const cx of [-1,1])for(const cz of [-1,1])addPinnacle(tx+cx*1.35,16.3,tz+cz*1.30,2.1,.26);
-      // 八角钟楼过渡层 + 陡峭深暮蓝石板尖塔（去掉玩具彩灯螺旋）
+      // 八角钟楼过渡层 + 陡峭深暮蓝石板尖塔 + 塔顶雪檐
       add(ch,new THREE.CylinderGeometry(1.38,1.52,1.3,8),gothicStoneM,tx,16.9,tz);
       const sp1=add(ch,new THREE.ConeGeometry(1.52,6.8,8),churchSlateM,tx,20.8,tz);
       sp1.rotation.y=Math.PI/8;
+      const spS=addNS(ch,new THREE.ConeGeometry(1.48,2.6,8),churchSnowM,tx,22.9,tz);
+      spS.rotation.y=Math.PI/8;
       addNS(ch,BX(.14,1.5,.14),goldGlowM,tx,24.6,tz);
       addNS(ch,BX(.88,.14,.14),goldGlowM,tx,24.9,tz);
     }
@@ -6355,14 +6378,21 @@ const skylineMats=[];
     add(ch,BX(1.05,4.8,3.4),gothicStoneM,-1.95,2.8,7.1);
     add(ch,BX(1.05,4.8,3.4),gothicStoneM,1.95,2.8,7.1);
 
-    // 三重尖拱门：左右侧门关闭带花环，★ 中央主大门向内左右敞开 78° 直通婚礼红毯大厅！
+    // 广场入口两侧古典艺术石柱雕塑（增添殿堂文化礼序感）
+    for(const s of [-1,1]){
+      add(ch,BX(1.05,.95,1.05),gothicTrimM,s*4.2,.52,11.6);
+      add(ch,new THREE.CylinderGeometry(.26,.32,1.45,10),gothicStoneM,s*4.2,1.72,11.6);
+      add(ch,new THREE.OctahedronGeometry(.32,1),goldTrimM,s*4.2,2.68,11.6);
+      addNS(ch,new THREE.SphereGeometry(.11,8,6),warmGlowM,s*4.2,3.10,11.6);
+    }
+
+    // 三重尖拱门：深邃多层拱券线脚 + 金色圣夜三角楣浮雕 + 敞开雕花胡桃木大门
     const portals=[{x:0,w:2.8,h:4.5,open:true},{x:-4.15,w:1.8,h:3.3},{x:4.15,w:1.8,h:3.3}];
     for(const pt of portals){
       if(pt.open){
-        // 敞开大门的左右石质门框柱 + 门楣拱券（中间完全打通！）
         for(const s of [-1,1]){
-          add(ch,BX(.42,4.4,.75),gothicTrimM,s*(pt.w/2+.15),2.6,9.05);
-          // 向内敞开的两扇厚重胡桃木雕花大门
+          add(ch,BX(.46,4.4,.85),gothicTrimM,s*(pt.w/2+.18),2.6,9.05);
+          add(ch,new THREE.CylinderGeometry(.14,.16,4.3,8),goldTrimM,s*(pt.w/2+.42),2.6,9.32);
           const leaf=new THREE.Group();
           leaf.position.set(s*1.28,.6,8.95);
           leaf.rotation.y=s>0?-1.32:1.32;
@@ -6370,21 +6400,56 @@ const skylineMats=[];
           const lwr=buildWreath(.38);lwr.position.set(-s*.62,2.3,-.10);leaf.add(lwr);
           ch.add(leaf);
         }
-        add(ch,BX(pt.w+.8,.55,.75),gothicTrimM,0,4.8,9.05);
+        add(ch,BX(pt.w+1.1,.58,.88),gothicTrimM,0,4.82,9.05);
+        add(ch,new THREE.CylinderGeometry(.52,.52,.22,16,1,false,0,Math.PI),goldTrimM,0,5.12,9.35).rotation.x=Math.PI/2;
       }else{
-        add(ch,makePointedArchGeo(pt.w+.65,pt.h+.45,.55),gothicTrimM,pt.x,.4,9.05);
-        add(ch,makePointedArchGeo(pt.w,pt.h,.35),woodDoorM,pt.x,.4,9.22);
-        const wr=buildWreath(.44);wr.position.set(pt.x,pt.h-.45,9.44);ch.add(wr);
+        add(ch,makePointedArchGeo(pt.w+.82,pt.h+.58,.62),gothicTrimM,pt.x,.4,9.02);
+        add(ch,makePointedArchGeo(pt.w,pt.h,.35),woodDoorM,pt.x,.4,9.24);
+        const wr=buildWreath(.44);wr.position.set(pt.x,pt.h-.45,9.46);ch.add(wr);
       }
       add(ch,makePointedWimperg(pt.w+.8,1.9,.35),gothicStoneM,pt.x,pt.h+.55,9.15);
     }
-    // 国王长廊 + 发光玫瑰花窗 + 中央尖山墙
-    add(ch,BX(11.8,.45,.45),gothicTrimM,0,5.8,8.95);
-    for(let x=-5.4;x<=5.4;x+=.9)add(ch,BX(.22,1.15,.28),gothicStoneM,x,6.55,9.0);
-    add(ch,BX(11.8,.35,.45),gothicTrimM,0,7.2,8.95);
+    // 巴黎圣母院式“国王长廊”（11 座古典尖拱壁龛与金冠先贤雕像）
+    add(ch,BX(11.8,.45,.48),gothicTrimM,0,5.8,8.95);
+    for(let x=-5.0;x<=5.0;x+=1.0){
+      add(ch,BX(.24,1.30,.32),gothicTrimM,x,6.50,9.02);
+      if(Math.abs(x)<4.8){
+        add(ch,new THREE.CylinderGeometry(.14,.18,.78,8),gothicStoneM,x+.5,6.35,9.06);
+        add(ch,new THREE.SphereGeometry(.12,8,6),gothicStoneM,x+.5,6.84,9.06);
+        add(ch,new THREE.CylinderGeometry(.11,.11,.06,8),goldTrimM,x+.5,6.96,9.06);
+      }
+    }
+    add(ch,BX(11.8,.35,.48),gothicTrimM,0,7.2,8.95);
+    // 立体放射状哥特玫瑰花窗（带石质窗棂 Tracery 浮雕阴影）
     const rw=addNS(ch,new THREE.CylinderGeometry(1.75,1.75,.18,24),roseM,0,9.6,8.85);rw.rotation.x=Math.PI/2;
-    add(ch,new THREE.TorusGeometry(1.82,.12,8,24),goldTrimM,0,9.6,8.90);
+    add(ch,new THREE.TorusGeometry(1.82,.14,8,24),goldTrimM,0,9.6,8.92);
+    add(ch,new THREE.TorusGeometry(.96,.06,6,20),gothicTrimM,0,9.6,8.96);
+    for(let r=0;r<8;r++){
+      const bar=add(ch,BX(3.52,.06,.08),gothicTrimM,0,9.6,8.96);
+      bar.rotation.z=r*Math.PI/8;
+    }
     add(ch,makePointedWimperg(5.0,3.6,.5),gothicStoneM,0,12.1,7.3);
+    // 中央山墙古典鎏金天文大钟（提升文化历史厚重感）
+    {
+      const clkTex=(()=>{
+        const [c,x]=cv(256,256);
+        x.fillStyle='#131d2e';x.beginPath();x.arc(128,128,120,0,Math.PI*2);x.fill();
+        x.strokeStyle='#e0b24c';x.lineWidth=10;x.beginPath();x.arc(128,128,116,0,Math.PI*2);x.stroke();
+        x.strokeStyle='#ffe29a';x.lineWidth=4;
+        for(let i=0;i<12;i++){
+          const a=i*Math.PI/6;
+          x.beginPath();x.moveTo(128+Math.cos(a)*86,128+Math.sin(a)*86);
+          x.lineTo(128+Math.cos(a)*104,128+Math.sin(a)*104);x.stroke();
+        }
+        x.strokeStyle='#fff1b8';x.lineWidth=6;
+        x.beginPath();x.moveTo(128,128);x.lineTo(128,58);x.stroke();
+        x.beginPath();x.moveTo(128,128);x.lineTo(178,150);x.stroke();
+        return ctex(c);
+      })();
+      const clk=addNS(ch,new THREE.CylinderGeometry(.92,.92,.14,24),M(0xffffff,{map:clkTex,emissive:0xffcf78,emissiveIntensity:.35,roughness:.35}),0,13.6,7.58);
+      clk.rotation.x=Math.PI/2;
+      add(ch,new THREE.TorusGeometry(.96,.08,8,24),goldTrimM,0,13.6,7.62);
+    }
 
     // ★★★ 教堂内部：电影级写实哥特大教堂圣诞婚礼现场（可从敞开大门直接走入观礼） ★★★
     // 1. 大理石拼花地板 + 刺绣金边红毯 + 撒落玫瑰花瓣
