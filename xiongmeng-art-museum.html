@@ -11157,6 +11157,7 @@ function toggleRideFacility(info){
   wheelSys.riding=true;
   if(info.kind==='coaster'){renderer.setPixelRatio(1);composer.setPixelRatio(1);}
   if(info.kind==='sleigh'){fp.yaw=flyingSleigh.rotation.y+Math.PI;fp.pitch=-.16;}
+  if(info.kind==='heli'&&info.heli){fp.yaw=info.heli.g.rotation.y+Math.PI;fp.pitch=-.42;}
   sfx.blip(988,.14,.08);
 }
 function toggleRideWheel(cab){
@@ -11337,7 +11338,7 @@ function updateWheelRide(dt){
       // 坐在圣诞老人后面的高处礼物堆上：居高临下俯瞰圣诞老人背影、三只驯鹿与雪夜全城
       wp.set(0,2.05,-2.65).applyMatrix4(flyingSleigh.matrixWorld);
     }else if(wheelSys.kind==='heli'&&wheelSys.heli){
-      wp.set(0,.45,2.2).applyMatrix4(wheelSys.heli.g.matrixWorld);
+      wp.set(0,.18,1.95).applyMatrix4(wheelSys.heli.g.matrixWorld);
     }
     fp.x=wp.x;fp.z=wp.z;fp.y=wp.y-FP_EYE;
     camera.position.copy(wp);
@@ -11610,92 +11611,90 @@ const helis=[];
     const g=new THREE.Group();scene.add(g);
     const bodyM=M(cfg.col,{roughness:.38,metalness:.14,envMapIntensity:.45});
     const stripeM=M(cfg.stripe,{roughness:.42,metalness:.18,envMapIntensity:.40});
-    // 1. 一体流线海豚机身 + 垂直尾翼轮廓（+X为机头方向 -> rotateY(-PI/2)后为+Z）
+    // 1. 纤细锐利无人航空器流线主舱（总宽仅 ~0.78m，告别玩具粗胖感，无驾驶员/座椅）
     const fuseSh=new THREE.Shape();
-    fuseSh.moveTo(2.05,.62);
-    fuseSh.quadraticCurveTo(2.12,.92,1.50,1.22);
-    fuseSh.quadraticCurveTo(.85,1.52,.15,1.58);
-    fuseSh.lineTo(-.85,1.58);
-    fuseSh.quadraticCurveTo(-1.35,1.52,-1.65,1.18);
-    fuseSh.lineTo(-3.45,1.14);
-    fuseSh.lineTo(-4.05,2.24);
-    fuseSh.lineTo(-4.35,2.24);
-    fuseSh.lineTo(-3.92,.96);
-    fuseSh.quadraticCurveTo(-2.55,.86,-1.45,.66);
-    fuseSh.quadraticCurveTo(-.70,.42,.20,.42);
-    fuseSh.quadraticCurveTo(1.55,.42,2.05,.62);
+    fuseSh.moveTo(2.22,.56);
+    fuseSh.quadraticCurveTo(2.15,.82,1.45,1.06);
+    fuseSh.quadraticCurveTo(.75,1.26,.05,1.28);
+    fuseSh.lineTo(-.82,1.26);
+    fuseSh.quadraticCurveTo(-1.25,1.20,-1.45,.94);
+    fuseSh.quadraticCurveTo(-1.25,.54,-.55,.46);
+    fuseSh.lineTo(1.25,.46);
+    fuseSh.quadraticCurveTo(1.95,.48,2.22,.56);
     fuseSh.closePath();
-    addNS(g,extrudeHeli(fuseSh,.92,.24),bodyM,0,0,0);
+    addNS(g,extrudeHeli(fuseSh,.52,.13),bodyM,0,0,0);
 
-    // 2. 流线包裹式暮蓝风挡座舱 + 机侧观景窗
+    // 2. 无人光学传感玻璃鼻罩 + 机身细腰线
     const canSh=new THREE.Shape();
-    canSh.moveTo(1.98,.72);
-    canSh.quadraticCurveTo(1.92,1.08,1.30,1.32);
-    canSh.lineTo(.48,1.44);
-    canSh.lineTo(.48,.76);
-    canSh.quadraticCurveTo(1.42,.66,1.98,.72);
+    canSh.moveTo(2.14,.62);
+    canSh.quadraticCurveTo(1.95,.96,1.25,1.12);
+    canSh.lineTo(.62,1.18);
+    canSh.lineTo(.62,.68);
+    canSh.quadraticCurveTo(1.48,.58,2.14,.62);
     canSh.closePath();
-    addNS(g,extrudeHeli(canSh,.82,.16),glassM,0,0,0);
-    addNS(g,BX(.045,.52,.82),darkM,0,1.16,1.18).rotation.x=.64; // 精致风挡中柱
+    addNS(g,extrudeHeli(canSh,.46,.09),glassM,0,0,0);
     for(const sx of [-1,1]){
-      addNS(g,BX(.06,.42,.82),glassM,sx*.68,1.02,-.28);
-      addNS(g,BX(.08,.11,2.25),stripeM,sx*.68,.66,-.15);
+      addNS(g,BX(.045,.075,2.15),stripeM,sx*.39,.64,.10);
     }
 
-    // 3. 顶部双发涡轴整流罩 + 进气口 + 双尾喷管
+    // 3. 顶部紧凑双发整流罩 + 双细尾喷管
     const cowlSh=new THREE.Shape();
-    cowlSh.moveTo(.48,1.55);
-    cowlSh.quadraticCurveTo(.15,1.82,-.55,1.80);
-    cowlSh.lineTo(-1.25,1.56);
-    cowlSh.lineTo(.48,1.55);
+    cowlSh.moveTo(.40,1.25);
+    cowlSh.quadraticCurveTo(.08,1.46,-.55,1.45);
+    cowlSh.lineTo(-1.15,1.24);
+    cowlSh.lineTo(.40,1.25);
     cowlSh.closePath();
-    addNS(g,extrudeHeli(cowlSh,.46,.12),stripeM,0,0,0);
-    for(const sx of [-.20,.20]){
-      addNS(g,new THREE.CylinderGeometry(.10,.12,.30,10),steelM,sx,1.62,-1.18).rotation.x=Math.PI/2;
+    addNS(g,extrudeHeli(cowlSh,.32,.08),stripeM,0,0,0);
+    for(const sx of [-.14,.14]){
+      addNS(g,new THREE.CylinderGeometry(.07,.085,.24,10),steelM,sx,1.32,-1.12).rotation.x=Math.PI/2;
     }
 
-    // 4. 水平稳定翼 + 端板翼尖 + 涵道尾桨 (Fenestron)
-    addNS(g,BX(1.75,.05,.38),stripeM,0,1.04,-3.18);
-    for(const sx of [-.88,.88])addNS(g,BX(.045,.34,.42),bodyM,sx,1.06,-3.18);
-    const fen=addNS(g,new THREE.TorusGeometry(.30,.055,10,20),goldM,0,1.22,-3.68);
+    // 4. 独立细长锥形圆柱尾梁 + 纤细水平安定翼 + 后掠垂尾 + 紧凑涵道尾桨
+    const boom=addNS(g,new THREE.CylinderGeometry(.075,.155,3.25,12),bodyM,0,.92,-2.75);
+    boom.rotation.x=Math.PI/2;
+    addNS(g,BX(1.48,.035,.26),stripeM,0,.92,-3.45);
+    for(const sx of [-.74,.74])addNS(g,BX(.032,.26,.32),bodyM,sx,.94,-3.45);
+    const vFin=addNS(g,BX(.055,.92,.44),bodyM,0,1.38,-4.15);
+    vFin.rotation.x=-.35;
+    const fen=addNS(g,new THREE.TorusGeometry(.24,.042,10,18),goldM,0,1.02,-4.08);
     fen.rotation.y=Math.PI/2;
-    const tRotor=new THREE.Group();tRotor.position.set(0,1.22,-3.68);g.add(tRotor);
+    const tRotor=new THREE.Group();tRotor.position.set(0,1.02,-4.08);g.add(tRotor);
     for(let k=0;k<4;k++){
-      addNS(tRotor,BX(.025,.50,.065),darkM,0,0,0).rotation.x=k*Math.PI/2;
+      addNS(tRotor,BX(.02,.38,.05),darkM,0,0,0).rotation.x=k*Math.PI/2;
     }
 
-    // 5. 管状弯折起落架滑雪橇 + 航行微光灯
+    // 5. 纤细管状钛金起落架 + 航行微光灯
     for(const sx of [-1,1]){
       const skCurve=new THREE.CatmullRomCurve3([
-        new THREE.Vector3(sx*.74,.08,-1.05),new THREE.Vector3(sx*.74,.08,1.15),new THREE.Vector3(sx*.74,.26,1.48)
+        new THREE.Vector3(sx*.64,.08,-1.05),new THREE.Vector3(sx*.64,.08,1.15),new THREE.Vector3(sx*.64,.24,1.46)
       ]);
-      addNS(g,new THREE.TubeGeometry(skCurve,14,.038,8,false),steelM,0,0,0);
-      for(const sz of [-.52,.72]){
-        addNS(g,new THREE.CylinderGeometry(.028,.034,.48,8),darkM,sx*.62,.30,sz).rotation.z=sx*.32;
+      addNS(g,new THREE.TubeGeometry(skCurve,14,.028,8,false),steelM,0,0,0);
+      for(const sz of [-.52,.68]){
+        addNS(g,new THREE.CylinderGeometry(.022,.026,.46,8),darkM,sx*.48,.28,sz).rotation.z=sx*.36;
       }
     }
-    addNS(g,new THREE.SphereGeometry(.045,6,5),new THREE.MeshBasicMaterial({color:0xff4d5a}),-.76,.70,.10);
-    addNS(g,new THREE.SphereGeometry(.045,6,5),new THREE.MeshBasicMaterial({color:0x4de896}),.76,.70,.10);
-    addNS(g,new THREE.SphereGeometry(.05,6,5),new THREE.MeshBasicMaterial({color:0xff5555}),0,2.28,-4.18);
+    addNS(g,new THREE.SphereGeometry(.04,6,5),new THREE.MeshBasicMaterial({color:0xff4d5a}),-.44,.64,.10);
+    addNS(g,new THREE.SphereGeometry(.04,6,5),new THREE.MeshBasicMaterial({color:0x4de896}),.44,.64,.10);
+    addNS(g,new THREE.SphereGeometry(.042,6,5),new THREE.MeshBasicMaterial({color:0xff5555}),0,1.88,-4.34);
 
-    // 6. 纤细 4 叶主旋翼总成（流线桨毂 + 香槟金桨尖）
-    const rotor=new THREE.Group();rotor.position.set(0,1.94,-.28);g.add(rotor);
-    addNS(rotor,new THREE.CylinderGeometry(.14,.18,.24,12),darkM,0,-.10,0);
-    addNS(rotor,new THREE.SphereGeometry(.18,12,8),goldM,0,.04,0).scale.set(1,.50,1);
+    // 6. 修长 5.8m 直径 4 叶主旋翼（真实修长比例）
+    const rotor=new THREE.Group();rotor.position.set(0,1.56,-.22);g.add(rotor);
+    addNS(rotor,new THREE.CylinderGeometry(.10,.14,.22,12),darkM,0,-.09,0);
+    addNS(rotor,new THREE.SphereGeometry(.14,12,8),goldM,0,.04,0).scale.set(1,.48,1);
     for(let k=0;k<4;k++){
       const arm=new THREE.Group();arm.rotation.y=k*Math.PI/2;rotor.add(arm);
-      addNS(arm,BX(2.40,.025,.15),darkM,1.25,0,0);
-      addNS(arm,BX(.24,.027,.16),goldM,2.34,0,0);
+      addNS(arm,BX(2.85,.018,.10),darkM,1.46,0,0);
+      addNS(arm,BX(.24,.020,.11),goldM,2.78,0,0);
     }
 
-    // 7. 精致机鼻探照灯云台 + 柔淡光束（去掉原本像大灯罩的巨型实心光锥）
-    const spot=new THREE.Group();spot.position.set(0,.42,1.52);g.add(spot);
-    addNS(spot,new THREE.SphereGeometry(.12,10,8),darkM,0,0,0);
-    addNS(spot,new THREE.SphereGeometry(.08,8,6),new THREE.MeshBasicMaterial({color:cfg.beam}),0,-.04,.06);
+    // 7. 机鼻下方航拍光电球形吊舱 + 柔淡光束
+    const spot=new THREE.Group();spot.position.set(0,.34,1.62);g.add(spot);
+    addNS(spot,new THREE.SphereGeometry(.11,10,8),darkM,0,0,0);
+    addNS(spot,new THREE.SphereGeometry(.065,8,6),new THREE.MeshBasicMaterial({color:cfg.beam}),0,-.04,.06);
     const beamH=cfg.y-1.0;
     const cone=new THREE.Mesh(
-      new THREE.ConeGeometry(1.5,beamH,16,1,true),
-      new THREE.MeshBasicMaterial({color:cfg.beam,transparent:true,opacity:.042,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide})
+      new THREE.ConeGeometry(1.35,beamH,16,1,true),
+      new THREE.MeshBasicMaterial({color:cfg.beam,transparent:true,opacity:.038,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide})
     );
     cone.position.y=-beamH/2;cone.raycast=()=>{};spot.add(cone);
     const item={g,rotor,tRotor,spot,cfg};
