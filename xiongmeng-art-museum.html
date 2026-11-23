@@ -610,8 +610,8 @@ function mergeStatic(root,skip){
    ════════════════════════════════════════════════════════════ */
 const host=document.getElementById('stage');
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance',stencil:false});
-const HI_DPR=Math.min(devicePixelRatio||1,1.85);
-const LO_DPR=Math.min(HI_DPR,1.25);
+const HI_DPR=Math.min(devicePixelRatio||1,1.55);
+const LO_DPR=Math.min(HI_DPR,1.05);
 renderer.setPixelRatio(HI_DPR);
 renderer.setSize(innerWidth,innerHeight);
 renderer.shadowMap.enabled=true;
@@ -638,8 +638,8 @@ controls.autoRotateSpeed=.55;
 
 const HOME={pos:camera.position.clone(),tgt:controls.target.clone()};
 
-/* ── 后期：日系二次元电影感三渲二管线 (4x MSAA Render -> 柔化细描边&新海诚调色 -> 柔和Bloom -> ACES) ── */
-const _msaaSamples=Math.min(4,renderer.capabilities.maxSamples||4);
+/* ── 后期：日系二次元电影感三渲二管线 (2x MSAA Render -> 柔化细描边&新海诚调色 -> 柔和Bloom -> ACES) ── */
+const _msaaSamples=Math.min(2,renderer.capabilities.maxSamples||2);
 const _composerRT=new THREE.WebGLRenderTarget(Math.max(1,Math.round(innerWidth*HI_DPR)),Math.max(1,Math.round(innerHeight*HI_DPR)),{type:THREE.HalfFloatType,samples:_msaaSamples});
 const composer=new EffectComposer(renderer,_composerRT);
 composer.addPass(new RenderPass(scene,camera));
@@ -700,7 +700,7 @@ const ambient=new THREE.AmbientLight(0x364d6b,.44); scene.add(ambient);
 const hemi=new THREE.HemisphereLight(0x6c96cc,0x423a35,.78); scene.add(hemi);
 const key=new THREE.DirectionalLight(0xc2dbf6,.52);
 key.castShadow=true;
-key.shadow.mapSize.set(2048,2048);
+key.shadow.mapSize.set(1536,1536);
 key.shadow.radius=3.2;
 key.shadow.camera.left=-56;key.shadow.camera.right=56;
 key.shadow.camera.top=56;key.shadow.camera.bottom=-56;
@@ -10521,10 +10521,14 @@ function animate(){
   updateHelis(dt);
   updateFireworks(dt);
   updateAerialHaze(dt,t);
-  updateOuterCrowd(dt,t);
+  const ridingFast=(wheelSys.riding&&wheelSys.kind==='coaster')||trainSys.riding;
+  if(!ridingFast||(_reflTick&1)===0)updateOuterCrowd(ridingFast?dt*2:dt,t);
   _reflTick++;
-  const shPeriod=((wheelSys.riding&&wheelSys.kind==='coaster')||trainSys.riding)?24:18;
-  if((_reflTick%shPeriod)===0)renderer.shadowMap.needsUpdate=true;
+  // 乘车高速俯瞰时冻结阴影重绘避免瞬时卡顿，平地走动时每 36 帧轻刷一次
+  if(!ridingFast&&(_reflTick%36)===0)renderer.shadowMap.needsUpdate=true;
+  // 室外高空俯瞰时自动隐藏建筑 1F 内部细碎展品/射灯，减少中心视野片元负载
+  const hide1F=camera.position.y>9.5&&!inBuildingXZ(camera.position.x,camera.position.z);
+  if(typeof shop1!=='undefined')shop1.visible=!hide1F;
 
   composer.render();
 
@@ -10534,7 +10538,6 @@ function animate(){
   if(nowMs-fpsT0>500){
     const f=Math.round(fpsFrames*1000/(nowMs-fpsT0));
     fpsEl.textContent=f+' FPS';
-    const ridingFast=(wheelSys.riding&&wheelSys.kind==='coaster')||trainSys.riding;
     if(!ridingFast){
       if(f<44){
         window._lowFpsStreak=(window._lowFpsStreak||0)+1;window._hiFpsStreak=0;
