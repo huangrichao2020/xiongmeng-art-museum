@@ -10017,7 +10017,7 @@ function animate(){
       const ahead=fx*fwdX+fz*fwdZ, lat=Math.abs(fx*fwdZ-fz*fwdX);
       if(ahead>-1.0&&ahead<9.8&&lat<2.3){
         tgtSpd=Math.min(tgtSpd,Math.max(0,(ahead-3.6)*.85));
-        if(ahead>1.0&&ahead<7.5&&tr.honkCd<=0&&tr.curSpd>1.6){tr.honkCd=4.2;}
+        if(ahead>1.0&&ahead<7.5&&tr.honkCd<=0&&tr.curSpd>1.6){sfx.horn();tr.honkCd=4.2;}
       }
     }
     // 3. 室外萌宠 / 小熊靠近路面时减速避让
