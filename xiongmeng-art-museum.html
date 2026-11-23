@@ -481,6 +481,7 @@
     <div class="toggles">
       <button id="t-fp">沉浸</button>
       <button id="t-fpv">穿越机</button>
+      <button id="t-quality" class="on" title="新海诚高画质柔光滤镜开关">高画质</button>
       <button id="t-sound" class="on">圣诞音</button>
       <button id="t-stars" class="on">流星雨</button>
       <button id="t-lights" class="on">圣诞灯</button>
@@ -770,28 +771,34 @@ composer.addPass(new RenderPass(scene,camera));
 const animeOutlineShader={
   uniforms:{
     tDiffuse:{value:null},
-    uRes:{value:new THREE.Vector2(Math.max(1,innerWidth*HI_DPR),Math.max(1,innerHeight*HI_DPR))}
+    uRes:{value:new THREE.Vector2(Math.max(1,innerWidth*HI_DPR),Math.max(1,innerHeight*HI_DPR))},
+    uHQ:{value:1.0}
   },
   vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
   fragmentShader:`
     uniform sampler2D tDiffuse;
     uniform vec2 uRes;
+    uniform float uHQ;
     varying vec2 vUv;
     float luma(vec3 c){return dot(c,vec3(0.299,0.587,0.114));}
     void main(){
       vec2 tx=1.0/uRes;
       vec4 base=texture2D(tDiffuse,vUv);
-      float tl=luma(texture2D(tDiffuse,vUv+vec2(-tx.x, tx.y)).rgb);
-      float tm=luma(texture2D(tDiffuse,vUv+vec2( 0.0,  tx.y)).rgb);
-      float tr=luma(texture2D(tDiffuse,vUv+vec2( tx.x, tx.y)).rgb);
-      float ml=luma(texture2D(tDiffuse,vUv+vec2(-tx.x, 0.0)).rgb);
-      float mr=luma(texture2D(tDiffuse,vUv+vec2( tx.x, 0.0)).rgb);
-      float bl=luma(texture2D(tDiffuse,vUv+vec2(-tx.x,-tx.y)).rgb);
-      float bm=luma(texture2D(tDiffuse,vUv+vec2( 0.0, -tx.y)).rgb);
-      float br=luma(texture2D(tDiffuse,vUv+vec2( tx.x,-tx.y)).rgb);
+      vec3 cTl=texture2D(tDiffuse,vUv+vec2(-tx.x, tx.y)).rgb;
+      vec3 cTm=texture2D(tDiffuse,vUv+vec2( 0.0,  tx.y)).rgb;
+      vec3 cTr=texture2D(tDiffuse,vUv+vec2( tx.x, tx.y)).rgb;
+      vec3 cMl=texture2D(tDiffuse,vUv+vec2(-tx.x, 0.0)).rgb;
+      vec3 cMr=texture2D(tDiffuse,vUv+vec2( tx.x, 0.0)).rgb;
+      vec3 cBl=texture2D(tDiffuse,vUv+vec2(-tx.x,-tx.y)).rgb;
+      vec3 cBm=texture2D(tDiffuse,vUv+vec2( 0.0, -tx.y)).rgb;
+      vec3 cBr=texture2D(tDiffuse,vUv+vec2( tx.x,-tx.y)).rgb;
+      float tl=luma(cTl),tm=luma(cTm),tr=luma(cTr);
+      float ml=luma(cMl),mr=luma(cMr);
+      float bl=luma(cBl),bm=luma(cBm),br=luma(cBr);
       float gx=-tl-2.0*ml-bl+tr+2.0*mr+br;
       float gy=-tl-2.0*tm-tr+bl+2.0*bm+br;
       // 局部微对比度（轻量化 Cavity AO 质感）+ 轻柔轮廓墨线
+      vec3 avgCol=(cTl+cTm+cTr+cMl+cMr+cBl+cBm+cBr)*0.125;
       float avgL=(tl+tm+tr+ml+mr+bl+bm+br)*0.125;
       float edge=smoothstep(0.32,0.68,sqrt(gx*gx+gy*gy));
       float centerL=luma(base.rgb);
@@ -799,12 +806,19 @@ const animeOutlineShader={
       vec3 ink=vec3(0.08,0.10,0.18);
       vec3 col=mix(base.rgb,ink,edge*edgeMask*0.16);
       col*=(1.0+clamp((centerL-avgL)*0.28,-0.08,0.08));
-      // 新海诚雪夜冷暖调色分级：暗部钴蓝通透、亮部暖琥珀、克制电影暗角聚焦中心
+      // 新海诚雪夜冷暖调色分级 + 高画质柔光胶片光晕滤镜 (Halation & Soft Glow Filter)
       float g=luma(col);
-      vec3 shinkaiShadow=mix(col,col*vec3(0.84,0.92,1.16),0.42*(1.0-smoothstep(0.05,0.45,g)));
-      vec3 shinkaiWarm=mix(shinkaiShadow,shinkaiShadow*vec3(1.06,1.01,0.92),smoothstep(0.45,0.95,g)*0.45);
-      col=mix(vec3(g),shinkaiWarm,1.10);
-      float vig=1.0-smoothstep(0.36,0.94,length(vUv-vec2(0.5)))*0.14;
+      vec3 shinkaiShadow=mix(col,col*vec3(0.82,0.91,1.18),(0.38+0.12*uHQ)*(1.0-smoothstep(0.05,0.46,g)));
+      vec3 shinkaiWarm=mix(shinkaiShadow,shinkaiShadow*vec3(1.08,1.02,0.91),smoothstep(0.42,0.95,g)*(0.42+0.16*uHQ));
+      col=mix(vec3(g),shinkaiWarm,1.08+0.07*uHQ);
+      if(uHQ>0.5){
+        // 高画质专属光滤镜：高光暖金柔焦溢光 (Halation) + 梦幻暗部天光透亮感
+        float hi=smoothstep(0.55,0.96,max(centerL,avgL));
+        vec3 halation=max(avgCol-vec3(0.42),vec3(0.0))*vec3(1.14,0.96,0.78);
+        col+=halation*hi*0.24;
+        col=pow(max(col,vec3(0.0)),vec3(0.965));
+      }
+      float vig=1.0-smoothstep(0.36,0.94,length(vUv-vec2(0.5)))*(0.13+0.03*uHQ);
       col*=vig;
       gl_FragColor=vec4(col,base.a);
     }
@@ -812,8 +826,11 @@ const animeOutlineShader={
 };
 const animePass=new ShaderPass(animeOutlineShader);
 composer.addPass(animePass);
-const BLOOM_SCALE=IS_TOUCH_DEV?.35:.5;   // 触屏端泛光降到 0.35 倍分辨率，省一大截填充率
-const bloom=new UnrealBloomPass(new THREE.Vector2(Math.max(64,Math.round(innerWidth*BLOOM_SCALE)),Math.max(64,Math.round(innerHeight*BLOOM_SCALE))),.16,.36,.90);
+/* ── 还原并优化 GitHub 初版高画质梦幻光滤镜：
+   采用 0.25 倍四分之一分辨率宽半径泛光（strength:0.34, radius:0.82, threshold:0.76），
+   像素填充开销仅为半分辨率的 1/4，却能让所有暖窗、圣诞树星芒、花窗、灯笼与烟花拥有浓郁柔和的新海诚大光晕！ ── */
+const BLOOM_SCALE=0.25;
+const bloom=new UnrealBloomPass(new THREE.Vector2(Math.max(64,Math.round(innerWidth*BLOOM_SCALE)),Math.max(64,Math.round(innerHeight*BLOOM_SCALE))),.34,.82,.76);
 const _bloomSetSize=bloom.setSize.bind(bloom);
 bloom.setSize=(w,h)=>_bloomSetSize(Math.max(64,Math.round(w*BLOOM_SCALE)),Math.max(64,Math.round(h*BLOOM_SCALE)));
 composer.addPass(bloom);
@@ -9851,6 +9868,32 @@ function applyTime(h){
   }
 }
 document.getElementById('hour').addEventListener('input',e=>applyTime(parseFloat(e.target.value)));
+function applyQualityMode(on){
+  state.quality=!!on;
+  const btn=document.getElementById('t-quality');
+  if(btn){
+    btn.classList.toggle('on',state.quality);
+    btn.textContent=state.quality?'高画质':'标准';
+  }
+  const targetDpr=state.quality?HI_DPR:LO_DPR;
+  renderer.setPixelRatio(targetDpr);
+  composer.setPixelRatio(targetDpr);
+  if(animePass&&animePass.uniforms){
+    animePass.uniforms.uHQ.value=state.quality?1.0:0.0;
+    animePass.uniforms.uRes.value.set(Math.max(1,innerWidth*targetDpr),Math.max(1,innerHeight*targetDpr));
+  }
+  bloom.enabled=true;
+  bloom.strength=state.quality?.34:.14;
+  bloom.radius=state.quality?.82:.35;
+  bloom.threshold=state.quality?.76:.90;
+  renderer.toneMappingExposure=state.quality?(IS_TOUCH_DEV?1.20:1.16):1.08;
+  renderer.shadowMap.needsUpdate=true;
+}
+document.getElementById('t-quality').onclick=function(){
+  applyQualityMode(!state.quality);
+  sfx.blip(state.quality?780:520,.08,.06);
+};
+applyQualityMode(true);
 document.getElementById('t-lights').onclick=function(){
   state.lights=!state.lights;this.classList.toggle('on',state.lights);
 };
@@ -11416,7 +11459,7 @@ function animate(){
         if(window._lowFpsStreak>=2&&renderer.getPixelRatio()>LO_DPR+.05){
           renderer.setPixelRatio(LO_DPR);composer.setPixelRatio(LO_DPR);
         }
-      }else if(f>=54){
+      }else if(f>=54&&state.quality){
         window._hiFpsStreak=(window._hiFpsStreak||0)+1;window._lowFpsStreak=0;
         if(window._hiFpsStreak>=3&&renderer.getPixelRatio()<HI_DPR-.05){
           renderer.setPixelRatio(HI_DPR);composer.setPixelRatio(HI_DPR);
@@ -12119,64 +12162,80 @@ function updateLaunchRide(dt){
 }
 
 /* ════════════════════════════════════════════════════════════
-   16.5 FPV 穿越机 6-DOF 特技绕飞模式（Acro Freestyle Drone POV）
+   16.5 FPV 穿越机 6-DOF 特技绕飞模式（一镜到底 7 大孔洞/峡谷真穿越 + 等弧长气动运镜）
    ════════════════════════════════════════════════════════════ */
 const fpvSys=(()=>{
+  // 顺时针一镜到底、零折返、零穿墙的 7 大真孔洞/峡谷/高塔俯冲闭合航线
   const pts=[
-    new THREE.Vector3(  0.0,  3.2, 16.8), // 0. 北街低空起飞对准艺术馆大门
-    new THREE.Vector3(  0.0,  3.5,  8.6), // 1. 贴地穿掠艺术馆门廊雨棚
-    new THREE.Vector3(  1.2, 14.2, -1.5), // 2. 垂直拉升跃过艺术馆星空天台
-    new THREE.Vector3(-12.0, 11.5,  3.2), // 3. 刀锋侧倾俯冲西侧雪园
-    new THREE.Vector3(-24.4,  3.6,  0.4), // 4. 贴水掠过鲁道夫驯鹿喷泉
-    new THREE.Vector3(-32.5,  5.0, -1.2), // 5. 穿行圣诞市集暖光步行街
-    new THREE.Vector3(-44.0, 12.6, 21.5), // 6. 高速拉升直扑哥特大教堂
-    new THREE.Vector3(-49.0, 16.5, 36.0), // 7. ★ 哥特大教堂双塔钟楼穿缝 + 360° 桶滚
-    new THREE.Vector3(-42.5,  8.2, 46.0), // 8. Split-S 倒扣俯冲切入游乐园
-    new THREE.Vector3(-24.5,  3.0, 45.5), // 9. 切入巨型皇家溜冰场
-    new THREE.Vector3(-18.0,  2.2, 38.6), // 10. ★ 皇家溜冰场 2.2m 贴冰漂移掠过花滑大师
-    new THREE.Vector3(-12.5,  3.5, 29.8), // 11. 冰场北口拉起追逐云霄飞车
-    new THREE.Vector3(-21.0, 11.2, 23.0), // 12. 沿云霄飞车爬坡段并排攀升
-    new THREE.Vector3(-28.4, 14.4, 28.5), // 13. ★ 云霄飞车 14.4m 主峰刀锋追逐
-    new THREE.Vector3(-25.5, 12.2, 48.8), // 14. 西南高空驼峰掠飞
-    new THREE.Vector3( -7.2, 12.8, 41.5), // 15. 中央高架烟花走廊 + 360° 极速桶滚
-    new THREE.Vector3(  1.5,  5.4, 29.2), // 16. 俯冲切入中央旋转木马
-    new THREE.Vector3(  6.0,  3.2, 39.5), // 17. ★ 60° 刀锋压弯贴檐绕飞旋转木马
-    new THREE.Vector3( 15.0,  2.6, 46.2), // 18. 超低空贴地掠过碰碰车场
-    new THREE.Vector3( 24.5, 12.5, 36.0), // 19. 拉升对准摩天轮中心轴
-    new THREE.Vector3( 27.5, 14.0, 36.0), // 20. ★ 摩天轮轮心穿越 Powerloop
-    new THREE.Vector3( 30.5, 23.8, 48.5), // 21. 26m 弹射跳伞塔与巨型圣诞老人高空大回环
-    new THREE.Vector3( 37.5,  4.4, 36.0), // 22. ★ 俯冲穿过摇滚音乐节舞台旋转光束
-    new THREE.Vector3( 49.0,  9.6, 36.0), // 23. 刀锋掠过百老汇大剧院霓虹门头
-    new THREE.Vector3( 33.5,  5.2, 12.5), // 24. 高速切入东侧动漫园区
-    new THREE.Vector3( 25.0,  3.6, -1.5), // 25. ★ 动漫园区小黄人/马里奥雕塑 S 弯绕桩
-    new THREE.Vector3( 13.5,  6.8, 13.0)  // 26. 穿出动漫园回到北街主干道
+    // 【Stage 1：北街助跑 -> 正中钻过游乐园鎏金花格大门牌坊拱洞 (x=4.0, z=19.9, 门洞宽7.4m×高4.3m)】
+    new THREE.Vector3( -6.5,  2.3, 12.2),
+    new THREE.Vector3(  2.8,  2.3, 13.8),
+    new THREE.Vector3(  4.0,  2.4, 19.9), // ★ 孔洞穿越 1：笔直钻过游乐园正门牌坊中心
+    new THREE.Vector3(  1.2,  2.5, 25.8), // 从留言亭左侧通道丝滑切入园内
+
+    // 【Stage 2：中央旋转木马贴檐压弯 -> 21×28m 皇家溜冰场 1.65m 贴冰长掠 + 云霄飞车高架桥洞下穿】
+    new THREE.Vector3( -2.5,  2.6, 32.2),
+    new THREE.Vector3(-12.5,  1.8, 35.5),
+    new THREE.Vector3(-18.0,  1.65,38.6), // ★ 贴冰穿越 2：离冰面 1.65m 掠过花滑大师，头顶穿云霄飞车高架
+    new THREE.Vector3(-23.8,  2.4, 43.2),
+    new THREE.Vector3(-35.0,  7.2, 47.5),
+
+    // 【Stage 3：哥特大教堂后方拉升 -> 双塔钟楼正中 4.5m 露天峡谷穿塔 + 正立面垂直贴面俯冲 (Building Dive)】
+    new THREE.Vector3(-47.5, 17.8, 45.5),
+    new THREE.Vector3(-49.0, 18.2, 36.0), // ★ 狭缝穿越 3：从教堂左右双塔钟楼正中间露天峡谷穿塔而过
+    new THREE.Vector3(-49.0, 16.2, 26.8), // 悬停玫瑰花窗与天文大钟正前方，准备垂直俯冲
+    new THREE.Vector3(-49.0,  5.2, 20.2), // ★ 垂直贴面俯冲：顺着教堂正门石阶红毯极速俯冲到底
+    new THREE.Vector3(-46.5,  2.8, 12.5),
+
+    // 【Stage 4：西侧 11.5m 皇家巨型圣诞树贴冠环绕 -> 驯鹿喷泉贴水掠飞】
+    new THREE.Vector3(-45.5,  5.2,  3.2),
+    new THREE.Vector3(-37.5,  4.4, -3.2), // ★ 贴冠环绕 4：擦过 11.5m 皇家巨型圣诞树双螺旋金带与礼盒山
+    new THREE.Vector3(-24.4,  2.3, -2.2), // 贴水掠过西侧冰雪喷泉与鲁道夫驯鹿
+    new THREE.Vector3(-13.5,  2.3,  6.8),
+
+    // 【Stage 5：熊萌艺术馆正门玻璃雨棚下方横向一穿到底 (z=8.35, 雨棚净高4.2m)】
+    new THREE.Vector3( -5.2,  2.2,  8.35),
+    new THREE.Vector3(  0.0,  2.2,  8.35), // ★ 廊洞穿越 5：从艺术馆正门雨棚与迎宾台阶之间横向穿廊而过
+    new THREE.Vector3(  8.5,  2.4,  8.35),
+    new THREE.Vector3( 18.5,  3.0, -7.5),
+
+    // 【Stage 6：东侧动漫园区南北双拱门连穿 + 马里奥/小黄人巨型手办中轴大道贴地穿行】
+    new THREE.Vector3( 25.0,  2.3, -8.5), // 对准动漫园北拱门
+    new THREE.Vector3( 25.0,  2.2, -1.5), // ★ 拱门连穿 6：沿动漫园中轴大道连钻南北两道圣诞拱门
+    new THREE.Vector3( 25.0,  2.4,  8.5),
+    new THREE.Vector3( 34.0,  4.8, 22.0),
+
+    // 【Stage 7：摇滚音乐节舞台聚光灯束低空穿掠 -> 26m 跳伞塔冲天 Powerloop -> 摩天轮贴盘俯冲返航】
+    new THREE.Vector3( 38.2,  3.6, 36.0), // ★ 舞台穿掠 7：贴着摇滚乐队与欢呼观众头顶穿过旋转光束
+    new THREE.Vector3( 36.5, 13.5, 47.0),
+    new THREE.Vector3( 30.0, 23.5, 51.0), // ★ 冲天回环：沿 26m 弹射跳伞塔冲入高空漫天烟花核心
+    new THREE.Vector3( 22.5, 13.2, 36.0), // 从高空 Split-S 俯冲贴着摩天轮大转盘西侧掠下
+    new THREE.Vector3( 13.5,  3.8, 26.5),
+    new THREE.Vector3( -1.0,  2.4, 15.0)
   ];
   const curve=new THREE.CatmullRomCurve3(pts,true,'centripetal',.5);
   const STAGES=[
-    [0.00,'STAGE 01 · 熊萌艺术馆门廊贴地穿掠 + 垂直跃顶'],
-    [0.12,'STAGE 02 · 西侧驯鹿喷泉贴水漂移 + 圣诞市集穿行'],
-    [0.23,'STAGE 03 · 哥特大教堂双塔穿缝 + 360° 极速桶滚'],
-    [0.34,'STAGE 04 · 21×28m 皇家溜冰场 2.2m 贴冰掠飞'],
-    [0.45,'STAGE 05 · 云霄飞车 14.4m 高架并排追逐 + 烟花穿云'],
-    [0.60,'STAGE 06 · 旋转木马 60° 刀锋压弯 + 碰碰车场超低空掠飞'],
-    [0.71,'STAGE 07 · 摩天轮轮心穿越 Powerloop + 26m 跳伞塔回环'],
-    [0.82,'STAGE 08 · 摇滚音乐节舞台光束俯冲 + 百老汇大剧院掠翼'],
-    [0.90,'STAGE 09 · 东侧动漫园区巨型手办 S 弯绕桩特技']
+    [0.00,'STAGE 01 · 游乐园鎏金大门牌坊正中钻洞穿越'],
+    [0.14,'STAGE 02 · 皇家溜冰场 1.6m 贴冰长掠 + 云霄飞车桥洞下穿'],
+    [0.29,'STAGE 03 · 哥特大教堂双塔峡谷穿缝 + 正立面垂直俯冲'],
+    [0.45,'STAGE 04 · 11.5m 皇家巨型圣诞树贴冠刀锋环绕 + 喷泉掠水'],
+    [0.58,'STAGE 05 · 熊萌艺术馆正门玻璃雨棚下方横向穿廊'],
+    [0.70,'STAGE 06 · 东侧动漫园区双拱门连穿 + 巨型手办中轴掠飞'],
+    [0.83,'STAGE 07 · 摇滚舞台光束穿行 + 26m 跳伞塔冲天回环俯冲']
   ];
-  // 预设 4 个自动 360° 炫技桶滚触发点 (u 坐标)
+  // 仅在 3 处开阔出洞/冲顶高潮点触发干净利落的 360° 极速副翼桶滚，绝不在狭缝内乱转
   const AUTO_TRICKS=[
-    {u:0.26,dir:1,name:'⚡ 自动特技：教堂双塔 360° 极速副翼桶滚！'},
-    {u:0.54,dir:-1,name:'⚡ 自动特技：高空烟花走廊 360° 逆向横滚！'},
-    {u:0.76,dir:1,name:'⚡ 自动特技：摩天轮穿心 Powerloop 360° 桶滚！'},
-    {u:0.86,dir:-1,name:'⚡ 自动特技：摇滚舞台聚光灯束 360° 炫技横滚！'}
+    {u:0.35,dir:1,name:'⚡ 特技：穿出教堂双塔 · 360° 垂直俯冲桶滚！'},
+    {u:0.63,dir:-1,name:'⚡ 特技：穿出艺术馆门廊 · 360° 贴地极速桶滚！'},
+    {u:0.90,dir:1,name:'⚡ 特技：26m 跳伞塔烟花之巅 · 360° 高空回环桶滚！'}
   ];
   return {
-    active:false,u:0,baseSpd:0.0175,boost:false,
+    active:false,u:0,baseSpd:0.0145,boost:false,
     bank:0,rollExtra:0,rollVel:0,manualRoll:0,fov:60,lastTrickIdx:-1,trickBannerT:0,
     curve,STAGES,AUTO_TRICKS,
-    p:new THREE.Vector3(),pPrev:new THREE.Vector3(),pNext:new THREE.Vector3(),
+    p:new THREE.Vector3(),pLook:new THREE.Vector3(),
     t0:new THREE.Vector3(),t1:new THREE.Vector3(),t2:new THREE.Vector3(),
-    up:new THREE.Vector3(),right:new THREE.Vector3(),look:new THREE.Vector3()
+    up:new THREE.Vector3(),right:new THREE.Vector3(),lookDir:new THREE.Vector3()
   };
 })();
 
@@ -12253,22 +12312,23 @@ function updateFpvDrone(dt){
     }
   }
 
-  // 采样前后切线，解算水平曲率离心压弯角（Knife-Edge Banking）
-  const du=0.008;
+  // 长跨度前瞻切线采样 (du=0.018) 解算稳定大弯道离心压弯角，消除短距离拐点抖动
+  const du=0.018;
   s.curve.getPointAt(s.u,s.p);
+  s.curve.getPointAt((s.u+0.012)%1,s.pLook); // 真实飞手前瞻视线点（提前盯住门洞与弯心）
   s.curve.getTangentAt((s.u-du+1)%1,s.t0);
   s.curve.getTangentAt(s.u,s.t1);
   s.curve.getTangentAt((s.u+du)%1,s.t2);
-  const turnRate=(s.t0.z*s.t2.x-s.t0.x*s.t2.z)*26.0;
-  const tgtBank=clamp(turnRate,-1.12,1.12); // 最大约 ±64° 压弯侧倾
-  s.bank+=(tgtBank-s.bank)*Math.min(1,dt*6.5);
+  const turnRate=(s.t0.z*s.t2.x-s.t0.x*s.t2.z)*18.0;
+  const tgtBank=clamp(turnRate,-0.95,0.95); // 稳定顺滑的电影级压弯侧倾（最高 ~54°）
+  s.bank+=(tgtBank-s.bank)*Math.min(1,dt*4.2);
 
   // 手动 A/D 横滚叠加
   let mRollInput=0;
   if(fp.keys['KeyA']||fp.keys['ArrowLeft'])mRollInput-=1;
   if(fp.keys['KeyD']||fp.keys['ArrowRight'])mRollInput+=1;
   if(joy.mag>0.05)mRollInput+=joy.dx;
-  s.manualRoll+=(mRollInput*0.85-s.manualRoll)*Math.min(1,dt*8);
+  s.manualRoll+=(mRollInput*0.85-s.manualRoll)*Math.min(1,dt*7);
 
   // 360° 极速桶滚角积分
   if(Math.abs(s.rollVel)>0.01){
@@ -12288,23 +12348,24 @@ function updateFpvDrone(dt){
 
   // 动态广角 FOV（随空速与特技桶滚自动在 78°~90° 间呼吸伸缩）
   const tgtFov=78+(throttle*diveBoost-1)*14+(Math.abs(s.rollVel)>0.1?6:0);
-  s.fov+=(clamp(tgtFov,75,92)-s.fov)*Math.min(1,dt*6);
+  s.fov+=(clamp(tgtFov,75,92)-s.fov)*Math.min(1,dt*5);
   if(Math.abs(camera.fov-s.fov)>0.08){
     camera.fov=s.fov;
     camera.updateProjectionMatrix();
   }
 
-  // 无万向锁 6-DOF 相机姿态：围绕真实飞行切线 T 旋转 (压弯角 + 手动横滚 + 360° 桶滚)
+  // 无万向锁 6-DOF 相机姿态：围绕前瞻视线方向 lookDir 旋转 (稳定压弯角 + 手动横滚 + 360° 桶滚)
+  s.lookDir.subVectors(s.pLook,s.p).normalize();
   const totalRoll=s.bank+s.manualRoll+s.rollExtra;
   s.up.set(0,1,0);
-  s.right.crossVectors(s.t1,s.up);
+  s.right.crossVectors(s.lookDir,s.up);
   if(s.right.lengthSq()<1e-5)s.right.set(1,0,0);else s.right.normalize();
-  s.up.crossVectors(s.right,s.t1).normalize();
-  s.up.applyAxisAngle(s.t1,totalRoll);
+  s.up.crossVectors(s.right,s.lookDir).normalize();
+  s.up.applyAxisAngle(s.lookDir,totalRoll);
 
   camera.position.copy(s.p);
   camera.up.copy(s.up);
-  camera.lookAt(s.look.copy(s.p).addScaledVector(s.t1,12.0));
+  camera.lookAt(s.pLook);
 
   // 更新 FPV OSD 眼镜遥测数据与人工地平线
   if((_reflTick&1)===0){
