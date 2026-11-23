@@ -8839,7 +8839,7 @@ const sfx={
     const lp=c.createBiquadFilter();lp.type='lowpass';
     lp.frequency.setValueAtTime(250,t);lp.frequency.exponentialRampToValueAtTime(115,t+.36);
     const g=c.createGain();
-    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.125,t+.025);
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.095,t+.025);
     g.gain.exponentialRampToValueAtTime(.0004,t+dur);
     const o=c.createOscillator();o.type='sine';o.frequency.setValueAtTime(f,t);
     o.connect(lp);lp.connect(g);g.connect(this.musicBus);
@@ -8882,6 +8882,43 @@ const sfx={
       this.playLead(midi,t,dur,.115,.08);
     }
   },
+  /* ══ 合成圣诞乐器 BGM 调度器
+     这套乐器（暖钢琴 + 原声贝斯 + 弦乐长音 + 竖琴琶音 + 雪橇铃 + 圣诞大厅混响）
+     早就写好了，但之前只有 schedNote/playLead 这些"发声函数"，没有任何定时器去驱动它们，
+     所以页面一直在播那三条 mp3。现在把它接上，做成真正的主 BGM：
+     音色是合成出来的，音量、节奏、混响都能精确控制，不会像成品 mp3 那样又满又吵。 */
+  synth:{timer:null,step:0,nextT:0,gain:.0},
+  startSynthBgm(){
+    const c=this.ctx;
+    if(!c||this.synth.timer)return;
+    this.synth.step=0;this.synth.nextT=c.currentTime+.18;
+    this.synth.timer=setInterval(()=>{
+      if(!this.on||!this.ctx){this.stopSynthBgm();return;}
+      const STEP=.5;                       // 120 BPM，一拍半秒
+      const now=this.ctx.currentTime;
+      while(this.synth.nextT<now+.45){
+        this.playStep(this.synth.nextT,STEP,this.synth.step);
+        this.synth.step=(this.synth.step+1)%this.SONG.length;
+        this.synth.nextT+=STEP;
+      }
+    },110);
+  },
+  stopSynthBgm(){
+    if(this.synth.timer){clearInterval(this.synth.timer);this.synth.timer=null;}
+  },
+  playStep(t,stepDur,i){
+    const row=this.SONG[i];
+    if(!row)return;
+    const midi=row[0],beats=row[1],chord=row[2];
+    const dur=Math.max(.2,beats*stepDur);
+    if(chord){
+      /* 和弦垫音每两步触发一次（否则 1.2s 的长音会叠成糊墙），贝斯每步都在 */
+      if(i%2===0)this.playWarmChord(chord,t);
+      this.playBass(chord[0],t,Math.min(dur,1.3));
+    }
+    if(midi>0)this.playLead(midi,t,dur,.105,.08);
+    if(i%4===0)this.playSleighBell(t,i%8===0);   // 每四拍点缀一次雪橇铃
+  },
   bgmTracks:null,
   initBgmTracks(){
     if(this.bgmTracks)return;
@@ -8919,11 +8956,16 @@ const sfx={
     const inMus=cx>-10.5&&cx<12.5&&cz>-12.0&&cz<8.5&&cy<9.5;
     const dRock=Math.hypot(cx-39.5,cz-36.5);
     const rockK=inMus?0:Math.max(0,Math.min(1,1-(dRock-9)/16));
-    /* BGM 目标音量（整体压低，别让背景音乐盖过场景）
-       户外 park + rock 会重叠，峰值控制在 .34 左右 */
-    const tMus=inMus?.26:0;
-    const tRock=rockK*.28;
-    const tPark=inMus?0:.22*(1-rockK*.85);
+    /* 三条 mp3 现在只当"远处环境垫"，主 BGM 是合成的圣诞乐器 */
+    const tMus=inMus?.10:0;
+    const tRock=rockK*.12;
+    const tPark=inMus?0:.09*(1-rockK*.85);
+    /* 合成圣诞乐器 BGM 音量：馆内更饱满，户外收小当远景音乐 */
+    const tSyn=inMus?.46:.26;
+    if(this.musicBus){
+      this.synth.gain+=(tSyn-this.synth.gain)*Math.min(1,dt*1.5);
+      this.musicBus.gain.value=this.synth.gain;
+    }
     const k=Math.min(1,dt*2.4);
     tr.v.museum+=(tMus-tr.v.museum)*k;
     tr.v.park+=(tPark-tr.v.park)*k;
@@ -8944,6 +8986,7 @@ const sfx={
       if(this.ctx&&this.ctx.state==='suspended')this.ctx.resume();
       if(this.master&&this.ctx)this.master.gain.setTargetAtTime(.85,this.ctx.currentTime,.20);
       this.initBgmTracks();
+      this.startSynthBgm();          // 合成圣诞乐器 BGM（主）
       if(this.bgmTracks){
         for(const k of ['museum','park','rock']){
           this.bgmTracks[k].a.play().catch(()=>{});
@@ -8951,6 +8994,7 @@ const sfx={
       }
     }else{
       if(this.master&&this.ctx)this.master.gain.setTargetAtTime(0,this.ctx.currentTime,.20);
+      this.stopSynthBgm();
       if(this.bgmTracks){
         for(const k of ['museum','park','rock'])this.bgmTracks[k].a.pause();
       }
