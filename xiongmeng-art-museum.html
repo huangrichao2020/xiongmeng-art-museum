@@ -8174,29 +8174,29 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     const railSilverM=M(0xe4edf7,{roughness:.22,metalness:.90});
     const pierFootM=M(0xd9e2ec,{roughness:.85});
     // 中央主脊梁
-    const spineMesh=new THREE.Mesh(new THREE.TubeGeometry(curve,280,.17,8,true),spineM);
+    const spineMesh=new THREE.Mesh(new THREE.TubeGeometry(curve,150,.17,7,true),spineM);
     spineMesh.castShadow=true;spineMesh.receiveShadow=true;cg.add(spineMesh);
-    // 左右双轨：沿水平法向偏移 ±0.40m
+    // 左右双轨：沿水平法向偏移 ±0.40m（细轨不投射阴影，大幅减负）
     const upV=new THREE.Vector3(0,1,0);
     for(const side of [-1,1]){
       const rPts=[];
-      for(let i=0;i<180;i++){
-        const u=i/180;
+      for(let i=0;i<110;i++){
+        const u=i/110;
         const p=curve.getPointAt(u), tan=curve.getTangentAt(u);
         const bin=new THREE.Vector3().crossVectors(tan,upV).normalize();
         if(bin.lengthSq()<.01)bin.set(1,0,0);
         rPts.push(p.clone().addScaledVector(bin,side*.40).add(new THREE.Vector3(0,.16,0)));
       }
       const rCurve=new THREE.CatmullRomCurve3(rPts,true);
-      const rMesh=new THREE.Mesh(new THREE.TubeGeometry(rCurve,280,.06,6,true),railSilverM);
-      rMesh.castShadow=true;cg.add(rMesh);
+      const rMesh=new THREE.Mesh(new THREE.TubeGeometry(rCurve,150,.06,5,true),railSilverM);
+      rMesh.castShadow=false;cg.add(rMesh);
     }
-    // 枕木、灯珠与立体 A 字高塔立柱（54 组精细支撑）
-    const pN=54;
+    // 枕木、灯珠与立体 A 字高塔立柱（46 组精细支撑）
+    const pN=46;
     for(let i=0;i<pN;i++){
       const u=i/pN;
       const p=curve.getPointAt(u), tan=curve.getTangentAt(u);
-      const tie=add(cg,BX(.98,.065,.15),spineM,p.x,p.y+.08,p.z);
+      const tie=addNS(cg,BX(.98,.065,.15),spineM,p.x,p.y+.08,p.z);
       tie.rotation.y=Math.atan2(tan.x,tan.z);
       if(i%2===0&&p.y>1.3){
         const ph=p.y-.04;
@@ -10440,16 +10440,17 @@ function animate(){
   if(amusement.horses){for(const h of amusement.horses)h.g.position.y=h.baseY+Math.sin(t*2.8+h.ph)*.26;}
   if(amusement.coaster){
     const co=amusement.coaster;
-    const headP=co.curve.getPointAt(co.t%1);
-    const spd=Math.max(.045,.115+(5.8-headP.y)*.012);
+    if(!co._vP){co._vP=new THREE.Vector3();co._vT=new THREE.Vector3();co._vL=new THREE.Vector3();}
+    co.curve.getPointAt(co.t%1,co._vP);
+    const spd=Math.max(.024,.056+(5.8-co._vP.y)*.0055);
     co.t=(co.t+spd*dt)%1;
-    const _up=new THREE.Vector3(0,1,0);
-    co.cars.forEach((car,ci)=>{
-      const u=(co.t-ci*.028+1)%1;
-      const p=co.curve.getPointAt(u), tan=co.curve.getTangentAt(u);
-      car.position.copy(p);
-      car.lookAt(p.clone().add(tan));
-    });
+    for(let ci=0;ci<co.cars.length;ci++){
+      const u=(co.t-ci*.024+1)%1;
+      co.curve.getPointAt(u,co._vP);
+      co.curve.getTangentAt(u,co._vT);
+      co.cars[ci].position.copy(co._vP);
+      co.cars[ci].lookAt(co._vL.copy(co._vP).add(co._vT));
+    }
   }
   for(const car of amusement.bumper){
     const st=car.userData.st;
@@ -10506,7 +10507,8 @@ function animate(){
   updateAerialHaze(dt,t);
   updateOuterCrowd(dt,t);
   _reflTick++;
-  if((_reflTick%6)===0)renderer.shadowMap.needsUpdate=true;
+  const shPeriod=(wheelSys.riding&&wheelSys.kind==='coaster')?24:6;
+  if((_reflTick%shPeriod)===0)renderer.shadowMap.needsUpdate=true;
 
   composer.render();
 
@@ -11281,12 +11283,13 @@ function updateWheelRide(dt){
       wp.set(2.1,-3.65,0).applyMatrix4(amusement.ship.matrixWorld);
     }else if(wheelSys.kind==='coaster'&&amusement.coaster){
       const co=amusement.coaster, car0=co.cars[0];
+      if(!co._camL)co._camL=new THREE.Vector3();
       wp.set(0,.70,.24).applyMatrix4(car0.matrixWorld);
       fp.x=wp.x;fp.z=wp.z;fp.y=wp.y-FP_EYE;
       camera.position.copy(wp);
-      const lookTgt=new THREE.Vector3(0,.56,8.0).applyMatrix4(car0.matrixWorld);
+      co._camL.set(0,.56,8.0).applyMatrix4(car0.matrixWorld);
       camera.up.set(0,1,0);
-      camera.lookAt(lookTgt);
+      camera.lookAt(co._camL);
       trainHud.classList.add('show');
       trainMsgEl.textContent='正在乘坐 '+wheelSys.label+'（车头锁定第一视角 · 高度 '+wp.y.toFixed(1)+'m）';
       trainBtnEl.textContent='下来 (E)';
