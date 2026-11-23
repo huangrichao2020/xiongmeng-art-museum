@@ -7238,11 +7238,11 @@ function buildSnow(n){
 buildSnow(720);
 const rain=null,ripples=null,eaveDrips=null,rainGlass=[];
 
-/* ══ 冬夜疏朗星点 + 持续绚丽流星雨（去掉银河带，改为 42 颗错峰长尾流光流星雨） ══ */
-let stars=null,starMat=null,meteorTails=null,meteorHeads=null;
+/* ══ 冬夜疏朗星点 + 《光·遇》星漠风超长蓝紫星尘流星雨（平行斜掠天际 + 璀璨星核光晕 + 1500颗闪烁碎钻星尘长尾） ══ */
+let stars=null,starMat=null,meteorTails=null,meteorHeads=null,meteorHalos=null,meteorSparks=null,meteorSparkMat=null;
 const STAR_R=240;
 {
-  const N=420;
+  const N=460;
   const pos=new Float32Array(N*3),sz=new Float32Array(N),col=new Float32Array(N*3),ph=new Float32Array(N);
   const dir=new THREE.Vector3();
   for(let i=0;i<N;i++){
@@ -7250,11 +7250,11 @@ const STAR_R=240;
     dir.set(s*Math.cos(th),y,s*Math.sin(th));
     pos.set([dir.x*STAR_R,dir.y*STAR_R+6,dir.z*STAR_R],i*3);
     const t=rng();
-    sz[i]=t<.03?R(3.0,4.2):t<.25?R(1.6,2.6):R(.8,1.5);
+    sz[i]=t<.04?R(3.2,4.6):t<.28?R(1.8,2.8):R(.9,1.6);
     const warm=rng();
-    if(warm>.85)col.set([1,.84,.68],i*3);
-    else if(warm>.55)col.set([1,.95,.88],i*3);
-    else col.set([.76,.88,1],i*3);
+    if(warm>.82)col.set([.88,.80,1.0],i*3);
+    else if(warm>.50)col.set([.96,.95,1.0],i*3);
+    else col.set([.74,.84,1.0],i*3);
     ph[i]=R(0,Math.PI*2);
   }
   const g=new THREE.BufferGeometry();
@@ -7280,108 +7280,222 @@ const STAR_R=240;
         vec2 d=gl_PointCoord-.5;
         float a=smoothstep(.5,.03,length(d));
         a*=a;
-        gl_FragColor=vec4(vCol*vTw*a*1.3,a*vTw*uOpacity*.72);
+        gl_FragColor=vec4(vCol*vTw*a*1.35,a*vTw*uOpacity*.78);
       }`
   });
   stars=new THREE.Points(g,starMat);
   stars.frustumCulled=false;
   scene.add(stars);
 }
-/* 真实天文辐射点流星雨（常态零星划过 + 每隔 10~16 秒触发一波密集流星潮齐落） */
-const METEOR_N=30, METEOR_BASE=8, meteors=[];
-const RADIANT=new THREE.Vector3(.42,.62,-.66).normalize();
-const _radT1=new THREE.Vector3(0,1,0).cross(RADIANT).normalize();
-const _radT2=RADIANT.clone().cross(_radT1).normalize();
-const meteorWave={cooldown:3.5};
+/* 《光·遇》星漠同款梦幻蓝紫星尘流星雨：
+   1. 平行斜掠轨迹：36 颗超长拖尾流星分成 4 大天区平行斜划夜空（倾角 ~32°），无论朝向艺术馆还是游乐园都能抬头看见成排平行划过的星雨；
+   2. 三层发光结构：耀眼白紫星核头 (meteorHeads) + 柔和蓝紫光晕 (meteorHalos) + 90~155m 渐变流光长线 (meteorTails) + 1512 颗沿尾迹闪烁散落的星尘碎钻粒子带 (meteorSparks)。 */
+const METEOR_N=36, METEOR_BASE=20, SPARKS_PER_METEOR=42, meteors=[];
+const meteorWave={cooldown:4.0};
+let _meteorSparkPos=null, _meteorSparkAlpha=null;
 {
-  const tailGeo=new THREE.CylinderGeometry(.055,.002,1.0,6,1,false);
+  // 1. 纤细超长渐变流光内芯线 (y=0 为流星头，y=-1 为尾端)
+  const tailGeo=new THREE.CylinderGeometry(.11,.004,1.0,6,1,false);
   tailGeo.translate(0,-.5,0);
   const posAttr=tailGeo.attributes.position, tCols=new Float32Array(posAttr.count*3);
   for(let i=0;i<posAttr.count;i++){
-    const k=Math.max(0,Math.min(1,posAttr.getY(i)+1)); // y=-1 -> 0, y=0 -> 1
-    const f=Math.pow(k,3.2);
-    tCols[i*3]=f;tCols[i*3+1]=f;tCols[i*3+2]=f;
+    const k=Math.max(0,Math.min(1,posAttr.getY(i)+1)); // y=-1 -> 0(尾), y=0 -> 1(头)
+    const f=Math.pow(k,2.1);
+    // 头部高亮星白偏紫，中后段过渡为《光·遇》梦幻电光蓝紫
+    tCols[i*3]=f*(.72+.28*k);
+    tCols[i*3+1]=f*(.58+.40*k);
+    tCols[i*3+2]=f*1.0;
   }
   tailGeo.setAttribute('color',new THREE.BufferAttribute(tCols,3));
   const tailMat=new THREE.MeshBasicMaterial({
-    color:0xffffff,vertexColors:true,transparent:true,opacity:.52,
+    color:0xffffff,vertexColors:true,transparent:true,opacity:.82,
     blending:THREE.AdditiveBlending,depthWrite:false,fog:false
   });
   meteorTails=new THREE.InstancedMesh(tailGeo,tailMat,METEOR_N);
   meteorTails.frustumCulled=false;meteorTails.userData.noReflect=true;
   scene.add(meteorTails);
 
-  const headGeo=new THREE.SphereGeometry(.15,8,6);
+  // 2. 璀璨星核头 + 外层梦幻蓝紫柔光晕
+  const headGeo=new THREE.SphereGeometry(.38,10,8);
   const headMat=new THREE.MeshBasicMaterial({
-    color:0xffffff,transparent:true,opacity:.8,
+    color:0xffffff,transparent:true,opacity:.96,
     blending:THREE.AdditiveBlending,depthWrite:false,fog:false
   });
   meteorHeads=new THREE.InstancedMesh(headGeo,headMat,METEOR_N);
   meteorHeads.frustumCulled=false;meteorHeads.userData.noReflect=true;
   scene.add(meteorHeads);
 
-  const mCols=[0xf4f8ff,0xf4f8ff,0xfff3de,0xdceeff,0xffe8c2];
-  const mc=new THREE.Color();
-  const _uDir=new THREE.Vector3(), _tan=new THREE.Vector3();
-  function spawnMeteor(m,delay=0,surge=false){
-    for(let tries=0;tries<10;tries++){
-      const phi=R(0,Math.PI*2), ang=R(surge?.18:.16,surge?.88:.95);
-      _uDir.copy(RADIANT).multiplyScalar(Math.cos(ang))
-        .addScaledVector(_radT1,Math.sin(ang)*Math.cos(phi))
-        .addScaledVector(_radT2,Math.sin(ang)*Math.sin(phi))
-        .normalize();
-      if(_uDir.y>.16)break;
+  const haloGeo=new THREE.SphereGeometry(1.15,10,8);
+  const haloMat=new THREE.MeshBasicMaterial({
+    color:0xa78bfa,transparent:true,opacity:.44,
+    blending:THREE.AdditiveBlending,depthWrite:false,fog:false
+  });
+  meteorHalos=new THREE.InstancedMesh(haloGeo,haloMat,METEOR_N);
+  meteorHalos.frustumCulled=false;meteorHalos.userData.noReflect=true;
+  scene.add(meteorHalos);
+
+  // 3. 1512 颗沿流星长尾闪烁的《光·遇》星尘碎钻粒子带 (36 × 42)
+  const totalSparks=METEOR_N*SPARKS_PER_METEOR;
+  _meteorSparkPos=new Float32Array(totalSparks*3);
+  _meteorSparkAlpha=new Float32Array(totalSparks);
+  const spSize=new Float32Array(totalSparks);
+  const spColor=new Float32Array(totalSparks*3);
+  const spPhase=new Float32Array(totalSparks);
+  const spOffset=new Float32Array(totalSparks*3); // 垂直于轨迹的微散射偏移
+  const spFrac=new Float32Array(totalSparks);     // 0=头部, 1=尾端
+
+  for(let i=0;i<METEOR_N;i++){
+    for(let j=0;j<SPARKS_PER_METEOR;j++){
+      const idx=i*SPARKS_PER_METEOR+j;
+      // 前密后疏分布，让星头附近爆发出亮紫白星簇，长尾拉出闪烁星尘链
+      const u=Math.pow(j/(SPARKS_PER_METEOR-1), 1.15);
+      spFrac[idx]=u;
+      spPhase[idx]=R(0,Math.PI*2);
+      // 掺入大颗璀璨主星尘与细碎微光星尘
+      const isBig=(j%5===0)||j<4;
+      spSize[idx]=(isBig?R(5.5,8.8):R(2.6,5.2))*(1.0-.52*u);
+      // 颜色：头部亮星白 -> 梦幻浅紫 (#e0c3fc) -> 禁阁深邃电光紫蓝 (#8b5cf6 / #6366f1)
+      if(u<.16){
+        spColor.set([1.0, .95, 1.0], idx*3);
+      }else if(u<.52){
+        spColor.set([.82, .64, 1.0], idx*3);
+      }else{
+        spColor.set([.56, .46, 1.0], idx*3);
+      }
+      // 轨迹两侧自然微散射（越往尾端散开越柔和）
+      const spread=(.18+1.25*u)*(isBig?.65:1.1);
+      const ang=R(0,Math.PI*2);
+      spOffset[idx*3]=Math.cos(ang)*spread;
+      spOffset[idx*3+1]=Math.sin(ang)*spread;
+      spOffset[idx*3+2]=R(-.35,.35);
+      _meteorSparkPos[idx*3+1]=-500;
+      _meteorSparkAlpha[idx]=0;
     }
-    const rad=R(170,210);
-    m.p0.copy(_uDir).multiplyScalar(rad);
-    m.p0.y+=6;
-    _tan.copy(_uDir).addScaledVector(RADIANT,-1/Math.max(.25,_uDir.dot(RADIANT)));
-    if(_tan.lengthSq()<1e-4)_tan.set(-1,-1,0);
-    m.dir.copy(_tan).normalize();
-    m.dist=surge?R(62,102):R(55,90);
-    m.len=surge?R(18,34):R(14,26);
-    m.w=surge?R(.50,.90):R(.42,.78);
-    m.dur=surge?R(.58,.96):R(.72,1.18);
+  }
+  const spGeo=new THREE.BufferGeometry();
+  spGeo.setAttribute('position',new THREE.BufferAttribute(_meteorSparkPos,3).setUsage(THREE.DynamicDrawUsage));
+  spGeo.setAttribute('aAlpha',new THREE.BufferAttribute(_meteorSparkAlpha,1).setUsage(THREE.DynamicDrawUsage));
+  spGeo.setAttribute('aSize',new THREE.BufferAttribute(spSize,1));
+  spGeo.setAttribute('aColor',new THREE.BufferAttribute(spColor,3));
+  spGeo.setAttribute('aPhase',new THREE.BufferAttribute(spPhase,1));
+  spGeo.userData={spOffset,spFrac};
+
+  meteorSparkMat=new THREE.ShaderMaterial({
+    uniforms:{uTime:{value:0},uPR:{value:Math.min(devicePixelRatio,2)},uOpacity:{value:1}},
+    transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,
+    vertexShader:`
+      attribute float aSize; attribute float aAlpha; attribute vec3 aColor; attribute float aPhase;
+      uniform float uTime,uPR;
+      varying vec3 vCol; varying float vA;
+      void main(){
+        vCol=aColor;
+        float tw=.42+.58*pow(.5+.5*sin(uTime*11.5+aPhase),1.6);
+        vA=aAlpha*tw;
+        gl_PointSize=aSize*uPR*(.78+.38*tw);
+        gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);
+      }`,
+    fragmentShader:`
+      uniform float uOpacity;
+      varying vec3 vCol; varying float vA;
+      void main(){
+        if(vA<=0.002)discard;
+        vec2 p=gl_PointCoord-.5;
+        float r=length(p);
+        float core=smoothstep(.48,.0,r);
+        // 十字星芒微辉光 + 柔光圆核
+        float crossGlow=max(0.0,1.0-abs(p.x)*6.5)*max(0.0,1.0-abs(p.y)*1.8)+max(0.0,1.0-abs(p.y)*6.5)*max(0.0,1.0-abs(p.x)*1.8);
+        float a=clamp(core*core+.38*crossGlow,0.0,1.0)*vA*uOpacity;
+        gl_FragColor=vec4(vCol*(1.15+.65*core),a);
+      }`
+  });
+  meteorSparks=new THREE.Points(spGeo,meteorSparkMat);
+  meteorSparks.frustumCulled=false;meteorSparks.userData.noReflect=true;
+  scene.add(meteorSparks);
+
+  const mCols=[0xe9d5ff,0xc4b5fd,0xa5b4fc,0xf5f3ff,0xd8b4fe];
+  const haloCols=[0x9333ea,0x7c3aed,0x6366f1,0xa855f7,0x8b5cf6];
+  const mc=new THREE.Color();
+
+  // 4 大天区平行斜掠轨迹（如同《光·遇》星漠中从右上方平行斜划向左下方的壮丽星雨幕布）
+  function spawnMeteor(m,delay=0,surge=false,sectorIdx=0){
+    const sectorAz=[0, Math.PI*.52, Math.PI, Math.PI*1.48][sectorIdx%4];
+    const az=sectorAz+R(-.52,.52);
+    const fwdX=Math.sin(az), fwdZ=-Math.cos(az);
+    const rightX=-fwdZ, rightZ=fwdX; // 天区横向展开轴
+    const distOut=R(145,205);
+    const lat=R(-115,115);
+    const startY=R(68,132);
+    // 起点在天区右上方，沿 ~33° 平行斜角划向左下方
+    m.p0.set(
+      fwdX*distOut + rightX*(lat+R(35,75)),
+      startY,
+      fwdZ*distOut + rightZ*(lat+R(35,75))
+    );
+    const slope=R(-.54,-.64); // ~32° 平行斜下倾角
+    m.dir.set(
+      -rightX + fwdX*R(-.08,.08),
+      slope,
+      -rightZ + fwdZ*R(-.08,.08)
+    ).normalize();
+    // 计算两个正交法向量供星尘微散射使用
+    m.n1.set(0,1,0).cross(m.dir).normalize();
+    m.n2.copy(m.dir).cross(m.n1).normalize();
+    m.dist=surge?R(165,235):R(145,210);
+    m.len=surge?R(95,155):R(80,130);
+    m.w=surge?R(.78,1.25):R(.65,1.05);
+    m.dur=surge?R(2.5,3.7):R(2.8,4.1);
     m.wait=delay;
     m.life=0;
   }
+
   for(let i=0;i<METEOR_N;i++){
     const base=i<METEOR_BASE;
-    const m={p0:new THREE.Vector3(),dir:new THREE.Vector3(),dist:72,len:20,w:.6,dur:.9,life:0,wait:999,base,active:base,spawn:null};
+    const m={
+      idx:i,p0:new THREE.Vector3(),dir:new THREE.Vector3(),
+      n1:new THREE.Vector3(1,0,0),n2:new THREE.Vector3(0,1,0),
+      dist:180,len:110,w:.85,dur:3.2,life:0,wait:999,base,active:base,spawn:null
+    };
     if(base){
-      spawnMeteor(m,R(0,3.2),false);
-      m.spawn=()=>spawnMeteor(m,R(1.2,5.0),false);
+      spawnMeteor(m,R(0,3.8),false,i);
+      m.spawn=()=>spawnMeteor(m,R(.25,2.2),false,i);
     }else{
-      m.spawn=(delay=0)=>{m.active=true;spawnMeteor(m,delay,true);};
+      m.spawn=(delay=0)=>{m.active=true;spawnMeteor(m,delay,true,i);};
     }
     meteors.push(m);
     mc.setHex(mCols[i%mCols.length]);
     meteorTails.setColorAt(i,mc);
+    mc.setHex(0xffffff);
     meteorHeads.setColorAt(i,mc);
+    mc.setHex(haloCols[i%haloCols.length]);
+    meteorHalos.setColorAt(i,mc);
   }
   if(meteorTails.instanceColor)meteorTails.instanceColor.needsUpdate=true;
   if(meteorHeads.instanceColor)meteorHeads.instanceColor.needsUpdate=true;
+  if(meteorHalos.instanceColor)meteorHalos.instanceColor.needsUpdate=true;
 }
 const _mUP=new THREE.Vector3(0,1,0),_mQ=new THREE.Quaternion(),_mS=new THREE.Vector3(),_mM=new THREE.Matrix4(),_mPos=new THREE.Vector3();
 function updateMeteors(dt){
+  meteorSparkMat.uniforms.uTime.value=performance.now()*.001;
   meteorWave.cooldown-=dt;
   if(meteorWave.cooldown<=0){
-    meteorWave.cooldown=R(10.5,16.5);
+    meteorWave.cooldown=R(7.5,11.5);
     for(let i=METEOR_BASE;i<METEOR_N;i++){
-      meteors[i].spawn((i-METEOR_BASE)*0.09+R(0,.35));
+      meteors[i].spawn((i-METEOR_BASE)*0.12+R(0,.35));
     }
   }
+  const {spOffset,spFrac}=meteorSparks.geometry.userData;
   for(let i=0;i<METEOR_N;i++){
     const m=meteors[i];
-    if(!m.active){
+    const baseIdx=i*SPARKS_PER_METEOR;
+    if(!m.active||m.wait>0){
+      if(m.active&&m.wait>0)m.wait-=dt;
       _mS.set(0.001,0.001,0.001);_mM.compose(m.p0,_mQ.identity(),_mS);
-      meteorTails.setMatrixAt(i,_mM);meteorHeads.setMatrixAt(i,_mM);
-      continue;
-    }
-    if(m.wait>0){
-      m.wait-=dt;
-      _mS.set(0.001,0.001,0.001);_mM.compose(m.p0,_mQ.identity(),_mS);
-      meteorTails.setMatrixAt(i,_mM);meteorHeads.setMatrixAt(i,_mM);
+      meteorTails.setMatrixAt(i,_mM);meteorHeads.setMatrixAt(i,_mM);meteorHalos.setMatrixAt(i,_mM);
+      for(let j=0;j<SPARKS_PER_METEOR;j++){
+        const idx=baseIdx+j;
+        _meteorSparkAlpha[idx]=0;
+        _meteorSparkPos[idx*3+1]=-500;
+      }
       continue;
     }
     m.life+=dt;
@@ -7390,23 +7504,54 @@ function updateMeteors(dt){
       if(m.base)m.spawn();
       else m.active=false;
       _mS.set(0.001,0.001,0.001);_mM.compose(m.p0,_mQ.identity(),_mS);
-      meteorTails.setMatrixAt(i,_mM);meteorHeads.setMatrixAt(i,_mM);
+      meteorTails.setMatrixAt(i,_mM);meteorHeads.setMatrixAt(i,_mM);meteorHalos.setMatrixAt(i,_mM);
+      for(let j=0;j<SPARKS_PER_METEOR;j++){
+        const idx=baseIdx+j;
+        _meteorSparkAlpha[idx]=0;
+        _meteorSparkPos[idx*3+1]=-500;
+      }
       continue;
     }
-    const env=Math.sin(Math.min(1,k)*Math.PI);
-    const curLen=m.len*(.30+.85*env), curW=m.w*(.45+.65*env);
-    _mPos.copy(m.p0).addScaledVector(m.dir,k*m.dist);
+    // 平滑淡入淡出包络：流星划过天际后长尾余晖缓缓消散
+    const fadeIn=Math.min(1,k*5.5);
+    const fadeOut=k<.74?1.0:Math.max(0,(1-k)/.26);
+    const env=fadeIn*fadeOut;
+    const traveled=k*m.dist;
+    const curLen=Math.min(m.len, traveled+.15*m.len)*(.35+.65*fadeIn);
+    const curW=m.w*(.55+.55*env);
+    _mPos.copy(m.p0).addScaledVector(m.dir,traveled);
     _mQ.setFromUnitVectors(_mUP,m.dir);
     _mS.set(curW,curLen,curW);
     _mM.compose(_mPos,_mQ,_mS);
     meteorTails.setMatrixAt(i,_mM);
-    const hs=.45+.85*env;
+
+    const hs=(.75+.65*env)*m.w;
     _mS.set(hs,hs,hs);
     _mM.compose(_mPos,_mQ.identity(),_mS);
     meteorHeads.setMatrixAt(i,_mM);
+
+    const haloS=hs*1.65;
+    _mS.set(haloS,haloS,haloS);
+    _mM.compose(_mPos,_mQ.identity(),_mS);
+    meteorHalos.setMatrixAt(i,_mM);
+
+    // 更新该颗流星尾迹上的 42 颗闪烁星尘碎钻坐标与亮度
+    for(let j=0;j<SPARKS_PER_METEOR;j++){
+      const idx=baseIdx+j;
+      const u=spFrac[idx];
+      const backDist=u*curLen;
+      const ox=spOffset[idx*3], oy=spOffset[idx*3+1];
+      _meteorSparkPos[idx*3]  =_mPos.x - m.dir.x*backDist + m.n1.x*ox + m.n2.x*oy;
+      _meteorSparkPos[idx*3+1]=_mPos.y - m.dir.y*backDist + m.n1.y*ox + m.n2.y*oy;
+      _meteorSparkPos[idx*3+2]=_mPos.z - m.dir.z*backDist + m.n1.z*ox + m.n2.z*oy;
+      _meteorSparkAlpha[idx]=env*Math.pow(1.0-u, 0.85);
+    }
   }
   meteorTails.instanceMatrix.needsUpdate=true;
   meteorHeads.instanceMatrix.needsUpdate=true;
+  meteorHalos.instanceMatrix.needsUpdate=true;
+  meteorSparks.geometry.attributes.position.needsUpdate=true;
+  meteorSparks.geometry.attributes.aAlpha.needsUpdate=true;
 }
 
 /* 招牌暖金节庆雪地反光 */
@@ -10893,9 +11038,11 @@ function animate(){
   const twilight=!nightNow&&(state.hour>=16.8||state.hour<=7.2);
   const starOn=(nightNow||twilight)&&state.stars;
   if(starOn)updateMeteors(dt);
-  starMat.uniforms.uOpacity.value=nightNow?.85:.38;
-  meteorTails.material.opacity=nightNow?.92:.58;
-  meteorHeads.material.opacity=nightNow?.95:.65;
+  starMat.uniforms.uOpacity.value=nightNow?.88:.42;
+  meteorTails.material.opacity=nightNow?.88:.55;
+  meteorHeads.material.opacity=nightNow?.98:.68;
+  if(meteorHalos){meteorHalos.material.opacity=nightNow?.48:.28;meteorHalos.visible=starOn;}
+  if(meteorSparks){meteorSparkMat.uniforms.uOpacity.value=nightNow?1.0:.62;meteorSparks.visible=starOn;}
   stars.visible=starOn;meteorTails.visible=starOn;meteorHeads.visible=starOn;
 
   /* 空中巡游圣诞老人驯鹿雪橇 + 魔法星尘拖尾 */
