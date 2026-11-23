@@ -7787,13 +7787,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     pool(g,7,.03,.16);
   }
 
-  /* ── 巨型圣诞树：直接复用 buildChristmasTree（避开海盗船，置于西北广场） ── */
-  {
-    const t=buildChristmasTree({scale:2.2,layers:7,gifts:true});
-    t.position.set(-15.5,0,25.5);fair.add(t);
-    pool(fair,5.5,.03,.24,0xffd89a);
-    OUTDOOR_OBS.push([-15.5,25.5,2.4]);
-  }
+  /* ── 西北广场已腾空，供海盗船进驻与云霄飞车大展区 ── */
 
   /* ── 小吃一条街：六摊连排 ── */
   {
@@ -7921,9 +7915,9 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     OUTDOOR_OBS.push([27,36,4.6]);
   }
 
-  /* ── 豪华圣诞海盗船（沿 X 轴前后荡秋千，Z 轴双侧 A 字龙门架） ── */
+  /* ── 豪华圣诞海盗船（挪至西北广场，为云霄飞车腾出整片西侧黄金区） ── */
   {
-    const g=new THREE.Group();g.position.set(-21.5,0,33.0);fair.add(g);
+    const g=new THREE.Group();g.position.set(-20.0,0,25.5);fair.add(g);
     const hullDark=M(0x4b2b1a,{roughness:.72});
     const hullMid=M(0x7c4527,{roughness:.68});
     const hullGilt=M(0xe8b653,{roughness:.32,metalness:.8});
@@ -7999,7 +7993,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       for(const sz of [-1,1])bulb(pivot,bx,-5.12,sz*1.25,.10,Math.abs(i+sz));
     }
     pool(g,6.5,.03,.28);
-    OUTDOOR_OBS.push([-21.5,33.0,3.8]);
+    OUTDOOR_OBS.push([-20.0,25.5,3.8]);
   }
 
   /* ── 皇家圣诞旋转木马：红白条纹双层顶棚 + 8 匹立体切线奔跑木马 + 上下起伏 ── */
@@ -8149,83 +8143,88 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     pool(g,14,.03,.18,0x9fe8ff);
   }
 
-  /* ── 星夜极光云霄飞车（独占西南区，双螺旋立体弯道 + 低矮全景车头） ── */
+  /* ── 星夜极光云霄飞车（重点打造：独占整个西侧南北区，12.2m 大爬坡 + 360° 立体螺旋 + S 弯高速俯冲） ── */
   {
     const cg=new THREE.Group();fair.add(cg);
     const pts=[
-      new THREE.Vector3(-14.0, 1.45, 41.2), // 站台出发（朝西爬坡）
-      new THREE.Vector3(-20.5, 4.20, 41.2), // 链条牵引坡道
-      new THREE.Vector3(-28.4,10.60, 43.0), // 西北最高峰
-      new THREE.Vector3(-29.2, 5.80, 48.2), // 急坠入弯
-      new THREE.Vector3(-25.8, 2.35, 54.2), // 西南高速谷底
-      new THREE.Vector3(-20.0, 6.80, 52.8), // 上旋螺旋半圈
-      new THREE.Vector3(-21.6, 5.40, 46.6), // 螺旋内切交叉高架
-      new THREE.Vector3(-25.2, 3.30, 49.0), // 下旋穿出螺旋
-      new THREE.Vector3(-17.5, 2.30, 54.8), // S 弯贴地加速段
-      new THREE.Vector3(-10.8, 8.20, 53.6), // 东南高空回转峰
-      new THREE.Vector3( -7.8, 4.60, 47.8), // 东侧俯冲弯道
-      new THREE.Vector3( -9.5, 1.85, 42.0), // 回站减速段
+      new THREE.Vector3(-12.5, 1.45, 35.8), // 站台出发（朝西爬坡）
+      new THREE.Vector3(-20.2, 5.40, 34.8), // 长链条牵引攀升
+      new THREE.Vector3(-28.4,12.20, 37.2), // 西北 12.2m 最高峰（俯瞰全园）
+      new THREE.Vector3(-29.5, 6.20, 44.2), // 极速俯冲下坠
+      new THREE.Vector3(-26.8, 2.25, 51.4), // 贴地谷底高速冲刺
+      new THREE.Vector3(-21.2, 7.80, 54.6), // 拉起进入立体大螺旋
+      new THREE.Vector3(-17.0, 9.40, 48.6), // 螺旋上缘高空压弯
+      new THREE.Vector3(-21.4, 5.20, 44.0), // 螺旋内切交叉下穿
+      new THREE.Vector3(-26.0, 3.00, 48.0), // 旋出谷底再加速
+      new THREE.Vector3(-19.2, 2.20, 54.8), // 南侧 S 弯贴地飞驰
+      new THREE.Vector3(-10.8, 8.80, 53.6), // 东南高空驼峰大回转
+      new THREE.Vector3( -7.4, 4.40, 47.2), // 东侧俯冲压弯
+      new THREE.Vector3( -8.2, 1.85, 39.2), // 进站减速直道
     ];
     const curve=new THREE.CatmullRomCurve3(pts,true,'catmullrom',.42);
-    const spineM=M(0x2a394a,{roughness:.42,metalness:.72});
-    const railSilverM=M(0xdce6f2,{roughness:.25,metalness:.88});
+    const spineM=M(0x2a394a,{roughness:.40,metalness:.75});
+    const railSilverM=M(0xe4edf7,{roughness:.22,metalness:.90});
     const pierFootM=M(0xd9e2ec,{roughness:.85});
     // 中央主脊梁
-    const spineMesh=new THREE.Mesh(new THREE.TubeGeometry(curve,220,.16,8,true),spineM);
+    const spineMesh=new THREE.Mesh(new THREE.TubeGeometry(curve,280,.17,8,true),spineM);
     spineMesh.castShadow=true;spineMesh.receiveShadow=true;cg.add(spineMesh);
-    // 左右双轨：沿水平法向偏移 ±0.38m
+    // 左右双轨：沿水平法向偏移 ±0.40m
     const upV=new THREE.Vector3(0,1,0);
     for(const side of [-1,1]){
       const rPts=[];
-      for(let i=0;i<140;i++){
-        const u=i/140;
+      for(let i=0;i<180;i++){
+        const u=i/180;
         const p=curve.getPointAt(u), tan=curve.getTangentAt(u);
         const bin=new THREE.Vector3().crossVectors(tan,upV).normalize();
         if(bin.lengthSq()<.01)bin.set(1,0,0);
-        rPts.push(p.clone().addScaledVector(bin,side*.38).add(new THREE.Vector3(0,.15,0)));
+        rPts.push(p.clone().addScaledVector(bin,side*.40).add(new THREE.Vector3(0,.16,0)));
       }
       const rCurve=new THREE.CatmullRomCurve3(rPts,true);
-      const rMesh=new THREE.Mesh(new THREE.TubeGeometry(rCurve,220,.058,6,true),railSilverM);
+      const rMesh=new THREE.Mesh(new THREE.TubeGeometry(rCurve,280,.06,6,true),railSilverM);
       rMesh.castShadow=true;cg.add(rMesh);
     }
-    // 枕木、灯珠与落地钢柱（40 组均匀分布）
-    const pN=40;
+    // 枕木、灯珠与立体 A 字高塔立柱（54 组精细支撑）
+    const pN=54;
     for(let i=0;i<pN;i++){
       const u=i/pN;
       const p=curve.getPointAt(u), tan=curve.getTangentAt(u);
-      const tie=add(cg,BX(.96,.065,.15),spineM,p.x,p.y+.08,p.z);
+      const tie=add(cg,BX(.98,.065,.15),spineM,p.x,p.y+.08,p.z);
       tie.rotation.y=Math.atan2(tan.x,tan.z);
       if(i%2===0&&p.y>1.3){
         const ph=p.y-.04;
-        add(cg,new THREE.CylinderGeometry(.12,.17,ph,8),spineM,p.x,ph/2,p.z);
-        add(cg,new THREE.CylinderGeometry(.28,.34,.26,8),pierFootM,p.x,.13,p.z);
+        add(cg,new THREE.CylinderGeometry(.12,.18,ph,8),spineM,p.x,ph/2,p.z);
+        add(cg,new THREE.CylinderGeometry(.30,.36,.26,8),pierFootM,p.x,.13,p.z);
+        // 高峰塔架加装金色横撑环，更有真实过山车工程结构感
+        if(ph>5.5){
+          add(cg,new THREE.TorusGeometry(.22,.035,6,12),gldM,p.x,ph*.55,p.z).rotation.x=Math.PI/2;
+        }
       }
-      if(i%2===1)bulb(cg,p.x,p.y+.22,p.z,.08,i);
+      if(i%2===1)bulb(cg,p.x,p.y+.24,p.z,.085,i);
     }
-    // 云霄飞车登车站台（朝北敞开，方便玩家走近或按 E 乘车）
-    const st=new THREE.Group();st.position.set(-14,0,41.2);cg.add(st);
-    add(st,BX(5.6,.48,3.2),M(0x475569,{roughness:.8}),0,.24,0);
-    add(st,BX(5.8,.16,1.2),M(0xdfe6ec,{roughness:.9}),0,.10,-2.0).castShadow=false;
-    for(const sx of [-2.4,2.4])for(const sz of [-1.25,1.25])
-      add(st,BX(.16,3.2,.16),M(0x6d4a30,{roughness:.85}),sx,1.8,sz);
+    // 云霄飞车登车站台（移至中区主干道旁 -12.5, 35.8，朝北敞开，进园即见）
+    const st=new THREE.Group();st.position.set(-12.5,0,35.8);cg.add(st);
+    add(st,BX(5.8,.48,3.4),M(0x475569,{roughness:.8}),0,.24,0);
+    add(st,BX(6.0,.16,1.2),M(0xdfe6ec,{roughness:.9}),0,.10,-2.1).castShadow=false;
+    for(const sx of [-2.5,2.5])for(const sz of [-1.35,1.35])
+      add(st,BX(.16,3.3,.16),M(0x6d4a30,{roughness:.85}),sx,1.85,sz);
     for(const sz of [-1,1]){
-      const r=add(st,BX(6.0,.14,1.9),M(0x284e78,{roughness:.68}),0,3.55,sz*.72);r.rotation.x=sz*.26;
-      const sn=add(st,BX(6.04,.11,1.86),snowM,0,3.66,sz*.74);sn.rotation.x=sz*.26;
+      const r=add(st,BX(6.2,.14,2.0),M(0x284e78,{roughness:.68}),0,3.62,sz*.74);r.rotation.x=sz*.26;
+      const sn=add(st,BX(6.24,.11,1.96),snowM,0,3.73,sz*.76);sn.rotation.x=sz*.26;
     }
-    add(st,BX(6.06,.16,.24),gldM,0,3.82,0);
+    add(st,BX(6.26,.16,.24),gldM,0,3.88,0);
     const [sc,sctx]=cv(512,96);
     sctx.fillStyle='#14243a';sctx.fillRect(0,0,512,96);
     sctx.strokeStyle='#f4c56a';sctx.lineWidth=4;sctx.strokeRect(6,6,500,84);
     sctx.fillStyle='#ffe9b5';sctx.font='700 32px '+HK;sctx.textAlign='center';
-    sctx.fillText('星夜云霄飞车',256,48);
+    sctx.fillText('星夜极光云霄飞车',256,48);
     sctx.fillStyle='#8fd3ff';sctx.font='700 14px monospace';
     sctx.fillText('STARLIGHT COASTER · PRESS E',256,77);
-    signPanel(st,3.8,.68,ctex(sc),0,2.85,-1.35,.95);
-    for(let b=0;b<6;b++)bulb(st,-2.2+b*.88,3.2,-1.35,.09,b);
+    signPanel(st,4.0,.70,ctex(sc),0,2.92,-1.45,.95);
+    for(let b=0;b<6;b++)bulb(st,-2.2+b*.88,3.26,-1.45,.09,b);
     // 4 节低矮流线型全景列车（第 1 节做小巧尖头且留空前排视野，绝不挡玩家视角）
     const cars=[];
     const carCols=[0xd23b32,0xe8a838,0x2f8f6b,0x3f6ba8];
-    const coasterRef={kind:'coaster',label:'星夜云霄飞车'};
+    const coasterRef={kind:'coaster',label:'星夜极光云霄飞车'};
     for(let c=0;c<4;c++){
       const car=new THREE.Group();
       const bodyM=M(carCols[c],{roughness:.42,metalness:.25});
@@ -8236,8 +8235,8 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
         nose.rotation.x=Math.PI/2;
         addNS(car,new THREE.SphereGeometry(.09,8,6),getBulbMat(0xfff1a8,0),0,.30,.98);
       }
-      add(car,BX(.68,.26,.10),M(0x1f2937,{roughness:.6}),0,.52,-.46); // 低靠背
-      add(car,BX(.64,.045,.045),M(0x94a3b8,{roughness:.3,metalness:.8}),0,.56,.20); // 低安全压杠
+      add(car,BX(.68,.26,.10),M(0x1f2937,{roughness:.6}),0,.52,-.46);
+      add(car,BX(.64,.045,.045),M(0x94a3b8,{roughness:.3,metalness:.8}),0,.56,.20);
       if(c>0){
         const rider=makePerson(carCols[(c+1)%4],0xfbe2cf,{scale:.50,acc:c%2?'santa':'beanie'});
         rider.position.set(0,.34,-.18);car.add(rider);
@@ -8248,7 +8247,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     }
     st.userData.physObj={type:'ride',ref:coasterRef};
     amusement.coaster={curve,cars,t:0};
-    OUTDOOR_OBS.push([-14,41.2,2.8]);
+    OUTDOOR_OBS.push([-12.5,35.8,2.9]);
   }
 
   /* ── 巨型圣诞老人地标雕塑（带大理石鎏金底座、礼物袋与挥手致意） ── */
@@ -11097,7 +11096,7 @@ function toggleRideTrain(stationHint){
 }
 const wheelSys={riding:false,cab:null,kind:null,car:null,label:''};
 const RIDE_EXITS={
-  wheel:[27,41.2],carousel:[-4,37.5],ship:[-21.5,38.2],coaster:[-14,38.4],bumper:[-6.5,45.0],sleigh:[0,10.2],heli:[0,10.2]
+  wheel:[27,41.2],carousel:[-4,37.5],ship:[-20.0,30.8],coaster:[-12.5,33.2],bumper:[-6.5,45.0],sleigh:[0,10.2],heli:[0,10.2]
 };
 function stopFacilityRide(){
   if(wheelSys.cab&&wheelSys.cab.userData.rods)wheelSys.cab.userData.rods.forEach(r=>r.visible=true);
