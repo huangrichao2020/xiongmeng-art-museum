@@ -29,6 +29,15 @@
   html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--han);overflow:hidden;
     -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
   canvas{display:block;touch-action:none;-webkit-user-select:none;user-select:none}
+  /* 禁止长按选中界面文字：手机浏览器/微信内置浏览器长按按钮会弹出
+     系统「取词 + 朗读」浮层（几个深色圆圈把文字圈起来，还带个♪图标），
+     糊在画面上很难看。整页不需要复制文本，直接全局关掉。 */
+  html,body,#stage,body *{
+    -webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;
+    -webkit-touch-callout:none;
+  }
+  /* 输入框要保留正常选中/粘贴能力（留言板） */
+  input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
   html,body{overscroll-behavior:none}
   #stage{position:fixed;inset:0}
 
