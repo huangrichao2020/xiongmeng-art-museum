@@ -5022,20 +5022,24 @@ const lampPools=[];
     new THREE.Vector3(0,5.95,1.25)
   ]);
   const poleGeo=new THREE.TubeGeometry(poleCurve,20,.068,10,false);
-  /* 路灯光幕锥体：所有路灯共用同一份几何与材质 */
+  /* 路灯光幕锥体：所有路灯共用同一份几何与材质
+     顶点色沿轴向：灯口最亮、地面端保留 0.45 的浓度。
+     注意锥体是「尖端在灯口、大面在地面」，如果把亮度全压在尖端，
+     屏幕可见的那块面积极小，整条光锥会看起来完全消失 ——
+     所以下端必须留够底噪，只做温和的上亮下淡。 */
   const lampConeGeo=(()=>{
     const geo=new THREE.ConeGeometry(2.6,5.8,32,1,true);
     const pa=geo.attributes.position, cols=new Float32Array(pa.count*3);
     for(let i=0;i<pa.count;i++){
       const t=(pa.getY(i)+2.9)/5.8;      // 0 = 地面端, 1 = 灯口
-      const f=Math.pow(t,2.0)*.9+.06;    // 灯口最亮，向地面迅速衰减
+      const f=.45+.55*Math.pow(t,1.5);
       cols[i*3]=f;cols[i*3+1]=f;cols[i*3+2]=f;
     }
     geo.setAttribute('color',new THREE.BufferAttribute(cols,3));
     return geo;
   })();
   const lampConeMat=new THREE.MeshBasicMaterial({
-    color:0xffd79a,vertexColors:true,transparent:true,opacity:.17,
+    color:0xffd79a,vertexColors:true,transparent:true,opacity:.26,
     blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false});
   for(const x of lx){
     const g=new THREE.Group();g.position.set(x,0,11.45);street.add(g);
@@ -11861,13 +11865,13 @@ const helis=[];
       const pa=beamGeo.attributes.position,cols=new Float32Array(pa.count*3);
       for(let i=0;i<pa.count;i++){
         const t=(pa.getY(i)+beamH/2)/beamH;   // 0 = 地面端, 1 = 灯口
-        const f=Math.pow(t,2.0)*.88+.05;
+        const f=.45+.55*Math.pow(t,1.5);       // 下端留底噪，否则大面全透明 → 光柱看不见
         cols[i*3]=f;cols[i*3+1]=f;cols[i*3+2]=f;
       }
       beamGeo.setAttribute('color',new THREE.BufferAttribute(cols,3));
     }
     const beamCone=new THREE.Mesh(beamGeo,new THREE.MeshBasicMaterial({
-      color:cfg.beam,vertexColors:true,transparent:true,opacity:.09,
+      color:cfg.beam,vertexColors:true,transparent:true,opacity:.12,
       blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false}));
     beamCone.position.y=-beamH/2;beamCone.castShadow=false;beamCone.raycast=()=>{};
     spot.add(beamCone);
