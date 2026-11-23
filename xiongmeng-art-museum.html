@@ -6459,6 +6459,8 @@ const skylineMats=[];
 
     // 5. 平安夜圣坛祈愿圣诞树（去掉粉红玫瑰球婚庆拱门，营造庄严浪漫的平安夜氛围）
     const rosePinkM=M(0xff758f,{roughness:.75});
+    const roseWhiteM=M(0xfff5f7,{roughness:.75});
+    const veilM=new THREE.MeshPhysicalMaterial({color:0xffffff,transparent:true,opacity:.68,roughness:.35,side:THREE.DoubleSide,depthWrite:false});
     for(const sx of [-1,1]){
       const st=buildChristmasTree({scale:.55,layers:5,gifts:true});st.position.set(sx*2.15,1.14,-6.2);ch.add(st);
     }
