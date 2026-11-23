@@ -5092,7 +5092,7 @@ const animePark=new THREE.Group();animePark.userData.tag='park';scene.add(animeP
     }
   }
 
-  // 4. 四角圣诞树 + 雪人 + 覆雪冬青红果灌木 + 14 盏草坪暖光柱灯
+  // 4. 四角圣诞树 + 雪人 + 14 盏草坪暖光柱灯（冬青灌木已删）
   for(const [tx,tz,sc] of [
     [PX-11.6,PZ-9.0,.70],[PX+11.6,PZ-9.0,.70],[PX-12.0,PZ+8.8,.66],[PX+12.0,PZ+8.8,.66]
   ]){
@@ -5103,17 +5103,7 @@ const animePark=new THREE.Group();animePark.userData.tag='park';scene.add(animeP
     const psm=buildSnowman(.92);
     psm.position.set(PX+s*4.2,.14,PZ+8.4);psm.rotation.y=-s*.28;animePark.add(psm);
   }
-  const bushM=M(0x285435,{roughness:.88,flatShading:false});
-  const bollardM=M(0x283038,{roughness:.5,metalness:.6});
-  const bollardGlow=new THREE.MeshBasicMaterial({color:0xffdf9e});
-  const berryM=M(0xe62e2e,{roughness:.35});
-  for(const [bx,bz] of [
-    [PX-4.5,PZ-9.2],[PX+4.5,PZ-9.2],[PX-4.5,PZ+9.2],[PX+4.5,PZ+9.2]
-  ]){
-    add(animePark,new THREE.SphereGeometry(.65,12,10),bushM,bx,.52,bz).scale.set(1.2,.85,1.1);
-    add(animePark,new THREE.SphereGeometry(.56,12,8,0,Math.PI*2,0,Math.PI*.48),snowCapM,bx,.58,bz).scale.set(1.16,.78,1.06);
-    for(let bi=0;bi<4;bi++)add(animePark,new THREE.SphereGeometry(.07,6,5),berryM,bx+Math.cos(bi*1.5)*.48,.58,bz+Math.sin(bi*1.5)*.45);
-  }
+  /* 4 颗「覆雪冬青红果灌木」已删除：远看只是 4 颗无细节的深绿面疙瘩，还堵在广场通道上 */
   // 东侧动漫园地面矮灯柱与高柱天幕彩球已全部清除，保留中央广角主灯保持画面干净通透
 
   // 6. 合并为 1 盏广角中心主灯（砍掉 3 盏零散 PointLight，大幅加速全场 PBR 片元着色）
@@ -7750,13 +7740,12 @@ const OUTDOOR_OBS=(()=>{
   for(const bx of [-8.4,4.5])list.push([bx,9.5,.55]);
   list.push([-7.2,9.3,.45],[9.6,10.6,.48],[-10.75,11.2,.48],[19.6,10.7,.58],[3.25,8.75,.72],[-10.9,9.55,.95]);
   for(const s of [-1,1])list.push([s*8.3,8.55,1.05],[s*4.9,8.55,.72],[s*3.9,8.20,.5]);
-  // 2. 东侧动漫雪园内部全障碍：中央与两圈雕塑底座 + 门柱 + 角树 + 雪人 + 灌木 + 草坪灯 + 高灯杆
+  // 2. 东侧动漫雪园内部全障碍：中央与两圈雕塑底座 + 门柱 + 角树 + 雪人 + 草坪灯 + 高灯杆（灌木障碍已删）
   const PX=26.5,PZ=-2.0;
   list.push([PX,PZ,2.35],[PX-5.5,PZ-4.2,1.85],[PX+5.5,PZ-4.2,1.8],[PX-5.5,PZ+4.2,1.85],[PX+5.5,PZ+4.2,1.75]);
   list.push([PX,PZ-6.8,1.9],[PX-10.2,PZ-6.8,1.8],[PX+10.2,PZ-6.8,1.8],[PX-10.2,PZ,1.75],[PX+10.2,PZ,1.75],[PX-10.2,PZ+6.6,1.75],[PX+10.2,PZ+6.6,1.9]);
   for(const s of [-1,1]){list.push([PX+s*3.6,PZ+10.55,.65],[PX+s*4.2,PZ+8.4,.85]);}
   for(const [tx,tz] of [[PX-11.6,PZ-9],[PX+11.6,PZ-9],[PX-12,PZ+8.8],[PX+12,PZ+8.8]])list.push([tx,tz,1.35]);
-  for(const [bx,bz] of [[PX-4.5,PZ-9.2],[PX+4.5,PZ-9.2],[PX-4.5,PZ+9.2],[PX+4.5,PZ+9.2]])list.push([bx,bz,1.0]);
   for(const [lx,lz] of [
     [PX-2.4,PZ+8.2],[PX+2.4,PZ+8.2],[PX-2.4,PZ+4.4],[PX+2.4,PZ+4.4],[PX-2.4,PZ-4.4],[PX+2.4,PZ-4.4],
     [PX-2.4,PZ-8.2],[PX+2.4,PZ-8.2],[PX-7.8,PZ+2.0],[PX+7.8,PZ+2.0],[PX-7.8,PZ-2.0],[PX+7.8,PZ-2.0],
