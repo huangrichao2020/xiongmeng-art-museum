@@ -6317,8 +6317,9 @@ const skylineMats=[];
   // ── 1. 游乐园左侧：象牙白哥特大教堂（正门敞开，内部正在举办盛大圣诞婚礼） (-49, 0, 36) ──
   {
     const ch=new THREE.Group();ch.position.set(-49,0,36);ch.rotation.y=Math.PI;lmGroup.add(ch);
-    const gothicStoneM=M(0xefede8,{roughness:.76,metalness:.05});
-    const gothicTrimM=M(0xd2cec6,{roughness:.74,metalness:.06});
+    const gothicStoneM=M(0xe6dfd3,{roughness:.84,metalness:0,envMapIntensity:.16});
+    const gothicTrimM=M(0xc6bdb0,{roughness:.80,metalness:0,envMapIntensity:.16});
+    const churchSlateM=M(0x283a54,{roughness:.68,metalness:.14,envMapIntensity:.28});
     const makePointedWimperg=(w,h,depth)=>{
       const sh=new THREE.Shape();
       sh.moveTo(-w/2,0);sh.lineTo(w/2,0);sh.lineTo(0,h);sh.closePath();
@@ -6334,12 +6335,10 @@ const skylineMats=[];
       const g=new THREE.ExtrudeGeometry(sh,{depth,bevelEnabled:false});
       g.translate(0,0,-depth/2);return g;
     };
-    const addPinnacle=(x,y,z,h=2.4,r=.32)=>{
-      add(ch,BX(r*1.8,h*.35,r*1.8),gothicTrimM,x,y+h*.175,z);
-      const p=add(ch,new THREE.ConeGeometry(r,h*.65,4),gothicStoneM,x,y+h*.675,z);
+    const addPinnacle=(x,y,z,h=2.4,r=.30)=>{
+      add(ch,BX(r*1.8,h*.36,r*1.8),gothicTrimM,x,y+h*.18,z);
+      const p=add(ch,new THREE.ConeGeometry(r,h*.64,4),churchSlateM,x,y+h*.68,z);
       p.rotation.y=Math.PI/4;
-      const ps=add(ch,new THREE.ConeGeometry(r*.86,h*.55,4),snowRoofM,x,y+h*.73,z);
-      ps.rotation.y=Math.PI/4;
     };
 
     // 石板广场 + 迎宾红毯大道 + 三级宽石阶（逐级铺红毯，严禁实心方块压住台阶产生 Z-fighting）
@@ -6353,30 +6352,38 @@ const skylineMats=[];
 
     // 中空大教堂主体（留出中央大厅空间 x∈[-2.8,2.8], z∈[-7.8,9.2] 可从正门直视内部婚礼！）
     add(ch,BX(12.8,.6,17.2),gothicTrimM,0,.30,-.5).receiveShadow=true;
-    // 主殿左右高侧墙 + 后墙 + 顶部高拱屋顶（不再用实心方块堵死大厅）
+    // 主殿左右高侧墙 + 后墙 + 顶部高拱屋顶 + 耳堂人字坡顶与侧廊壁柱（告别光秃方盒子）
     for(const sx of [-1,1]){
       add(ch,BX(.65,10.2,16.4),gothicStoneM,sx*2.9,5.2,-.5).receiveShadow=true; // 主殿左右墙
       add(ch,BX(3.2,4.8,14.6),gothicStoneM,sx*4.5,2.5,-.8).receiveShadow=true;  // 两侧低矮侧廊
+      add(ch,BX(3.35,.22,14.8),gothicTrimM,sx*4.5,4.95,-.8);                    // 侧廊檐口石线脚
+      for(let z=-6.2;z<=4.6;z+=2.7)add(ch,BX(.35,4.8,.42),gothicTrimM,sx*6.15,2.5,z); // 侧廊壁柱
       add(ch,BX(3.2,9.2,4.8),gothicStoneM,sx*6.0,4.7,-1.8).receiveShadow=true;  // 十字耳堂左右横翼
+      add(ch,BX(3.4,.26,5.0),gothicTrimM,sx*6.0,9.32,-1.8);                     // 耳堂檐口石线脚
+      // 耳堂双坡人字屋顶 + 端头三角形石山墙
+      for(const sz of [-1,1]){
+        const tr=add(ch,BX(3.4,.22,3.1),churchSlateM,sx*6.0,10.35,-1.8+sz*1.22);
+        tr.rotation.x=sz*.72;
+      }
+      const tg=new THREE.Mesh(makeGableGeo(4.8,2.2,.45),gothicStoneM);
+      tg.rotation.y=sx*Math.PI/2;tg.position.set(sx*7.42,9.3,-1.8);tg.castShadow=true;ch.add(tg);
     }
     add(ch,BX(6.4,10.2,.75),gothicStoneM,0,5.2,-8.4).receiveShadow=true;        // 圣坛后墙
     add(ch,BX(6.4,2.4,16.4),gothicStoneM,0,9.1,-.5);                             // 大厅顶部封顶板
-    // 侧廊单坡屋顶 + 主殿陡坡人字石板屋顶 + 厚实白雪
+    // 侧廊单坡屋顶 + 主殿陡坡人字石板屋顶（取消重叠 Z-fighting 雪片，保留干净石板脊线）
     for(const sx of [-1,1]){
-      const ar=add(ch,BX(3.2,.20,14.8),slateRoofM,sx*4.6,5.25,-.8);ar.rotation.z=-sx*.38;
-      const as=add(ch,BX(3.0,.14,14.6),snowRoofM,sx*4.6,5.36,-.8);as.rotation.z=-sx*.38;
+      const ar=add(ch,BX(3.25,.22,14.9),churchSlateM,sx*4.6,5.28,-.8);ar.rotation.z=-sx*.38;
     }
     const roofLen=16.8, halfSpan=3.4, roofH=3.8;
     const slopeAng=Math.atan2(roofH,halfSpan), slopeLen=Math.hypot(halfSpan,roofH);
     for(const sx of [-1,1]){
-      const sl=add(ch,BX(slopeLen,.24,roofLen),slateRoofM,sx*halfSpan/2,10.2+roofH/2,-.5);sl.rotation.z=-sx*slopeAng;
-      const sn=add(ch,BX(slopeLen-.1,.16,roofLen-.1),snowRoofM,sx*halfSpan/2,10.35+roofH/2,-.5);sn.rotation.z=-sx*slopeAng;
+      const sl=add(ch,BX(slopeLen,.26,roofLen),churchSlateM,sx*halfSpan/2,10.2+roofH/2,-.5);sl.rotation.z=-sx*slopeAng;
       for(let z=-5.5;z<=4.5;z+=2.5){
         add(ch,BX(.16,2.8,1.15),stainedM,sx*3.26,7.8,z);
         add(ch,BX(.22,3.0,1.30),gothicTrimM,sx*3.20,7.8,z);
       }
     }
-    add(ch,BX(.42,.36,roofLen+.1),gothicTrimM,0,10.2+roofH+.04,-.5); // 主殿屋脊压条
+    add(ch,BX(.44,.38,roofLen+.1),gothicTrimM,0,10.2+roofH+.04,-.5); // 主殿屋脊压条
     { // 补齐主殿圣坛后方三角形山墙，避免屋顶后部悬空露洞
       const gSh=new THREE.Shape();
       gSh.moveTo(-halfSpan+.15,10.15);gSh.lineTo(halfSpan-.15,10.15);gSh.lineTo(0,10.2+roofH);gSh.closePath();
@@ -6391,42 +6398,40 @@ const skylineMats=[];
         if(Math.abs(z+1.8)<1.5)continue;
         add(ch,BX(.95,7.0,.95),gothicTrimM,sx*6.65,3.5,z);
         add(ch,BX(1.15,3.6,1.15),gothicStoneM,sx*6.65,1.8,z);
-        addPinnacle(sx*6.65,7.0,z,2.3,.34);
+        addPinnacle(sx*6.65,7.0,z,2.3,.30);
         const f1=add(ch,BX(3.8,.32,.46),gothicStoneM,sx*4.85,8.2,z);f1.rotation.z=-sx*.44;
         const f2=add(ch,BX(3.8,.28,.42),gothicTrimM,sx*4.85,6.4,z);f2.rotation.z=-sx*.38;
-        addNS(ch,new THREE.SphereGeometry(.085,5,4),warmGlowM,sx*4.85,8.42,z);
       }
     }
 
     // ★ 中央细尖塔（Flèche）
-    add(ch,BX(1.4,1.8,1.4),gothicTrimM,0,14.2,-1.8);
-    const fl1=add(ch,new THREE.ConeGeometry(.75,5.4,8),slateRoofM,0,17.6,-1.8);
-    const fl2=add(ch,new THREE.ConeGeometry(.66,4.9,8),snowRoofM,0,17.8,-1.8);
-    fl1.rotation.y=fl2.rotation.y=Math.PI/8;
-    addNS(ch,BX(.12,1.1,.12),goldGlowM,0,20.7,-1.8);
-    addNS(ch,BX(.65,.12,.12),goldGlowM,0,20.9,-1.8);
+    add(ch,new THREE.CylinderGeometry(.68,.78,1.9,8),gothicTrimM,0,14.2,-1.8);
+    const fl1=add(ch,new THREE.ConeGeometry(.75,5.4,8),churchSlateM,0,17.6,-1.8);
+    fl1.rotation.y=Math.PI/8;
+    addNS(ch,BX(.10,1.1,.10),goldGlowM,0,20.7,-1.8);
+    addNS(ch,BX(.62,.10,.10),goldGlowM,0,20.9,-1.8);
 
-    // ★ 西立面：高耸白色对称双塔（Twin Spires，高 23.8m）
+    // ★ 西立面：层次分明的象牙沙石哥特对称双塔（含层间檐口线脚 + 八角钟楼灯笼 + 俐落石板尖塔）
     for(const sx of [-1,1]){
       const tx=sx*4.15, tz=7.1;
       add(ch,BX(3.9,8.4,3.8),gothicStoneM,tx,4.2,tz);
+      add(ch,BX(4.25,.28,4.15),gothicTrimM,tx,8.45,tz);
       add(ch,BX(3.5,4.8,3.4),gothicStoneM,tx,10.8,tz);
+      add(ch,BX(3.85,.26,3.75),gothicTrimM,tx,13.25,tz);
       add(ch,BX(3.1,3.2,3.0),gothicTrimM,tx,14.6,tz);
+      add(ch,BX(3.38,.26,3.28),gothicTrimM,tx,16.2,tz);
       for(const cx of [-1,1])for(const cz of [-1,1])add(ch,BX(.42,15.8,.42),gothicTrimM,tx+cx*1.68,7.9,tz+cz*1.62);
       for(const wx of [-.68,.68]){
         add(ch,makePointedArchGeo(.88,3.4,.18),stainedM,tx+wx,8.8,tz+1.75);
         add(ch,makePointedArchGeo(.80,2.4,.18),warmGlowM,tx+wx,13.4,tz+1.55);
       }
-      for(const cx of [-1,1])for(const cz of [-1,1])addPinnacle(tx+cx*1.35,16.2,tz+cz*1.30,2.2,.28);
-      const sp1=add(ch,new THREE.ConeGeometry(1.55,6.6,8),slateRoofM,tx,19.5,tz);
-      const sp2=add(ch,new THREE.ConeGeometry(1.42,6.1,8),snowRoofM,tx,19.7,tz);
-      sp1.rotation.y=sp2.rotation.y=Math.PI/8;
-      for(let i=0;i<22;i++){
-        const t=i/22, a=t*Math.PI*5, rr=1.48*(1-t)+.12;
-        addNS(ch,new THREE.SphereGeometry(.085,6,5),[warmGlowM,goldGlowM,redGlowM][i%3],tx+Math.cos(a)*rr,16.5+t*6.0,tz+Math.sin(a)*rr);
-      }
-      addNS(ch,BX(.16,1.6,.16),goldGlowM,tx,23.2,tz);
-      addNS(ch,BX(.95,.16,.16),goldGlowM,tx,23.5,tz);
+      for(const cx of [-1,1])for(const cz of [-1,1])addPinnacle(tx+cx*1.35,16.3,tz+cz*1.30,2.1,.26);
+      // 八角钟楼过渡层 + 陡峭深暮蓝石板尖塔（去掉玩具彩灯螺旋）
+      add(ch,new THREE.CylinderGeometry(1.38,1.52,1.3,8),gothicStoneM,tx,16.9,tz);
+      const sp1=add(ch,new THREE.ConeGeometry(1.52,6.8,8),churchSlateM,tx,20.8,tz);
+      sp1.rotation.y=Math.PI/8;
+      addNS(ch,BX(.14,1.5,.14),goldGlowM,tx,24.6,tz);
+      addNS(ch,BX(.88,.14,.14),goldGlowM,tx,24.9,tz);
     }
 
     // 中央西立面上半段（y=5.1 以上保留，y=0.6~5.1 正中央完全镂空做敞开大门洞！）
@@ -7998,8 +8003,8 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       const cym=add(g,new THREE.CylinderGeometry(.34,.34,.02,14),gldM,cx,1.46,-.75);
       cymbals.push(cym);
     }
-    const drum=makePerson(0x3b6ba8,0xe8c49a,{scale:.84,acc:'headphone'});
-    drum.position.set(0,.52,-1.18);g.add(drum);
+    const drum=makePerson(0x3b6ba8,0xe8c49a,{scale:.88,acc:'headphone'});
+    drum.position.set(0,.74,-1.18);g.add(drum);
     const makeRockBear=(x,z,coat,acc,guitCol)=>{
       const b=makePerson(coat,0xe8c49a,{scale:.86,acc});
       b.position.set(x,.52,z);
@@ -8493,7 +8498,9 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
 }
 /* 游乐园里的人：排队、围观、吃小吃、到处溜达（约 75 人热闹逛园） */
 {
+  let _qSkip=0;
   const Q=(path,c,sp,s,acc)=>{
+    if((_qSkip++&1)===1)return; // 游乐园 NPC 减半，园内更通透清爽
     // 确保所有游客都有独立行动路线（若是单点则自动扩展成附近小幅散步环线）
     const p=(path.length>=2&&Math.hypot(path[0][0]-path[1][0],path[0][2]-path[1][2])>0.35)
       ? path
@@ -10475,57 +10482,58 @@ function animate(){
     });
   }
   if(amusement.band){
-    const b=amusement.band, beat=t*7.2;
-    // 1. 活动摇头舞台投射灯光束扫射
+    const b=amusement.band, beat=t*8.4;
+    // 1. 舞台射灯大幅度摇头扫射、光束明暗闪烁
     for(const sp of b.spotHeads){
-      sp.head.rotation.x=-.32+Math.sin(t*1.9+sp.ph)*.38;
-      sp.head.rotation.z=Math.cos(t*1.45+sp.ph*1.3)*.44;
-      sp.bm.opacity=.09+.08*Math.max(0,Math.sin(beat*.8+sp.ph));
+      sp.head.rotation.x=-.35+Math.sin(t*2.6+sp.ph)*.58;
+      sp.head.rotation.z=Math.cos(t*2.1+sp.ph*1.3)*.65;
+      sp.bm.opacity=.14+.16*Math.max(0,Math.sin(beat*.9+sp.ph));
     }
-    // 2. 乐队全情投入热力演出（甩头、扫弦、狂敲架子鼓、铜钹震颤）
-    b.drum.userData.armL.rotation.x=-1.15+Math.sin(beat*2.2)*.68;
-    b.drum.userData.armR.rotation.x=-1.15-Math.sin(beat*2.2)*.68;
-    b.drum.rotation.x=Math.sin(beat*1.1)*.12;
-    b.cymbals.forEach((cy,ci)=>{cy.rotation.z=Math.sin(beat*3.0+ci)*.09;});
-    b.voc.position.y=.52+Math.abs(Math.sin(beat))*.09;
-    b.voc.rotation.y=Math.sin(t*2.4)*.24;
-    b.voc.rotation.x=Math.sin(beat)*.10;
-    b.voc.userData.armR.rotation.x=-.95+Math.sin(beat*1.8)*.48;
-    b.voc.userData.armL.rotation.x=-1.65+Math.cos(beat*.9)*.35;
-    b.gtrL.rotation.z=Math.sin(beat*.6)*.14;
-    b.gtrL.rotation.y=.22+Math.sin(t*1.8)*.20;
-    b.gtrL.userData.armR.rotation.x=-.9+Math.sin(beat*2.4)*.45;
-    b.gtrL.userData.armL.rotation.x=-.75+Math.sin(t*4.5)*.18;
-    b.gtrR.rotation.z=-Math.sin(beat*.6)*.14;
-    b.gtrR.rotation.y=-.22+Math.cos(t*1.8)*.20;
-    b.gtrR.userData.armR.rotation.x=-.9+Math.cos(beat*2.4)*.45;
-    b.gtrR.userData.armL.rotation.x=-.75+Math.cos(t*4.2)*.18;
-    const pScale=1+Math.max(0,Math.sin(beat*2))*.12;
+    // 2. 乐队全员大幅度热力演出（主唱高跳摇摆、吉他/贝斯手扭腰甩头走位、鼓手高举双臂狂敲）
+    b.drum.userData.armL.rotation.x=-1.2+Math.sin(beat*2.5)*.92;
+    b.drum.userData.armR.rotation.x=-1.2-Math.sin(beat*2.5)*.92;
+    b.drum.rotation.x=Math.sin(beat*1.25)*.22;
+    b.cymbals.forEach((cy,ci)=>{cy.rotation.z=Math.sin(beat*3.5+ci)*.16;});
+    b.voc.position.y=.52+Math.abs(Math.sin(beat))*.22;
+    b.voc.rotation.y=Math.sin(t*3.2)*.38;
+    b.voc.rotation.x=Math.sin(beat)*.20;
+    b.voc.userData.armR.rotation.x=-1.0+Math.sin(beat*2.0)*.72;
+    b.voc.userData.armL.rotation.x=-2.1+Math.cos(beat*1.2)*.55;
+    b.gtrL.position.x=-1.65+Math.sin(t*1.8)*.32;
+    b.gtrL.position.y=.52+Math.abs(Math.sin(beat+1.1))*.14;
+    b.gtrL.rotation.z=Math.sin(beat*.75)*.22;
+    b.gtrL.rotation.y=.25+Math.sin(t*2.4)*.34;
+    b.gtrL.userData.armR.rotation.x=-.95+Math.sin(beat*2.6)*.68;
+    b.gtrL.userData.armL.rotation.x=-.85+Math.sin(t*5.5)*.28;
+    b.gtrR.position.x=1.65-Math.sin(t*1.8)*.32;
+    b.gtrR.position.y=.52+Math.abs(Math.cos(beat+1.1))*.14;
+    b.gtrR.rotation.z=-Math.sin(beat*.75)*.22;
+    b.gtrR.rotation.y=-.25+Math.cos(t*2.4)*.34;
+    b.gtrR.userData.armR.rotation.x=-.95+Math.cos(beat*2.6)*.68;
+    b.gtrR.userData.armL.rotation.x=-.85+Math.cos(t*5.2)*.28;
+    const pScale=1+Math.max(0,Math.sin(beat*2))*.16;
     for(const wf of b.woofers)wf.scale.set(pScale,1,pScale);
-    // 3. 台下观众轮流扭动身体、蹦跳与高举挥手
+    // 3. 台下观众持续轮流高跳、扭腰与挥手
     for(let fi=0;fi<b.fans.length;fi++){
-      const fn=b.fans[fi], cyc=(t*0.65+fn.ph)%3.0;
+      const fn=b.fans[fi], cyc=(t*.9+fn.ph)%3.0;
       if(cyc<1.0){
-        // 轮流蹦跳欢呼
-        fn.b.position.y=Math.abs(Math.sin(beat+fn.ph))*.24;
-        fn.b.rotation.y=fn.baseY+Math.sin(t*2+fn.ph)*.12;
-        fn.b.rotation.z=0;
-        fn.b.userData.armR.rotation.x=-2.35+Math.sin(beat*1.4+fn.ph)*.32;
-        fn.b.userData.armL.rotation.x=-2.15-Math.sin(beat*1.4+fn.ph)*.30;
+        fn.b.position.y=Math.abs(Math.sin(beat*1.1+fn.ph))*.36;
+        fn.b.rotation.y=fn.baseY+Math.sin(t*3.2+fn.ph)*.25;
+        fn.b.rotation.z=Math.sin(t*3.0+fn.ph)*.10;
+        fn.b.userData.armR.rotation.x=-2.45+Math.sin(beat*1.6+fn.ph)*.48;
+        fn.b.userData.armL.rotation.x=-2.25-Math.sin(beat*1.6+fn.ph)*.45;
       }else if(cyc<2.0){
-        // 左右摇摆扭身体
-        fn.b.position.y=Math.abs(Math.sin(beat*.5+fn.ph))*.05;
-        fn.b.rotation.y=fn.baseY+Math.sin(t*4.2+fn.ph)*.42;
-        fn.b.rotation.z=Math.sin(t*4.2+fn.ph)*.14;
-        fn.b.userData.armR.rotation.x=-1.4+Math.sin(beat+fn.ph)*.45;
-        fn.b.userData.armL.rotation.x=-1.4-Math.sin(beat+fn.ph)*.45;
+        fn.b.position.y=Math.abs(Math.sin(beat*.6+fn.ph))*.14;
+        fn.b.rotation.y=fn.baseY+Math.sin(t*5.2+fn.ph)*.62;
+        fn.b.rotation.z=Math.sin(t*5.2+fn.ph)*.22;
+        fn.b.userData.armR.rotation.x=-1.5+Math.sin(beat*1.4+fn.ph)*.65;
+        fn.b.userData.armL.rotation.x=-1.5-Math.sin(beat*1.4+fn.ph)*.65;
       }else{
-        // 单/双手高举挥舞荧光棒
-        fn.b.position.y=Math.abs(Math.sin(beat*.8+fn.ph))*.10;
-        fn.b.rotation.y=fn.baseY;
-        fn.b.rotation.z=Math.cos(t*3.2+fn.ph)*.08;
-        fn.b.userData.armR.rotation.x=-2.55+Math.sin(t*8.5+fn.ph)*.55;
-        fn.b.userData.armL.rotation.x=-.65+Math.cos(t*4.0+fn.ph)*.25;
+        fn.b.position.y=Math.abs(Math.sin(beat*.9+fn.ph))*.22;
+        fn.b.rotation.y=fn.baseY+Math.cos(t*2.4+fn.ph)*.20;
+        fn.b.rotation.z=Math.cos(t*4.0+fn.ph)*.14;
+        fn.b.userData.armR.rotation.x=-2.6+Math.sin(t*10+fn.ph)*.70;
+        fn.b.userData.armL.rotation.x=-2.0+Math.cos(t*8+fn.ph)*.55;
       }
     }
   }
