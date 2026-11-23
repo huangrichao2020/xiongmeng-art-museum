@@ -8811,26 +8811,57 @@ const sfx={
   },
   midiHz(m){return 440*Math.pow(2,(m-69)/12);},
   // 温暖圣诞木质钢琴 + 丝滑钢片琴（延音重叠 Legato，衔接如流水）
-  playLead(midi,t,dur,vel=.11,pan=.08){
+  /* 之前是三个正弦按整数倍叠在一起、共用一个包络 —— 那就是电钢/风琴的味道。
+     真实钢琴的三件事必须补上，否则怎么调包络都还是电子的：
+     1) 槌击瞬态：每个音开头一记极短（木质/毡槌）的宽带敲击
+     2) 分音不谐和：高次分音偏离整数倍，且偏离量比低次分音大
+     3) 分音独立衰减：琴弦越细的高次分音先死，音头亮、音尾暗 */
+  playLead(midi,t,dur,vel=.11,pan=.08,hammer=false){
     const c=this.ctx,f=this.midiHz(midi);
     const rel=Math.min(Math.max(dur*1.45,.42),.95);
     const filt=c.createBiquadFilter();filt.type='lowpass';
-    filt.frequency.setValueAtTime(Math.min(2400,f*4.8),t);
-    filt.frequency.exponentialRampToValueAtTime(Math.max(580,f*1.7),t+.26);
+    filt.frequency.setValueAtTime(Math.min(2600,f*5.2),t);
+    filt.frequency.exponentialRampToValueAtTime(Math.max(900,f*2.2),t+.30);
     const env=c.createGain();
     env.gain.setValueAtTime(0,t);
-    env.gain.linearRampToValueAtTime(vel,t+.018);
+    env.gain.linearRampToValueAtTime(vel,t+.016);
     env.gain.exponentialRampToValueAtTime(vel*.48,t+.16);
     env.gain.exponentialRampToValueAtTime(.0004,t+rel);
     const pn=c.createStereoPanner?c.createStereoPanner():null;
     if(pn){pn.pan.value=pan;filt.connect(env);env.connect(pn);pn.connect(this.musicBus);}
     else{filt.connect(env);env.connect(this.musicBus);}
-    for(const [mult,amp,det] of [[1,.74,0],[2,.25,1.5],[3,.07,-1.2]]){
-      const o=c.createOscillator();o.type='sine';o.frequency.setValueAtTime(f*mult,t);
-      if(det)o.detune.setValueAtTime(det,t);
-      const og=c.createGain();og.gain.value=amp;
+    // [倍频, 音量, 失谐(音分), 衰减比例]
+    const parts=[[1,.74,0,1],[2,.25,3.4,.46],[3,.07,7.2,.26]];
+    for(const [mult,amp,det,dec] of parts){
+      const o=c.createOscillator();o.type='sine';
+      // 每次触发给一点点随机失谐，避免机械重复（真人弹琴不会一模一样）
+      const jitter=(mult>1?(Math.random()-.5)*1.6:0);
+      o.frequency.setValueAtTime(f*mult,t);
+      o.detune.setValueAtTime(det+jitter,t);
+      const og=c.createGain();
+      const rr=Math.max(.14,rel*dec);
+      og.gain.setValueAtTime(0,t);
+      og.gain.linearRampToValueAtTime(amp,t+.012);
+      og.gain.exponentialRampToValueAtTime(amp*.26,t+.10*dec+.05);
+      og.gain.exponentialRampToValueAtTime(.0002,t+rr);
       o.connect(og);og.connect(filt);
-      o.start(t);o.stop(t+rel+.04);
+      o.start(t);o.stop(t+Math.max(rr,rel*.5)+.05);
+    }
+    /* 槌击瞬态：带通噪声爆音，55ms 内衰减干净。
+       这一下是"去电子感"最关键的东西 —— 纯正弦无论如何都出不来木头敲琴弦的起音。 */
+    if(hammer&&this.noiseBuf&&vel>.03){
+      const nb=c.createBufferSource();nb.buffer=this.noiseBuf;
+      const bp=c.createBiquadFilter();bp.type='bandpass';
+      bp.frequency.value=Math.min(2800,f*2.8);bp.Q.value=.85;
+      const ng=c.createGain();
+      ng.gain.setValueAtTime(0,t);
+      ng.gain.linearRampToValueAtTime(vel*.30,t+.004);
+      ng.gain.exponentialRampToValueAtTime(.0002,t+.055);
+      nb.connect(bp);bp.connect(ng);
+      const hp=c.createStereoPanner?c.createStereoPanner():null;
+      if(hp){hp.pan.value=pan;ng.connect(hp);hp.connect(this.musicBus);}
+      else ng.connect(this.musicBus);
+      nb.start(t,Math.random()*5,.09);
     }
   },
   // 温暖原声木贝斯（圆润连贯托底）
@@ -8911,7 +8942,7 @@ const sfx={
       this.playBass(chord[0],t,Math.min(dur,1.3));
     }
     if(midi>0){
-      this.playLead(midi,t,dur,.105,.08);
+      this.playLead(midi,t,dur,.105,.08,true);      // 主旋律带槌击瞬态
       /* 轻八度装饰（延迟 160ms 叠在上面），八音盒/钟琴的叮咚感，很轻不抢主旋律 */
       if(i%2===0)this.playLead(midi+12,t+.16,dur*.55,.026,.12);
     }
