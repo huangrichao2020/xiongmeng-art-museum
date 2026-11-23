@@ -8883,56 +8883,76 @@ const sfx={
     o.connect(lp);lp.connect(g);g.connect(this.musicBus);
     o.start(t);o.stop(t+dur+.05);
   },
-  // 丝滑流水竖琴分解琶音铺底
+  // 丝滑流水竖琴分解琶音铺底（真实竖琴采样）
   /* 原来这里还有一层三角波"温暖弦乐长音"（4 个音各 1.25s），
-     和竖琴琶音、钢琴叠在一起就糊成一片，很吵 —— 已去掉弦乐层，只留竖琴。 */
+     和竖琴琶音、钢琴叠在一起就糊成一片，很吵 —— 已去掉弦乐层，只留竖琴。
+     竖琴也从合成改成 Salamander 真琴采样（见 HARP_MAP / loadHarp）。 */
   playHarpPad(chord,t){
+    if(this.harpReady&&this.harpBuf){
+      for(let i=0;i<chord.length;i++){
+        const e=this.HARP_MAP[chord[i]];
+        if(!e)continue;
+        /* e = [段起点秒, 变调播放速率]；采样是稀疏的，用最近的采样变调，
+           偏差最多 2 个半音（12 音分以内听不出来） */
+        this.playBufSample(this.harpBuf,e[0],e[1],t+i*.072,this.HARP_SEG/e[1],.10,-.18+i*.09);
+      }
+      return;
+    }
     for(let i=0;i<chord.length;i++){
       this.playLead(chord[i],t+i*.072,.42,.042,-.18+i*.09);
     }
   },
-  /* ══ 真实钢琴采样（替代正弦合成的"钢琴"）
-     纯振荡器堆出来的钢琴永远是电钢味，怎么调包络都救不回来 ——
-     所以主旋律直接改用真实钢琴录音（Salamander/Steinway 采样，
-     来自 GitHub nbrosowsky/tonejs-instruments，CC-BY）。
-     曲子里主旋律只用到 G4~G5 共 8 个音，切成 1.7 秒一段拼成单个
-     audio/piano.wav（1.1MB），一次 fetch + decodeAudioData 全部加载。
-     没加载完时自动退回合成音色，不会开天窗。 */
+  /* ══ 真实乐器采样（替代正弦合成）
+     纯振荡器堆出来的钢琴/竖琴永远是电子味，怎么调包络都救不回来 ——
+     所以主旋律和竖琴琶音都改成真实录音采样
+     （Salamander 三角钢琴 / 竖琴，来自 GitHub nbrosowsky/tonejs-instruments，CC-BY）：
+       钢琴：主旋律只用 G4~G5 共 8 个音 → 切成 1.7 秒一段拼成 audio/piano.wav（1.1MB）
+       竖琴：采样库本身稀疏（每 1~2 个八度一个），取 C3/E3/G3/B3/D4/F4/A4 七个
+             用 playbackRate 变调，覆盖和弦所需的 15 个音高 → audio/harp.wav（0.6MB）
+     两个文件各自一次 fetch + decodeAudioData 加载，没就绪时自动退回合成音色。 */
   PIANO_MAP:{67:0,69:1.7,71:3.4,72:5.1,74:6.8,76:8.5,77:10.2,79:11.9},
   PIANO_SEG:1.7,
-  pianoBuf:null,pianoReady:false,
-  loadPiano(){
-    if(this.pianoBuf||this._pianoLoading)return;
-    this._pianoLoading=true;
-    fetch('./audio/piano.wav').then(r=>r.arrayBuffer()).then(ab=>{
-      const c=this.ctx;
-      if(!c)return;
-      return c.decodeAudioData(ab).then(buf=>{this.pianoBuf=buf;this.pianoReady=true;});
-    }).catch(()=>{this.pianoBuf=null;}).finally(()=>{this._pianoLoading=false;});
-  },
-  playPiano(midi,t,dur,vel=.22,pan=.08){
+  HARP_SEG:1.0,
+  HARP_MAP:{48:[0,1],50:[0,1.1225],52:[1,1],53:[1,1.0595],55:[2,1],57:[2,1.1225],
+            59:[3,1],60:[3,1.0595],62:[4,1],64:[5,.9439],65:[5,1],66:[5,1.0595],
+            67:[5,1.1225],69:[6,1],71:[6,1.1225]},
+  pianoBuf:null,pianoReady:false,harpBuf:null,harpReady:false,
+  /* 通用采样播放：只做起始 6ms 淡入，之后的衰减曲线全部交给采样本身
+     （真实乐器的自然衰减是录音里就有的，再叠一层人为包络反而变回电子味） */
+  playBufSample(buf,off,rate,t,dur,vel,pan){
     const c=this.ctx;
-    if(!c)return;
-    if(!this.pianoReady||!this.pianoBuf){this.playLead(midi,t,dur,vel*.5,pan);return;}
-    const map=this.PIANO_MAP;
-    if(map[midi]===undefined){this.playLead(midi,t,dur,vel*.5,pan);return;}
-    const src=c.createBufferSource();
-    src.buffer=this.pianoBuf;
-    src.playbackRate.value=1;               // 采样就是该音高，不需要变调
+    const src=c.createBufferSource();src.buffer=buf;src.playbackRate.value=rate;
     const g=c.createGain();
-    const rel=Math.min(Math.max(dur*1.5,.5),1.6);
-    /* 采样本身自带真实钢琴的自然衰减曲线，这里只做起音淡入和末尾淡出，
-       不再叠一层人为包络（那会把真钢琴压成电钢） */
     g.gain.setValueAtTime(0,t);
     g.gain.linearRampToValueAtTime(vel,t+.006);
-    g.gain.setValueAtTime(vel,Math.max(t+.01,t+rel-.14));
-    g.gain.exponentialRampToValueAtTime(.0006,t+rel);
-    const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=5200;
-    src.connect(lp);lp.connect(g);
+    src.connect(g);
     const pn=c.createStereoPanner?c.createStereoPanner():null;
     if(pn){pn.pan.value=pan;g.connect(pn);pn.connect(this.musicBus);}
     else g.connect(this.musicBus);
-    src.start(t,map[midi],Math.min(this.PIANO_SEG,this.pianoBuf.duration-map[midi]));
+    src.start(t,off,Math.max(.05,Math.min(dur,buf.duration-off)));
+  },
+  loadSample(url,onReady){
+    return fetch(url).then(r=>r.arrayBuffer()).then(ab=>{
+      const c=this.ctx;
+      if(!c)return null;
+      return c.decodeAudioData(ab).then(buf=>{onReady(buf);return buf;});
+    }).catch(()=>null);
+  },
+  loadPiano(){
+    if(this.pianoBuf||this._pianoLoading)return;
+    this._pianoLoading=true;
+    this.loadSample('./audio/piano.wav',b=>{if(b){this.pianoBuf=b;this.pianoReady=true;}}).finally(()=>{this._pianoLoading=false;});
+  },
+  loadHarp(){
+    if(this.harpBuf||this._harpLoading)return;
+    this._harpLoading=true;
+    this.loadSample('./audio/harp.wav',b=>{if(b){this.harpBuf=b;this.harpReady=true;}}).finally(()=>{this._harpLoading=false;});
+  },
+  playPiano(midi,t,dur,vel=.20,pan=.08){
+    if(!this.pianoReady||!this.pianoBuf||this.PIANO_MAP[midi]===undefined){
+      this.playLead(midi,t,dur,vel*.5,pan);return;
+    }
+    this.playBufSample(this.pianoBuf,this.PIANO_MAP[midi],1,t,this.PIANO_SEG,vel,pan);
   },
   // 极轻柔圣诞雪橇铃（每八拍温柔点缀一次）
   /* 原来频率 3150/4180 Hz、每 4 拍一次、全曲不停 —— 3~4kHz 的金属高频
@@ -9071,6 +9091,7 @@ const sfx={
       this.initBgmTracks();
       this.startSynthBgm();          // 合成圣诞乐器 BGM（主）
       this.loadPiano();               // 真实钢琴采样（异步预载，没好就先用合成音）
+      this.loadHarp();                // 真实竖琴采样（同上）
       if(this.bgmTracks){
         for(const k of ['museum','park','rock']){
           this.bgmTracks[k].a.play().catch(()=>{});
