@@ -7941,9 +7941,9 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     OUTDOOR_OBS.push([27,36,4.6]);
   }
 
-  /* ── 冬夜音乐节 · 露天摇滚乐表演舞台（替代原海盗船，西北广场开阔现场） ── */
+  /* ── 冬夜音乐节 · 露天摇滚乐表演舞台（背对教堂朝向游乐园中央，配活动光束射灯与热力乐队） ── */
   {
-    const g=new THREE.Group();g.position.set(-20.0,0,25.5);fair.add(g);
+    const g=new THREE.Group();g.position.set(-20.0,0,25.5);g.rotation.y=Math.PI*.44;fair.add(g);
     const deckM=M(0x232a36,{roughness:.75,metalness:.25,envMapIntensity:.2});
     const trussM=M(0xb8c4d4,{roughness:.32,metalness:.78,envMapIntensity:.55});
     const ampM=M(0x1b2028,{roughness:.85,metalness:.1,envMapIntensity:.15});
@@ -7951,7 +7951,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     add(g,BX(7.8,.48,4.6),deckM,0,.24,0);
     add(g,BX(7.92,.08,4.72),gldM,0,.49,0);
     add(g,BX(3.6,.22,.9),deckM,0,.11,2.72);
-    // 2. 两侧桁架立柱 + 顶部横梁 + 6 盏律动舞台射灯 + 背景大型摇滚灯箱屏幕
+    // 2. 两侧桁架立柱 + 顶部横梁 + 6 盏可摇头扫射投射灯（带动态光束锥）+ 背景巨幕灯箱
     for(const sx of [-3.6,3.6]){
       add(g,BX(.22,3.8,.22),trussM,sx,2.35,-1.85);
       add(g,BX(.22,3.8,.22),trussM,sx,2.35,1.85);
@@ -7961,14 +7961,20 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     add(g,BX(7.5,.24,.24),trussM,0,4.25,-1.85);
     add(g,BX(6.6,2.3,.18),ampM,0,2.2,-1.95);
     signPanel(g,6.2,1.95,animeSignTex(512,160,'雪夜冬日摇滚音乐节','WINTER ROCK FESTIVAL · LIVE'),0,2.2,-1.83,.72);
-    const stageSpots=[];
+    const spotHeads=[];
     const spotCols=[0xff5a88,0xffd066,0x5ce1ff,0xff5a88,0xffd066,0x5ce1ff];
     for(let i=0;i<6;i++){
       const sx=-2.5+i*1.0;
-      add(g,new THREE.CylinderGeometry(.10,.14,.26,10),ampM,sx,4.02,1.82).rotation.x=.55;
+      const head=new THREE.Group();head.position.set(sx,4.08,1.76);g.add(head);
+      add(head,new THREE.CylinderGeometry(.10,.14,.28,10),ampM,0,-.06,0);
       const lm=new THREE.MeshBasicMaterial({color:spotCols[i]});
-      addNS(g,new THREE.SphereGeometry(.11,8,6),lm,sx,3.92,1.92);
-      stageSpots.push({m:lm,ph:i*1.1});
+      addNS(head,new THREE.SphereGeometry(.11,8,6),lm,0,-.18,0);
+      const bm=new THREE.MeshBasicMaterial({
+        color:spotCols[i],transparent:true,opacity:.14,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide
+      });
+      const cone=new THREE.Mesh(new THREE.ConeGeometry(1.15,4.6,14,1,true),bm);
+      cone.position.y=-2.45;cone.raycast=()=>{};head.add(cone);
+      spotHeads.push({head,bm,ph:i*1.05});
     }
     // 3. 左右双层 PA 巨型音箱阵列（带低音炮振膜）
     const woofers=[];
@@ -7982,9 +7988,11 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     // 4. 爵士架子鼓组 + 4 只小熊摇滚乐手（主唱/主音吉他/贝斯手/鼓手）
     add(g,new THREE.CylinderGeometry(.48,.48,.46,16),M(0xb8383f,{roughness:.4}),0,.98,-.65).rotation.z=Math.PI/2;
     add(g,new THREE.CylinderGeometry(.26,.26,.18,12),M(0xf2ede4,{roughness:.6}),-.48,1.02,-.55);
+    const cymbals=[];
     for(const cx of [-.68,.68]){
       add(g,new THREE.CylinderGeometry(.02,.02,.95,6),trussM,cx,.98,-.75);
-      add(g,new THREE.CylinderGeometry(.34,.34,.02,14),gldM,cx,1.46,-.75);
+      const cym=add(g,new THREE.CylinderGeometry(.34,.34,.02,14),gldM,cx,1.46,-.75);
+      cymbals.push(cym);
     }
     const drum=makePerson(0x3b6ba8,0xe8c49a,{scale:.84,acc:'headphone'});
     drum.position.set(0,.52,-1.18);g.add(drum);
@@ -8003,18 +8011,19 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     add(g,new THREE.CylinderGeometry(.022,.022,1.18,6),trussM,0,1.10,1.25); // 立式麦克风架
     const gtrL=makeRockBear(-1.65,.55,0x345c8a,'cap',0xd84654);
     const gtrR=makeRockBear(1.65,.55,0x387460,'beret',0x58a6ff);
-    // 5. 台前挥舞荧光棒欢呼的小熊观众（6 只）
+    // 5. 台前挥舞荧光棒、轮流扭动与蹦跳欢呼的小熊观众（7 只）
     const fans=[];
-    const fanCols=[0xb84048,0x3d7a66,0x4b6fa8,0xd8a24a,0xc87a96,0x7c4e6c];
-    for(let i=0;i<6;i++){
-      const fx=-2.4+i*.96, fz=3.45+(i%2)*.55;
+    const fanCols=[0xb84048,0x3d7a66,0x4b6fa8,0xd8a24a,0xc87a96,0x7c4e6c,0xb84048];
+    for(let i=0;i<7;i++){
+      const fx=-2.7+i*.90, fz=3.45+(i%2)*.55;
       const fn=makePerson(fanCols[i],0xe8c49a,{scale:.80,acc:i%2?'santa':'earmuff'});
-      fn.position.set(fx,0,fz);fn.rotation.y=Math.PI+(i-2.5)*.08;
-      addNS(fn.userData.armR,new THREE.CylinderGeometry(.02,.02,.28,6),getBulbMat(spotCols[i],i),0,-.28,.08);
-      g.add(fn);fans.push({b:fn,ph:i*.85});
+      fn.position.set(fx,0,fz);fn.rotation.y=Math.PI+(i-3)*.08;
+      addNS(fn.userData.armR,new THREE.CylinderGeometry(.02,.02,.28,6),getBulbMat(spotCols[i%spotCols.length],i),0,-.28,.08);
+      if(i%2===0)addNS(fn.userData.armL,new THREE.CylinderGeometry(.02,.02,.28,6),getBulbMat(spotCols[(i+2)%spotCols.length],i+1),0,-.28,.08);
+      g.add(fn);fans.push({b:fn,ph:i*1.05,baseY:Math.PI+(i-3)*.08});
     }
     g.userData.keep=true;
-    amusement.band={drum,voc,gtrL,gtrR,woofers,stageSpots,fans};
+    amusement.band={drum,voc,gtrL,gtrR,woofers,spotHeads,cymbals,fans};
     amusement.dyn.add(g);
     pool(g,6.8,.03,.24,0xffa6c9);
     OUTDOOR_OBS.push([-20.0,25.5,4.2]);
@@ -10463,20 +10472,57 @@ function animate(){
   }
   if(amusement.band){
     const b=amusement.band, beat=t*7.2;
-    b.drum.userData.armL.rotation.x=-1.1+Math.sin(beat*2.0)*.55;
-    b.drum.userData.armR.rotation.x=-1.1-Math.sin(beat*2.0)*.55;
-    b.voc.position.y=.52+Math.abs(Math.sin(beat))*.05;
-    b.voc.userData.armR.rotation.x=-.9+Math.sin(beat*1.5)*.32;
-    b.gtrL.rotation.z=Math.sin(beat*.5)*.08;
-    b.gtrL.userData.armR.rotation.x=-.85+Math.sin(beat*2.0)*.28;
-    b.gtrR.rotation.z=-Math.sin(beat*.5)*.08;
-    b.gtrR.userData.armR.rotation.x=-.85+Math.cos(beat*2.0)*.28;
-    const pScale=1+Math.max(0,Math.sin(beat*2))*.10;
+    // 1. 活动摇头舞台投射灯光束扫射
+    for(const sp of b.spotHeads){
+      sp.head.rotation.x=-.32+Math.sin(t*1.9+sp.ph)*.38;
+      sp.head.rotation.z=Math.cos(t*1.45+sp.ph*1.3)*.44;
+      sp.bm.opacity=.09+.08*Math.max(0,Math.sin(beat*.8+sp.ph));
+    }
+    // 2. 乐队全情投入热力演出（甩头、扫弦、狂敲架子鼓、铜钹震颤）
+    b.drum.userData.armL.rotation.x=-1.15+Math.sin(beat*2.2)*.68;
+    b.drum.userData.armR.rotation.x=-1.15-Math.sin(beat*2.2)*.68;
+    b.drum.rotation.x=Math.sin(beat*1.1)*.12;
+    b.cymbals.forEach((cy,ci)=>{cy.rotation.z=Math.sin(beat*3.0+ci)*.09;});
+    b.voc.position.y=.52+Math.abs(Math.sin(beat))*.09;
+    b.voc.rotation.y=Math.sin(t*2.4)*.24;
+    b.voc.rotation.x=Math.sin(beat)*.10;
+    b.voc.userData.armR.rotation.x=-.95+Math.sin(beat*1.8)*.48;
+    b.voc.userData.armL.rotation.x=-1.65+Math.cos(beat*.9)*.35;
+    b.gtrL.rotation.z=Math.sin(beat*.6)*.14;
+    b.gtrL.rotation.y=.22+Math.sin(t*1.8)*.20;
+    b.gtrL.userData.armR.rotation.x=-.9+Math.sin(beat*2.4)*.45;
+    b.gtrL.userData.armL.rotation.x=-.75+Math.sin(t*4.5)*.18;
+    b.gtrR.rotation.z=-Math.sin(beat*.6)*.14;
+    b.gtrR.rotation.y=-.22+Math.cos(t*1.8)*.20;
+    b.gtrR.userData.armR.rotation.x=-.9+Math.cos(beat*2.4)*.45;
+    b.gtrR.userData.armL.rotation.x=-.75+Math.cos(t*4.2)*.18;
+    const pScale=1+Math.max(0,Math.sin(beat*2))*.12;
     for(const wf of b.woofers)wf.scale.set(pScale,1,pScale);
-    for(const fn of b.fans){
-      fn.b.position.y=Math.abs(Math.sin(beat+fn.ph))*.12;
-      fn.b.userData.armR.rotation.x=-2.2+Math.sin(beat+fn.ph)*.38;
-      fn.b.userData.armL.rotation.x=-1.8-Math.cos(beat+fn.ph)*.25;
+    // 3. 台下观众轮流扭动身体、蹦跳与高举挥手
+    for(let fi=0;fi<b.fans.length;fi++){
+      const fn=b.fans[fi], cyc=(t*0.65+fn.ph)%3.0;
+      if(cyc<1.0){
+        // 轮流蹦跳欢呼
+        fn.b.position.y=Math.abs(Math.sin(beat+fn.ph))*.24;
+        fn.b.rotation.y=fn.baseY+Math.sin(t*2+fn.ph)*.12;
+        fn.b.rotation.z=0;
+        fn.b.userData.armR.rotation.x=-2.35+Math.sin(beat*1.4+fn.ph)*.32;
+        fn.b.userData.armL.rotation.x=-2.15-Math.sin(beat*1.4+fn.ph)*.30;
+      }else if(cyc<2.0){
+        // 左右摇摆扭身体
+        fn.b.position.y=Math.abs(Math.sin(beat*.5+fn.ph))*.05;
+        fn.b.rotation.y=fn.baseY+Math.sin(t*4.2+fn.ph)*.42;
+        fn.b.rotation.z=Math.sin(t*4.2+fn.ph)*.14;
+        fn.b.userData.armR.rotation.x=-1.4+Math.sin(beat+fn.ph)*.45;
+        fn.b.userData.armL.rotation.x=-1.4-Math.sin(beat+fn.ph)*.45;
+      }else{
+        // 单/双手高举挥舞荧光棒
+        fn.b.position.y=Math.abs(Math.sin(beat*.8+fn.ph))*.10;
+        fn.b.rotation.y=fn.baseY;
+        fn.b.rotation.z=Math.cos(t*3.2+fn.ph)*.08;
+        fn.b.userData.armR.rotation.x=-2.55+Math.sin(t*8.5+fn.ph)*.55;
+        fn.b.userData.armL.rotation.x=-.65+Math.cos(t*4.0+fn.ph)*.25;
+      }
     }
   }
   if(amusement.carousel)amusement.carousel.rotation.y+=dt*.45;
