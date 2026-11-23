@@ -8727,31 +8727,31 @@ const sfx={
   // 欢快游乐园圣诞 BGM（Jingle Bells + We Wish You a Merry Christmas 轻快串联）
   // (MIDI音高, 节拍数, 可选伴奏和弦MIDI数组)
   SONG:[
-    [76,1,[48,60,64,67]],[76,1],[76,1.5],[79,.5],
-    [76,1,[48,60,64,67]],[76,1],[76,1.5],[79,.5],
-    [76,1,[48,60,64,67]],[79,1],[72,1.5],[74,.5],
-    [76,2,[48,60,64,67]],[79,1],[76,1],
-    [77,1,[53,60,65,69]],[77,1],[77,1.5],[77,.5],
-    [77,1,[48,60,64,67]],[76,1],[76,1],[76,.5],[76,.5],
-    [76,1,[50,62,66,69]],[74,1],[74,1],[76,1],
-    [74,1.5,[55,62,65,71]],[76,.5],[79,1.5],[74,.5],
-    [76,1,[48,60,64,67]],[76,1],[76,1.5],[79,.5],
-    [76,1,[48,60,64,67]],[76,1],[76,1.5],[79,.5],
-    [76,1,[48,60,64,67]],[79,1],[72,1.5],[74,.5],
-    [76,2,[48,60,64,67]],[79,1],[76,1],
-    [77,1,[53,60,65,69]],[77,1],[77,1.5],[77,.5],
-    [77,1,[48,60,64,67]],[76,1],[76,1],[76,.5],[76,.5],
-    [79,1,[55,62,65,71]],[79,1],[77,1],[74,1],
-    [72,2,[48,60,64,67]],[79,1],[76,1],
+    [76,1,[48,60,64,67]],[0,1],[76,1.5],[79,.5],
+    [76,1,[48,60,64,67]],[0,1],[76,1.5],[79,.5],
+    [76,1,[48,60,64,67]],[0,1],[72,1.5],[74,.5],
+    [76,2,[48,60,64,67]],[0,1],[76,1],
+    [77,1,[53,60,65,69]],[0,1],[77,1.5],[77,.5],
+    [77,1,[48,60,64,67]],[0,1],[76,1],[76,.5],[76,.5],
+    [76,1,[50,62,66,69]],[0,1],[74,1],[76,1],
+    [74,1.5,[55,62,65,71]],[0,.5],[79,1.5],[74,.5],
+    [76,1,[48,60,64,67]],[0,1],[76,1.5],[79,.5],
+    [76,1,[48,60,64,67]],[0,1],[76,1.5],[79,.5],
+    [76,1,[48,60,64,67]],[0,1],[72,1.5],[74,.5],
+    [76,2,[48,60,64,67]],[0,1],[76,1],
+    [77,1,[53,60,65,69]],[0,1],[77,1.5],[77,.5],
+    [77,1,[48,60,64,67]],[0,1],[76,1],[76,.5],[76,.5],
+    [79,1,[55,62,65,71]],[0,1],[77,1],[74,1],
+    [72,2,[48,60,64,67]],[0,1],[76,1],
     // B 段副歌推进（明快切分）
-    [67,1,[48,60,64,67]],[72,1],[72,.5],[74,.5],[72,.5],[71,.5],
-    [69,1,[53,60,65,69]],[69,1],[69,1],[72,1],
-    [74,1,[55,62,65,71]],[74,.5],[76,.5],[74,.5],[72,.5],[71,1],
-    [67,1,[52,59,64,67]],[67,1],[71,1],[74,1],
-    [76,1,[57,60,64,69]],[76,.5],[77,.5],[76,.5],[74,.5],[72,1],
-    [69,1,[53,60,65,69]],[67,.5],[67,.5],[69,1],[71,1],
-    [72,1,[50,62,65,69]],[74,1,[55,62,65,71]],[76,1],[79,1],
-    [72,2.5,[48,60,64,67]],[74,.5],[76,.5],[79,.5]
+    [67,1,[48,60,64,67]],[0,1],[72,.5],[74,.5],[72,.5],[71,.5],
+    [69,1,[53,60,65,69]],[0,1],[69,1],[72,1],
+    [74,1,[55,62,65,71]],[0,.5],[76,.5],[74,.5],[72,.5],[71,1],
+    [67,1,[52,59,64,67]],[0,1],[71,1],[74,1],
+    [76,1,[57,60,64,69]],[0,.5],[77,.5],[76,.5],[74,.5],[72,1],
+    [69,1,[53,60,65,69]],[0,.5],[67,.5],[69,1],[71,1],
+    [72,1,[50,62,65,69]],[0,1,[55,62,65,71]],[76,1],[79,1],
+    [72,2.5,[48,60,64,67]],[0,.5],[76,.5],[79,.5]
   ],
   boot(){
     if(this.ctx){if(this.ctx.state==='suspended')this.ctx.resume();return true;}
@@ -8760,7 +8760,9 @@ const sfx={
     const c=this.ctx=new AC();
     this.master=c.createGain();this.master.gain.value=0;this.master.connect(c.destination);
     const comp=c.createDynamicsCompressor();
-    comp.threshold.value=-15;comp.knee.value=12;comp.ratio.value=3.6;comp.attack.value=.005;comp.release.value=.16;
+    /* 压缩别太狠：threshold -15 / ratio 3.6 会把每个瞬时都压平，
+       听起来反而更"满更吵"。放宽一点，让音乐保留自己的动态起伏。 */
+    comp.threshold.value=-8;comp.knee.value=14;comp.ratio.value=2.4;comp.attack.value=.005;comp.release.value=.18;
     this.musicBus=c.createGain();this.musicBus.gain.value=.88;
     this.musicBus.connect(comp);comp.connect(this.master);
 
@@ -8779,7 +8781,7 @@ const sfx={
       }
     }
     const conv=c.createConvolver();conv.buffer=revBuf;
-    const revSend=c.createGain();revSend.gain.value=.34;
+    const revSend=c.createGain();revSend.gain.value=.26;
     this.musicBus.connect(conv);conv.connect(revSend);revSend.connect(comp);
 
     // 立体声轻柔冬雪微风底噪
@@ -8894,7 +8896,7 @@ const sfx={
         if(!e)continue;
         /* e = [段起点秒, 变调播放速率]；采样是稀疏的，用最近的采样变调，
            偏差最多 2 个半音（12 音分以内听不出来） */
-        this.playBufSample(this.harpBuf,e[0],e[1],t+i*.072,this.HARP_SEG/e[1],.10,-.18+i*.09);
+        this.playBufSample(this.harpBuf,e[0],e[1],t+i*.072,this.HARP_SEG/e[1],.085,-.18+i*.09);
       }
       return;
     }
@@ -8923,13 +8925,20 @@ const sfx={
     const c=this.ctx;
     const src=c.createBufferSource();src.buffer=buf;src.playbackRate.value=rate;
     const g=c.createGain();
+    const maxD=Math.max(.05,Math.min(dur,buf.duration-off));
     g.gain.setValueAtTime(0,t);
     g.gain.linearRampToValueAtTime(vel,t+.006);
+    /* 尾部 25ms 淡出：采样被时值截断时硬切会有咔哒声，
+       真钢琴收键时余音也是渐弱的，这里让截断点听不出来。 */
+    if(maxD>.045){
+      g.gain.setValueAtTime(vel,t+maxD-.025);
+      g.gain.linearRampToValueAtTime(0,t+maxD);
+    }
     src.connect(g);
     const pn=c.createStereoPanner?c.createStereoPanner():null;
     if(pn){pn.pan.value=pan;g.connect(pn);pn.connect(this.musicBus);}
     else g.connect(this.musicBus);
-    src.start(t,off,Math.max(.05,Math.min(dur,buf.duration-off)));
+    src.start(t,off,maxD);
   },
   loadSample(url,onReady){
     return fetch(url).then(r=>r.arrayBuffer()).then(ab=>{
@@ -8948,11 +8957,19 @@ const sfx={
     this._harpLoading=true;
     this.loadSample('./audio/harp.wav',b=>{if(b){this.harpBuf=b;this.harpReady=true;}}).finally(()=>{this._harpLoading=false;});
   },
-  playPiano(midi,t,dur,vel=.20,pan=.08){
+  playPiano(midi,t,dur,vel=.15,pan=.08){
     if(!this.pianoReady||!this.pianoBuf||this.PIANO_MAP[midi]===undefined){
       this.playLead(midi,t,dur,vel*.5,pan);return;
     }
-    this.playBufSample(this.pianoBuf,this.PIANO_MAP[midi],1,t,this.PIANO_SEG,vel,pan);
+    /* 关键：采样不能一律播满整段。
+       乐句是 120BPM、每步 0.5 秒，如果每个音都响满 1.7 秒，
+       稳态会同时压着 3~4 个钢琴音，音符之间一点缝都没有 ——
+       听起来就是一串"叮咚"从开头连到结尾，是全曲最吵的一层
+       （实测干声能量占比 70%、能量曲线全程恒定不停）。
+       换成采样时把音符时值丢了，是接真采样引入的回退。
+       现在按音符时值收尾（时值 + 一点余音），恢复真钢琴的句法。 */
+    const playDur=Math.min(this.PIANO_SEG,Math.max(.20,dur*.62+.24));
+    this.playBufSample(this.pianoBuf,this.PIANO_MAP[midi],1,t,playDur,vel,pan);
   },
   // 极轻柔圣诞雪橇铃（每八拍温柔点缀一次）
   /* 原来频率 3150/4180 Hz、每 4 拍一次、全曲不停 —— 3~4kHz 的金属高频
@@ -9016,7 +9033,7 @@ const sfx={
     }
     if(midi>0){
       /* 主旋律走真实钢琴采样（playPiano）；采样没就绪时它自己退回合成音色 */
-      this.playPiano(midi,t,dur,.20,.08);
+      this.playPiano(midi,t,dur,.15,.08);
       /* 原来这里还叠过一个高八度装饰音（每 2 步一次，E6 + 谐波到 4k），
          听着就是全程不停的"叮"，是第二个吵源 —— 已去掉，只留单音主旋律。 */
     }
@@ -9040,11 +9057,14 @@ const sfx={
       node.connect(hp);hp.connect(lp);lp.connect(g);g.connect(this.master);
       return {a,g};
     };
+    /* rock_festival.mp3 已停用：它是失真摇滚，4kHz 以上的高频贯穿整首
+       （分段能量全程 0.3~0.97），而且原文件 loop 接缝落差 78dB ——
+       每 24 秒就有一记从静默砸进重音的爆点，是"一直很吵"的一大来源。
+       文件还留在服务器上，想恢复只要把这一行加回去。 */
     this.bgmTracks={
       museum:mk('./audio/museum_piano.mp3'),
       park:mk('./audio/park_wonderland.mp3'),
-      rock:mk('./audio/rock_festival.mp3'),
-      v:{museum:0,park:0,rock:0}
+      v:{museum:0,park:0}
     };
   },
   updateBgmMix(dt){
@@ -9052,17 +9072,18 @@ const sfx={
     const tr=this.bgmTracks;
     const set=(k,v)=>{tr[k].g.gain.value=Math.max(0,Math.min(1,v));};
     if(!this.on){
-      for(const k of ['museum','park','rock']){tr.v[k]=Math.max(0,tr.v[k]-dt*1.6);set(k,tr.v[k]);}
+      for(const k of ['museum','park']){tr.v[k]=Math.max(0,tr.v[k]-dt*1.6);set(k,tr.v[k]);}
       return;
     }
     const cx=camera.position.x, cy=camera.position.y, cz=camera.position.z;
     const inMus=cx>-10.5&&cx<12.5&&cz>-12.0&&cz<8.5&&cy<9.5;
     const dRock=Math.hypot(cx-39.5,cz-36.5);
     const rockK=inMus?0:Math.max(0,Math.min(1,1-(dRock-9)/16));
-    /* 三条 mp3 现在只当"远处环境垫"，主 BGM 是合成的圣诞乐器 */
-    const tMus=inMus?.06:0;
-    const tRock=rockK*.06;
-    const tPark=inMus?0:.05*(1-rockK*.85);
+    /* 剩下的两条 mp3 只当"远处环境垫"，主 BGM 是合成的圣诞乐器。
+       两条素材都重做过无缝 loop（接缝落差 160dB → ±3dB），并把 park 预烘焙
+       了 3.2kHz 低通，把刺耳的高频彻底压掉。 */
+    const tMus=inMus?.055:0;
+    const tPark=inMus?0:.032*(1-rockK*.85);
     /* 合成圣诞乐器 BGM 音量：馆内更饱满，户外收小当远景音乐 */
     const tSyn=inMus?.46:.26;
     if(this.musicBus){
@@ -9072,10 +9093,8 @@ const sfx={
     const k=Math.min(1,dt*2.4);
     tr.v.museum+=(tMus-tr.v.museum)*k;
     tr.v.park+=(tPark-tr.v.park)*k;
-    tr.v.rock+=(tRock-tr.v.rock)*k;
     set('museum',tr.v.museum);
     set('park',tr.v.park);
-    set('rock',tr.v.rock);
   },
   pump(){},
   setRain(){},
@@ -9093,7 +9112,7 @@ const sfx={
       this.loadPiano();               // 真实钢琴采样（异步预载，没好就先用合成音）
       this.loadHarp();                // 真实竖琴采样（同上）
       if(this.bgmTracks){
-        for(const k of ['museum','park','rock']){
+        for(const k of ['museum','park']){
           this.bgmTracks[k].a.play().catch(()=>{});
         }
       }
@@ -9101,7 +9120,7 @@ const sfx={
       if(this.master&&this.ctx)this.master.gain.setTargetAtTime(0,this.ctx.currentTime,.20);
       this.stopSynthBgm();
       if(this.bgmTracks){
-        for(const k of ['museum','park','rock'])this.bgmTracks[k].a.pause();
+        for(const k of ['museum','park'])this.bgmTracks[k].a.pause();
       }
     }
   },
