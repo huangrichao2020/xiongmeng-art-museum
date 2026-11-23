@@ -479,6 +479,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 /* ════════════════════════════════════════════════════════════
    0. 基础工具
@@ -608,10 +609,50 @@ controls.autoRotateSpeed=.55;
 
 const HOME={pos:camera.position.clone(),tgt:controls.target.clone()};
 
-/* ── 后期：轻量高清 RenderPass + 极速柔和泛光（0.25x 采样倍速） + ACES 输出 ── */
+/* ── 后期：日系二次元电影感三渲二管线 (Render -> Sobel细描边&新海诚调色 -> 柔和Bloom -> ACES) ── */
 const composer=new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene,camera));
-const bloom=new UnrealBloomPass(new THREE.Vector2(Math.max(64,Math.round(innerWidth*.25)),Math.max(64,Math.round(innerHeight*.25))),.30,.82,.80);
+const animeOutlineShader={
+  uniforms:{
+    tDiffuse:{value:null},
+    uRes:{value:new THREE.Vector2(Math.max(1,innerWidth*HI_DPR),Math.max(1,innerHeight*HI_DPR))}
+  },
+  vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+  fragmentShader:`
+    uniform sampler2D tDiffuse;
+    uniform vec2 uRes;
+    varying vec2 vUv;
+    float luma(vec3 c){return dot(c,vec3(0.299,0.587,0.114));}
+    void main(){
+      vec2 tx=1.0/uRes;
+      vec4 base=texture2D(tDiffuse,vUv);
+      float tl=luma(texture2D(tDiffuse,vUv+vec2(-tx.x, tx.y)).rgb);
+      float tm=luma(texture2D(tDiffuse,vUv+vec2( 0.0,  tx.y)).rgb);
+      float tr=luma(texture2D(tDiffuse,vUv+vec2( tx.x, tx.y)).rgb);
+      float ml=luma(texture2D(tDiffuse,vUv+vec2(-tx.x, 0.0)).rgb);
+      float mr=luma(texture2D(tDiffuse,vUv+vec2( tx.x, 0.0)).rgb);
+      float bl=luma(texture2D(tDiffuse,vUv+vec2(-tx.x,-tx.y)).rgb);
+      float bm=luma(texture2D(tDiffuse,vUv+vec2( 0.0, -tx.y)).rgb);
+      float br=luma(texture2D(tDiffuse,vUv+vec2( tx.x,-tx.y)).rgb);
+      float gx=-tl-2.0*ml-bl+tr+2.0*mr+br;
+      float gy=-tl-2.0*tm-tr+bl+2.0*bm+br;
+      float edge=smoothstep(0.16,0.42,sqrt(gx*gx+gy*gy));
+      float centerL=luma(base.rgb);
+      // 极亮发光体与最暗夜空不压黑线，只给实体边缘加干净细锐的动漫深蓝紫墨线
+      float edgeMask=smoothstep(0.04,0.14,centerL)*(1.0-smoothstep(0.75,1.05,centerL));
+      vec3 ink=vec3(0.06,0.08,0.16);
+      vec3 col=mix(base.rgb,ink,edge*edgeMask*0.48);
+      // 日系二次元电影微调色：暗部轻染通透青紫，整体色彩更清澈饱满
+      float g=luma(col);
+      col=mix(vec3(g),col,1.12);
+      col=mix(col+vec3(0.006,0.012,0.028)*(1.0-smoothstep(0.0,0.35,g)),col,0.65);
+      gl_FragColor=vec4(col,base.a);
+    }
+  `
+};
+const animePass=new ShaderPass(animeOutlineShader);
+composer.addPass(animePass);
+const bloom=new UnrealBloomPass(new THREE.Vector2(Math.max(64,Math.round(innerWidth*.25)),Math.max(64,Math.round(innerHeight*.25))),.34,.82,.78);
 const _bloomSetSize=bloom.setSize.bind(bloom);
 bloom.setSize=(w,h)=>_bloomSetSize(Math.max(64,Math.round(w*.25)),Math.max(64,Math.round(h*.25)));
 composer.addPass(bloom);
@@ -8154,6 +8195,24 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     }
     pool(g,5.5,.03,.24,0xffd68a);
     OUTDOOR_OBS.push([32,52,2.8]);
+    // 异步加载 Blender 5.2.2 LTS 精雕版圣诞老人雕塑替换临时拼接体
+    try{
+      const gltfL=new GLTFLoader();
+      gltfL.load('./models/santa_monument.glb',gltf=>{
+        const mdl=gltf.scene;
+        mdl.position.set(32,0,52);
+        mdl.rotation.y=-2.45;
+        mdl.scale.setScalar(1.18);
+        mdl.traverse(o=>{
+          if(o.isMesh){
+            o.castShadow=false;o.receiveShadow=true;
+            if(window._applyAnimeToon)window._applyAnimeToon(o.material);
+          }
+        });
+        scene.add(mdl);
+        g.visible=false;
+      });
+    }catch(e){}
   }
 
   /* ── 圣诞高空弹射跳伞塔 (29.5, 0, 44.5)：位于摩天轮与圣诞老人雕塑中间，规模放大 1.42x ── */
@@ -10393,6 +10452,9 @@ addEventListener('resize',()=>{
   renderer.setSize(innerWidth,innerHeight);
   composer.setSize(innerWidth,innerHeight);
   bloom.setSize(innerWidth,innerHeight);
+  if(animePass&&animePass.uniforms&&animePass.uniforms.uRes){
+    animePass.uniforms.uRes.value.set(Math.max(1,innerWidth*HI_DPR),Math.max(1,innerHeight*HI_DPR));
+  }
 });
 
 /* 预热一次渲染，避免开场卡顿 */
@@ -11249,6 +11311,48 @@ function updateTrain(dt){
         }
       }
     }
+  });
+})();
+
+/* ══ 日系二次元电影感三渲二全局着色器增强（Cel Ramp + 冷青紫暗部 + 动漫 Rim 轮廓光） ══ */
+(function initAnimeNPR(){
+  function applyAnimeToon(m){
+    if(!m||m.userData._animePatched||m.transparent)return;
+    if(!(m.isMeshStandardMaterial||m.isMeshPhysicalMaterial))return;
+    if(m.metalness>=.72&&m.roughness<=.25)return;
+    m.userData._animePatched=true;
+    const prevCompile=m.onBeforeCompile;
+    m.customProgramCacheKey=()=>'anime_npr_v1';
+    m.onBeforeCompile=(shader,r)=>{
+      if(prevCompile)prevCompile(shader,r);
+      shader.fragmentShader=shader.fragmentShader.replace(
+        '#include <dithering_fragment>',
+        `
+        {
+          float _lum=dot(gl_FragColor.rgb,vec3(0.299,0.587,0.114));
+          // 锐利两阶半日系赛璐璐明暗切分，保留贴图纹理细节的同时增强动画块面感
+          float _cel=smoothstep(0.14,0.20,_lum)*0.42+smoothstep(0.46,0.53,_lum)*0.58;
+          vec3 _celCol=gl_FragColor.rgb*clamp(_cel/max(_lum,0.012),0.55,1.42);
+          // 暗部向新海诚雪夜冷青紫偏移，告别脏灰黑影
+          vec3 _shadowCold=gl_FragColor.rgb*vec3(0.76,0.85,1.12)+vec3(0.018,0.026,0.062);
+          float _darkMask=1.0-smoothstep(0.05,0.32,_lum);
+          vec3 _styled=mix(_celCol,_shadowCold,_darkMask*0.48);
+          // 强烈日系二次元边缘轮廓光 (Anime Rim Light)
+          float _rim=pow(1.0-clamp(abs(dot(normalize(vNormal),normalize(vViewPosition))),0.0,1.0),3.2);
+          _styled+=vec3(0.56,0.80,1.0)*_rim*0.26*(1.0-smoothstep(0.45,0.95,_lum));
+          gl_FragColor.rgb=mix(gl_FragColor.rgb,_styled,0.68);
+        }
+        #include <dithering_fragment>
+        `
+      );
+    };
+    m.needsUpdate=true;
+  }
+  window._applyAnimeToon=applyAnimeToon;
+  scene.traverse(o=>{
+    if(!o.isMesh||!o.material)return;
+    const mats=Array.isArray(o.material)?o.material:[o.material];
+    mats.forEach(applyAnimeToon);
   });
 })();
 
