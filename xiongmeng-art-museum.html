@@ -11849,10 +11849,29 @@ const helis=[];
     const spot=new THREE.Group();spot.position.set(0,.34,1.62);g.add(spot);
     addNS(spot,new THREE.SphereGeometry(.11,10,8),darkM,0,0,0);
     addNS(spot,new THREE.SphereGeometry(.065,8,6),new THREE.MeshBasicMaterial({color:cfg.beam}),0,-.04,.06);
-    /* 探照灯：不再用锥体网格做体积光。
-       锥体从下方/侧面看会变成一条生硬的实心白带（圆锥只有 16 段 → 硬折线），
-       DoubleSide + Additive 还会正反叠加出同心摩尔纹。
-       改成：机身下的小发光点 + 地面上的加性光池，光感干净且零穿帮。 */
+    /* 探照灯光束：恢复圆锤形锥体。
+       上次删掉换成小光点+地面光池后，空中就没有那道扫射的光柱了。
+       现在恢复锥体，并按路灯光幕同样的办法收拾干净：
+       - 32 段（原 16 段）→ 轮廓无折线硬角
+       - 顶点色沿轴向渐变：灯口最亮、越往下越淡 → 不会糊成实心白带
+       - 双面可见，从下方/侧面看都是一道柔和光柱 */
+    const beamH=cfg.y-1.0;
+    const beamGeo=new THREE.ConeGeometry(1.35,beamH,32,1,true);
+    {
+      const pa=beamGeo.attributes.position,cols=new Float32Array(pa.count*3);
+      for(let i=0;i<pa.count;i++){
+        const t=(pa.getY(i)+beamH/2)/beamH;   // 0 = 地面端, 1 = 灯口
+        const f=Math.pow(t,2.0)*.88+.05;
+        cols[i*3]=f;cols[i*3+1]=f;cols[i*3+2]=f;
+      }
+      beamGeo.setAttribute('color',new THREE.BufferAttribute(cols,3));
+    }
+    const beamCone=new THREE.Mesh(beamGeo,new THREE.MeshBasicMaterial({
+      color:cfg.beam,vertexColors:true,transparent:true,opacity:.09,
+      blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false}));
+    beamCone.position.y=-beamH/2;beamCone.castShadow=false;beamCone.raycast=()=>{};
+    spot.add(beamCone);
+    /* 灯口亮核 */
     const beamDot=addNS(spot,new THREE.SphereGeometry(.13,10,8),
       new THREE.MeshBasicMaterial({color:cfg.beam,transparent:true,opacity:.9,
         blending:THREE.AdditiveBlending,depthWrite:false}),0,-.05,.06);
