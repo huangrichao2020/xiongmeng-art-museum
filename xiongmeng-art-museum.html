@@ -7082,18 +7082,27 @@ makeTrafficCar(0x9a2c2c,1,1.60,8.2,230);
    ════════════════════════════════════════════════════════════ */
 function makePerson(color,skin,opts={}){
   const g=new THREE.Group();
-  const shirt=M(color,{roughness:.74,flatShading:false});
-  const fur=M(skin||0xe8c49a,{roughness:.76,flatShading:false});
-  const cream=M(opts.cream||0xf8ecd8,{roughness:.78,flatShading:false});
+  // 将过饱和/生硬的原色柔化为新海诚冬夜莫兰迪呢绒色，并彻底消除塑料反光 (roughness:.96, envMapIntensity:.10)
+  const _c=new THREE.Color(color||0xb85d6c).lerp(new THREE.Color(0x9ca8c0),.26);
+  const shirt=M(_c.getHex(),{roughness:.96,metalness:0,envMapIntensity:.10,flatShading:false});
+  const trimKnit=M(opts.cream||0xf3e8d6,{roughness:.95,metalness:0,envMapIntensity:.10,flatShading:false});
+  const btnM=M(0xd8b278,{roughness:.82,metalness:.05,envMapIntensity:.2,flatShading:false});
+  const fur=M(skin||0xe8c49a,{roughness:.92,metalness:0,envMapIntensity:.12,flatShading:false});
+  const cream=M(opts.cream||0xf8ecd8,{roughness:.92,metalness:0,envMapIntensity:.12,flatShading:false});
   const dark=M(0x232028,{roughness:.28,flatShading:false});
-  const wht=M(0xffffff,{roughness:.18,flatShading:false});
-  const blush=M(0xf2a2ae,{roughness:.7,flatShading:false});
+  const wht=M(0xffffff,{roughness:.22,flatShading:false});
+  const blush=M(0xf2a2ae,{roughness:.88,metalness:0,envMapIntensity:.10,flatShading:false});
 
-  // 维尼风圆润软萌小熊躯干：大圆小肚腩 + 露肚短上衣 + 短尾
-  const belly=add(g,new THREE.SphereGeometry(.265,20,16),fur,0,.48,0);
-  belly.scale.set(1.04,1.06,.95);
-  const tee=add(g,new THREE.SphereGeometry(.274,20,14,0,Math.PI*2,0,Math.PI*.56),shirt,0,.52,0);
-  tee.scale.set(1.04,1.02,.96);
+  // 维尼风圆润软萌小熊躯干 + 针织冬日毛衣/大衣造型（罗纹高领 + 针织下摆 + 牛角扣门襟，告别半圆塑料壳）
+  const belly=add(g,new THREE.SphereGeometry(.262,20,16),fur,0,.48,0);
+  belly.scale.set(1.03,1.06,.95);
+  const tee=add(g,new THREE.SphereGeometry(.275,20,14,0,Math.PI*2,0,Math.PI*.58),shirt,0,.51,0);
+  tee.scale.set(1.04,1.04,.96);
+  // 罗纹针织高领 + 下摆收边 + 前襟木质纽扣
+  addNS(g,new THREE.TorusGeometry(.162,.034,8,18),trimKnit,0,.735,.01).rotation.x=Math.PI/2;
+  addNS(g,new THREE.TorusGeometry(.268,.024,8,20),trimKnit,0,.465,0).rotation.x=Math.PI/2;
+  addNS(g,BX(.032,.18,.024),trimKnit,0,.58,.264);
+  for(const by of [.62,.53])addNS(g,new THREE.SphereGeometry(.019,8,6),btnM,0,by,.275);
   const tail=add(g,new THREE.SphereGeometry(.075,10,8),fur,0,.35,-.23);
   tail.scale.set(1,1,.9);
 
