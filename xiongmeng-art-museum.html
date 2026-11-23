@@ -1407,10 +1407,13 @@ const floorTex=(()=>{
 const skyCanvas=document.createElement('canvas');skyCanvas.width=512;skyCanvas.height=256;
 const skyTex=new THREE.CanvasTexture(skyCanvas);skyTex.mapping=THREE.EquirectangularReflectionMapping;
 skyTex.colorSpace=THREE.SRGBColorSpace;
+/* 等距柱状贴图必须循环采样：默认 ClampToEdge 会让球体 u=0/1 经度接缝处
+   在贴图左右边缘之间插值跳变，天空上就割出一条笔直的斜线（站在中央往西望天可见）。 */
+skyTex.wrapS=THREE.RepeatWrapping;
 const pmrem=new THREE.PMREMGenerator(renderer);pmrem.compileEquirectangularShader();
 
 const skyDome=new THREE.Mesh(
-  new THREE.SphereGeometry(300,32,18),
+  new THREE.SphereGeometry(300,64,28),
   new THREE.MeshBasicMaterial({map:skyTex,side:THREE.BackSide,fog:false,depthWrite:false})
 );
 skyDome.renderOrder=-10;scene.add(skyDome);
@@ -1433,6 +1436,19 @@ function paintSky(top,mid,bot,glow){
     g.fillStyle=mg;g.fillRect(-300,-34,600,68);
     g.restore();
   }
+  /* 边缘镜像对齐：把最左 6 列镜像到最右 6 列。
+     斜向银河光带会超出画布左右边界，若不处理，接缝处左右像素不一致，
+     即使开了 RepeatWrapping 仍会看到一条色差硬线。 */
+  const id=g.getImageData(0,0,512,256);
+  const d=id.data;
+  for(let y=0;y<256;y++){
+    for(let k=0;k<6;k++){
+      const s=(y*512+k)*4;
+      const t=(y*512+511-k)*4;
+      d[t]=d[s];d[t+1]=d[s+1];d[t+2]=d[s+2];d[t+3]=d[s+3];
+    }
+  }
+  g.putImageData(id,0,0);
   skyTex.needsUpdate=true;
 }
 let envRT=null;
