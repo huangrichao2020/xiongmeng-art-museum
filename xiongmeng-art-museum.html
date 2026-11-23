@@ -6726,7 +6726,10 @@ const skylineMats=[];
       for(let rz=0;rz<4;rz++){
         const pz=-2.6+rz*2.35;
         add(ch,BX(1.62,.44,.52),woodDoorM,sx*1.78,.86,pz);
-        add(ch,BX(1.62,.58,.10),woodDoorM,sx*1.78,1.24,pz-.22);
+        /* 靠背放在 +z 一侧（座位的后方）。
+           圣坛在局部 -z 方向，座椅必须面向 -z；
+           原先靠背放在了 pz-.22，正好挡在座位与圣坛之间 —— 整套椅子是反的。 */
+        add(ch,BX(1.62,.58,.10),woodDoorM,sx*1.78,1.24,pz+.22);
         add(ch,BX(.10,.62,.54),woodDoorM,sx*.98,1.02,pz);
         add(ch,new THREE.SphereGeometry(.10,6,5),roseWhiteM,sx*.94,1.26,pz);
         add(ch,new THREE.CylinderGeometry(.055,.075,.92,6),ivoryStoneM,sx*.96,1.12,pz+.36);
