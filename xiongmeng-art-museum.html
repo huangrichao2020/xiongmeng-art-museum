@@ -10269,7 +10269,7 @@ function animate(){
   /* NPC 维尼小熊群物理运动引擎（视距+室内外剔除、避障分离、礼让玩家与车流、弹性跳跃） */
   const camX=camera.position.x, camZ=camera.position.z;
   const camNearMuseum=Math.abs(camX)<18&&camZ>-15&&camZ<15;
-  const maxNpcD2=(wheelSys.riding&&wheelSys.kind==='coaster')?1936:3025; // 云霄飞车44m / 常态55m
+  const maxNpcD2=((wheelSys.riding&&wheelSys.kind==='coaster')||trainSys.riding)?1936:3025; // 乘车44m / 常态55m
   for(let ni=0;ni<npcs.length;ni++){
     const n=npcs[ni];
     const cdx=n.p.position.x-camX, cdz=n.p.position.z-camZ;
@@ -11060,11 +11060,9 @@ const trainCars=[];
       add(car,BX(1.64,.24,.62),trimM,0,.64,sz);
       add(car,BX(1.66,.08,.64),goldM,0,.55,sz);
     }
-    const passengerSlots=[
-      [-.46,-1.35],[.46,-1.35],
-      [-.46,0],[.46,0],
-      [.46,1.35] // 左前 [-.46, 1.35] 留空给玩家乘车
-    ];
+    const passengerSlots=cIdx===1
+      ? [[-.46,1.35],[.46,1.35],[-.46,0],[.46,0],[.46,-1.35]] // 末节车厢左后留给玩家，朝后看风景
+      : [[-.46,-1.35],[.46,-1.35],[-.46,0],[.46,0],[.46,1.35]];
     passengerSlots.forEach(([px,pz],pi)=>{
       const k=(cIdx*5+pi)%paxPalette.length;
       const mate=makePerson(paxPalette[k],0xfbe2cf,{scale:.80,acc:paxAccs[k]});
@@ -11092,9 +11090,10 @@ const trainBtnEl=document.getElementById('train-btn');
 function toggleRideTrain(stationHint){
   if(trainSys.riding){
     trainSys.riding=false;
+    renderer.setPixelRatio(HI_DPR);composer.setPixelRatio(HI_DPR);
     const st=trainSys.atStation;
     if(st){fp.x=st.exit[0];fp.z=st.exit[2];fp.y=0;}
-    else{const p=trainCars[1].position;fp.x=Math.max(-60,Math.min(60,p.x+2.2));fp.z=Math.max(-30,Math.min(60,p.z));fp.y=0;}
+    else{const p=trainCars[trainCars.length-1].position;fp.x=Math.max(-60,Math.min(60,p.x+2.2));fp.z=Math.max(-30,Math.min(60,p.z));fp.y=0;}
     fp.vx=fp.vz=0;
     sfx.blip(520,.1,.06);
   }else{
@@ -11104,6 +11103,7 @@ function toggleRideTrain(stationHint){
       trainSys.u=stationHint.u;trainSys.atStation=stationHint;trainSys.stopTimer=3.0;trainSys.speed=0;
     }
     trainSys.riding=true;
+    renderer.setPixelRatio(1);composer.setPixelRatio(1);
     sfx.blip(880,.12,.08);
   }
 }
@@ -11385,16 +11385,20 @@ function updateTrain(dt){
     const lp=new THREE.Vector3(0,2.45,1.18).applyMatrix4(trainCars[0].matrixWorld);
     spawnSnowPuff(lp.x,lp.y,lp.z,R(-.3,.3),R(1.3,2.2),R(-.3,.3),.9,.65);
   }
-  // 玩家乘车视角跟随（豪华 1 号观景车厢左前席）
+  // 玩家乘车视角跟随（锁定在最后一节车厢最后一排，面向正后方观景）
   if(trainSys.riding&&fp.on){
-    const seat=new THREE.Vector3(-.46,1.18,1.35).applyMatrix4(trainCars[1].matrixWorld);
-    fp.x=seat.x;fp.z=seat.z;fp.y=seat.y-FP_EYE+.65;
-    camera.position.set(seat.x,seat.y+.65,seat.z);
-    camera.rotation.set(fp.pitch,fp.yaw,0,'YXZ');
+    const caboose=trainCars[trainCars.length-1];
+    if(!caboose.userData._camS){caboose.userData._camS=new THREE.Vector3();caboose.userData._camL=new THREE.Vector3();}
+    const seat=caboose.userData._camS.set(0,1.50,-1.52).applyMatrix4(caboose.matrixWorld);
+    const lookBack=caboose.userData._camL.set(0,1.34,-14.0).applyMatrix4(caboose.matrixWorld);
+    fp.x=seat.x;fp.z=seat.z;fp.y=seat.y-FP_EYE;
+    camera.position.copy(seat);
+    camera.up.set(0,1,0);
+    camera.lookAt(lookBack);
     trainHud.classList.add('show');
     trainMsgEl.textContent=trainSys.atStation
-      ? ('已停靠 '+trainSys.atStation.name+' · 拖动看风景 / 可下车')
-      : '圣诞露天观光小火车行驶中 · 拖动鼠标自由看风景';
+      ? ('已停靠 '+trainSys.atStation.name+' · 尾车锁定朝后观景 / 按 E 下车')
+      : '皇家冬夜特快运行中 · 末节车厢朝后观景（按 E 下车）';
     trainBtnEl.textContent='下车 (E)';
   }else if(fp.on){
     const nearCar=Math.hypot(fp.x-trainCars[1].position.x,fp.z-trainCars[1].position.z)<8;
