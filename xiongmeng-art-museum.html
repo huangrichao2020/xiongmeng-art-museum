@@ -8213,29 +8213,31 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
   {
     const cg=new THREE.Group();fair.add(cg);
     const pts=[
-      new THREE.Vector3( -7.5,  1.60, 22.8), // 北侧发车直道（朝西高速加速）
-      new THREE.Vector3(-17.5,  6.80, 21.8), // 长链条爬升段
-      new THREE.Vector3(-28.8, 14.50, 23.2), // 西北 14.5m 超级最高峰（俯瞰全城）
-      new THREE.Vector3(-30.0,  7.20, 29.8), // 极速俯冲直道
+      new THREE.Vector3( -7.5,  1.60, 22.8), // 北侧发车直道
+      new THREE.Vector3(-15.5,  7.20, 21.8), // 链条爬升段
+      new THREE.Vector3(-23.5, 14.40, 21.8), // ★ 14.4m 高空水平观景段起点（平整不倾斜，直面烟花夜空）
+      new THREE.Vector3(-28.8, 14.50, 22.6), // ★ 高空水平观景段中点
+      new THREE.Vector3(-29.8, 14.20, 27.0), // ★ 高空水平观景段延展终点
+      new THREE.Vector3(-29.8,  7.20, 31.8), // 极速俯冲下坠
       new THREE.Vector3(-29.2,  2.10, 36.2), // 谷底拉起准备入环
-      // ★ 360° 垂直大回环 (Clothoid Vertical Loop along +Z at x ≈ -28.4)
+      // ★ 360° 垂直大回环
       new THREE.Vector3(-28.4,  6.20, 39.2),
-      new THREE.Vector3(-27.8, 12.60, 37.8), // 回环最高点（完全倒立！）
+      new THREE.Vector3(-27.8, 12.60, 37.8),
       new THREE.Vector3(-27.2,  6.20, 35.4),
-      new THREE.Vector3(-26.8,  2.20, 39.8), // 出环贴地冲刺
+      new THREE.Vector3(-26.8,  2.20, 39.8),
       // ★ 立体双螺旋 + 飞跃驼峰
-      new THREE.Vector3(-25.8,  2.40, 52.8), // 西南高速大弯
-      new THREE.Vector3(-17.5,  9.20, 54.4), // 拉起上螺旋峰
-      new THREE.Vector3(-13.8,  6.80, 47.2), // 螺旋内切俯冲
-      new THREE.Vector3(-19.5,  3.20, 43.4), // 交叉下穿高架
-      new THREE.Vector3(-21.8,  4.80, 49.8), // 二次旋出
-      new THREE.Vector3(-12.2,  2.30, 54.6), // 南侧 S 弯贴地飞驰
-      new THREE.Vector3( -6.2,  9.60, 52.2), // 东南高空驼峰
-      new THREE.Vector3( -5.2,  4.60, 43.2), // 东侧高速回转
-      new THREE.Vector3( -6.0,  2.20, 31.5), // 返程直道
+      new THREE.Vector3(-25.8,  2.40, 52.8),
+      new THREE.Vector3(-17.5,  9.20, 54.4),
+      new THREE.Vector3(-13.8,  6.80, 47.2),
+      new THREE.Vector3(-19.5,  3.20, 43.4),
+      new THREE.Vector3(-21.8,  4.80, 49.8),
+      new THREE.Vector3(-12.2,  2.30, 54.6),
+      new THREE.Vector3( -6.2,  9.60, 52.2),
+      new THREE.Vector3( -5.2,  4.60, 43.2),
+      new THREE.Vector3( -6.0,  2.20, 31.5),
     ];
     const curve=new THREE.CatmullRomCurve3(pts,true,'catmullrom',.40);
-    // 预计算无万向锁的连续平行传输法向 (trackUps)，确保经过 360° 垂直大回环倒立时车厢与镜头丝滑零翻转
+    // 预计算无万向锁的连续平行传输法向：平缓高架段强力回正水平，仅垂直回环允许倒立
     const NSEG=240;
     const trackUps=[];
     let prevUp=new THREE.Vector3(0,1,0);
@@ -8245,8 +8247,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       const proj=prevUp.clone().addScaledVector(_t0,-prevUp.dot(_t0));
       if(proj.lengthSq()<1e-5)proj.set(0,1,0);
       proj.normalize();
-      // 非回环段柔和向世界 +Y 回正，防止扭转累积
-      if(Math.abs(_t0.y)<0.55&&proj.y>0.2)proj.lerp(_n0.set(0,1,0),0.12).normalize();
+      if(Math.abs(_t0.y)<0.45&&proj.y>0.30)proj.lerp(_n0.set(0,1,0),0.65).normalize();
       trackUps.push(proj);
       prevUp=proj;
     }
@@ -10567,7 +10568,12 @@ function animate(){
     const co=amusement.coaster;
     if(!co._vP){co._vP=new THREE.Vector3();co._vT=new THREE.Vector3();co._vL=new THREE.Vector3();co._vU=new THREE.Vector3();}
     co.curve.getPointAt(co.t%1,co._vP);
-    const spd=Math.max(.022,.048+(6.5-co._vP.y)*.0045);
+    const onHighCrest=co._vP.y>12.5&&co._vP.z<30.0;
+    const spd=onHighCrest?.011:Math.max(.024,.052+(6.5-co._vP.y)*.0048); // 高处水平观景段放慢延迟，多赏烟花漫天
+    if(onHighCrest&&wheelSys.riding&&wheelSys.kind==='coaster'){
+      co._fwCd=(co._fwCd||0)-dt;
+      if(co._fwCd<=0&&window._triggerFwSalvo){window._triggerFwSalvo();co._fwCd=.65;}
+    }
     co.t=(co.t+spd*dt)%1;
     for(let ci=0;ci<co.cars.length;ci++){
       const u=(co.t-ci*.019+1)%1;
@@ -11827,6 +11833,7 @@ const fwSys=(()=>{
     }
     if(sfx.on)sfx.blip(R(130,220),.14,.018);
   }
+  window._triggerFwSalvo=()=>{nextWave=0;};
   return function updateFireworks(dt){
     nextWave-=dt;
     if(nextWave<=0){
