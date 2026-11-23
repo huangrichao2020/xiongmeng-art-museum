@@ -7487,8 +7487,9 @@ function buildStall(parent,x,z,rot,kind,cn,en){
     const b=add(g,new THREE.SphereGeometry(.09,8,6),stallBulbM,-.7+i*.7,H-.12,.55);
     b.castShadow=false;
   }
-  const pool=new THREE.Mesh(new THREE.CircleGeometry(2.3,24),new THREE.MeshBasicMaterial({
-    color:0xffb765,transparent:true,opacity:.15,blending:THREE.AdditiveBlending,depthWrite:false}));
+  /* 摊位地面光池：同样换成软边渐变（原来是实心硬边圆盘） */
+  const pool=new THREE.Mesh(new THREE.PlaneGeometry(3.6,3.6),new THREE.MeshBasicMaterial({
+    map:glowTex,color:0xffb765,transparent:true,opacity:.13,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
   pool.rotation.x=-Math.PI/2;pool.position.set(0,.17,0);pool.castShadow=false;g.add(pool);
   /* 货物 */
   const gy=1.02;
@@ -7736,12 +7737,23 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
   const snowM=M(0xf2f7fc,{roughness:.9});
   // 已移除游乐园空中/建筑彩球装饰，保持场景视觉纯净高级
   const bulb=()=>null;
-  /* 地面光池：纯贴片，不占光源预算 */
-  const poolGeo=new THREE.CircleGeometry(1,24);
+  /* 地面光池：纯贴片，不占光源预算
+     原来是实心平色圆盘（CircleGeometry + 纯色加色），边缘是硬的；
+     游乐园里圣诞树/摊位/摩天轮/舞台/木马/碰碰车各一个，几个大圆叠在一起，
+     地面就糊成一片发白的硬边光斑。现在统一换成 glowTex 径向渐变软边贴片，
+     材质按「颜色+透明度」分组缓存（原来用 sharedMat，同色不同透明度会互相覆盖 opacity）。 */
+  const poolGeo=new THREE.PlaneGeometry(1,1);
+  const poolMatCache=new Map();
+  const poolMat=(col,op)=>{
+    const k=col+'|'+op;
+    if(!poolMatCache.has(k))poolMatCache.set(k,new THREE.MeshBasicMaterial({
+      map:glowTex,color:col,transparent:true,opacity:op,
+      blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+    return poolMatCache.get(k);
+  };
   const pool=(parent,r,y,op,col)=>{
-    const p=new THREE.Mesh(poolGeo,sharedMat(col||0xffb765,{
-      transparent:true,opacity:op||.26,blending:THREE.AdditiveBlending,depthWrite:false}));
-    p.scale.setScalar(r);p.rotation.x=-Math.PI/2;p.position.y=y;p.castShadow=false;parent.add(p);return p;};
+    const p=new THREE.Mesh(poolGeo,poolMat(col||0xffb765,op||.26));
+    p.scale.set(r*2,r*2,1);p.rotation.x=-Math.PI/2;p.position.y=y;p.castShadow=false;parent.add(p);return p;};
   /* 高灯柱：柱身 + 双层暖彩灯珠 + 较大地面光斑 */
   const lightPost=(x,z,h)=>{
     const g=new THREE.Group();g.position.set(x,0,z);fair.add(g);
@@ -7752,7 +7764,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       bulb(g,Math.cos(a)*.22,h+.28+(i%2)*.14,Math.sin(a)*.22,.11,i*2);
     }
     bulb(g,0,h+.52,0,.13,1);
-    pool(g,2.8,.03,.28);
+    pool(g,2.2,.03,.24);
     return g;};
 
   /* ── 场地：76 × 38 米整块压雪乐园 ── */
@@ -7874,7 +7886,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       const u=i/29;
       bulb(g,-HW-.5+u*(HW*2+1.0),PH+.98,.16,.062,80+i);
     }
-    pool(g,7,.03,.16);
+    pool(g,5.5,.03,.14);
   }
 
   /* ── 西北广场已腾空，供海盗船进驻与云霄飞车大展区 ── */
@@ -7915,7 +7927,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       add(g,BX(3.15,.44,.07),M(k.cloth,{roughness:.8}),0,.92,1.05);
       signPanel(g,2.7,.56,animeSignTex(384,80,k.cn,k.en),0,2.45,1.4,.68);
       for(let b=0;b<5;b++)bulb(g,-1.4+b*.7,2.3,1.18,.12,b+i);
-      pool(g,3,.17,.17);
+      pool(g,2.2,.17,.14);
       OUTDOOR_OBS.push([x,z,1.8]);
     });
   }
@@ -7993,7 +8005,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     add(wDeck,BX(.10,1.6,.10),gldM,1.9,.8,.8);
     signPanel(wDeck,1.9,.48,ctex(wc),1.9,1.72,.84,.92);
     wDeck.userData.keep=true;wDeck.userData.physObj={type:'wheel',ref:null};
-    pool(g,R+3,.03,.22,0xffcf8f);
+    pool(g,R+1,.03,.18,0xffcf8f);
     OUTDOOR_OBS.push([27,36,4.6]);
   }
 
@@ -8082,7 +8094,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     g.userData.keep=true;
     amusement.band={drum,voc,gtrL,gtrR,woofers,spotHeads,cymbals,fans};
     // 不加入 amusement.dyn，避免被 mergeStatic(d) 拆成静态雕塑而冻结动画
-    pool(g,6.8,.03,.24,0xffa6c9);
+    pool(g,5.2,.03,.19,0xffa6c9);
     OUTDOOR_OBS.push([39.5,36.5,4.2]);
   }
 
@@ -8177,7 +8189,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       hg.add(rider);
       amusement.horses.push({g:hg,ph:i*1.57,baseY:1.08});
     }
-    pool(g,5.5,.03,.26);
+    pool(g,4.2,.03,.20);
     OUTDOOR_OBS.push([4.0,30.0,4.6]);
   }
 
@@ -8254,7 +8266,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       g.add(car);
       amusement.bumper.push(car);
     }
-    pool(g,14,.03,.18,0x9fe8ff);
+    pool(g,9,.03,.14,0x9fe8ff);
   }
 
   /* ── 星夜极光风景云霄飞车（回归舒展流畅风格：多段开阔冲高回落 + 全程正立零倾斜，串起北街/雪林/旋转木马/摩天轮/烟花全景） ── */
@@ -8417,7 +8429,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     for(let b=0;b<3;b++){
       add(g,BX(.75,.65,.75),M(boxCols[b],{roughness:.65}),-1.1+b*1.1,1.32,1.05);
     }
-    pool(g,5.5,.03,.24,0xffd68a);
+    pool(g,4.2,.03,.19,0xffd68a);
     OUTDOOR_OBS.push([32,52,2.8]);
     // 异步懒加载 Blender 5.2.2 LTS 精雕版圣诞老人雕塑替换临时拼接体（永不阻塞首屏加载）
     import('three/addons/loaders/GLTFLoader.js').then(({GLTFLoader})=>{
@@ -8475,7 +8487,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       add(seat,BX(.46,.85,.18),M(0x232933,{roughness:.6}),sx,.68,-.30);
     }
     for(const sx of [-.68,.68])add(seat,new THREE.CylinderGeometry(.12,.16,.75,8),gldM,sx,.35,-.72);
-    pool(g,4.2,.03,.24,0xff8a65);
+    pool(g,3.2,.03,.19,0xff8a65);
     g.userData.keep=true;
     g.userData.physObj={type:'launch',ref:g};
     amusement.dyn.add(g);
