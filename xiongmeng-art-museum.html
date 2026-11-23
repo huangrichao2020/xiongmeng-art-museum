@@ -8212,19 +8212,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       }
       if(i%2===1)bulb(cg,p.x,p.y+.24,p.z,.085,i);
     }
-    // 云霄飞车登车站台（移至中区主干道旁 -12.5, 35.8，朝北敞开，进园即见）
-    const st=new THREE.Group();st.position.set(-12.5,0,35.8);cg.add(st);
-    add(st,BX(5.8,.48,3.4),M(0x475569,{roughness:.8}),0,.24,0);
-    add(st,BX(6.0,.16,1.2),M(0xdfe6ec,{roughness:.9}),0,.10,-2.1).castShadow=false;
-    for(const sx of [-2.5,2.5])for(const sz of [-1.35,1.35])
-      add(st,BX(.16,3.3,.16),M(0x6d4a30,{roughness:.85}),sx,1.85,sz);
-    for(const sz of [-1,1]){
-      const r=add(st,BX(6.2,.14,2.0),M(0x284e78,{roughness:.68}),0,3.62,sz*.74);r.rotation.x=sz*.26;
-      const sn=add(st,BX(6.24,.11,1.96),snowM,0,3.73,sz*.76);sn.rotation.x=sz*.26;
-    }
-    add(st,BX(6.26,.16,.24),gldM,0,3.88,0);
-    signPanel(st,4.0,.70,animeSignTex(512,96,'星夜极光云霄飞车','STARLIGHT COASTER · PRESS E'),0,2.92,-1.45,.68);
-    for(let b=0;b<6;b++)bulb(st,-2.2+b*.88,3.26,-1.45,.09,b);
+    // 已去掉地面站台，保留通透立体轨道与可点击乘车列车
     // 4 节低矮流线型全景列车（第 1 节做小巧尖头且留空前排视野，绝不挡玩家视角）
     const cars=[];
     const carCols=[0xd23b32,0xe8a838,0x2f8f6b,0x3f6ba8];
@@ -8249,9 +8237,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       car.userData.physObj={type:'ride',ref:coasterRef};
       cg.add(car);cars.push(car);
     }
-    st.userData.physObj={type:'ride',ref:coasterRef};
     amusement.coaster={curve,cars,t:0};
-    OUTDOOR_OBS.push([-12.5,35.8,2.9]);
   }
 
   /* ── 巨型圣诞老人地标雕塑（带大理石鎏金底座、礼物袋与挥手致意） ── */
