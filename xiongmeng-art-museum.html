@@ -808,11 +808,15 @@ const animeOutlineShader={
       vec3 ink=vec3(0.08,0.10,0.18);
       vec3 col=mix(base.rgb,ink,edge*edgeMask*0.16);
       col*=(1.0+clamp((centerL-avgL)*0.28,-0.08,0.08));
-      // 新海诚雪夜高通透冷暖分级：保持云霄飞车与全园璀璨通透亮度，不压暗高光
+      // UE5 电影级高光柔化肩部曲线 (Filmic Highlight Shoulder) + 新海诚/光遇冷暖分级：
+      // 仅对接近过曝(>0.68)的强光地面做丝滑软膝压缩防死白，中低亮度与主灯光保持璀璨通透
       float g=luma(col);
-      vec3 shinkaiShadow=mix(col,col*vec3(0.82,0.91,1.18),(0.36+0.12*uHQ)*(1.0-smoothstep(0.04,0.42,g)));
-      vec3 shinkaiWarm=mix(shinkaiShadow,shinkaiShadow*vec3(1.07,1.02,0.92),smoothstep(0.48,0.96,g)*(0.38+0.14*uHQ));
-      col=mix(vec3(g),shinkaiWarm,1.10+0.06*uHQ);
+      vec3 hiShoulder=col/(vec3(1.0)+max(col-vec3(0.68),vec3(0.0))*0.48);
+      col=mix(col,hiShoulder,smoothstep(0.62,0.96,g));
+      g=luma(col);
+      vec3 shinkaiShadow=mix(col,col*vec3(0.80,0.90,1.20),(0.38+0.12*uHQ)*(1.0-smoothstep(0.04,0.44,g)));
+      vec3 shinkaiWarm=mix(shinkaiShadow,shinkaiShadow*vec3(1.08,1.02,0.91),smoothstep(0.46,0.95,g)*(0.40+0.14*uHQ));
+      col=mix(vec3(g),shinkaiWarm,1.12+0.06*uHQ);
       if(uHQ>0.5){
         // 高画质抗闪烁柔光滤镜：采用 9 邻域预滤波均值稳定提取高光，彻底消除移动时细小路灯亚像素闪烁
         col=max(vec3(0.0),(col-0.010)*1.035);
@@ -820,7 +824,7 @@ const animeOutlineShader={
         float pureLight=smoothstep(0.82,0.98,filteredL);
         col+=max(avgCol-vec3(0.74),vec3(0.0))*vec3(1.12,0.96,0.78)*pureLight*0.22;
       }
-      float vig=1.0-smoothstep(0.40,0.96,length(vUv-vec2(0.5)))*(0.10+0.03*uHQ);
+      float vig=1.0-smoothstep(0.38,0.95,length(vUv-vec2(0.5)))*(0.12+0.03*uHQ);
       col*=vig;
       gl_FragColor=vec4(col,base.a);
     }
@@ -7174,7 +7178,7 @@ const clouds=[];
    10. 圣诞飘雪天气与冬夜星空系统（全天候下雪 + 24h 昼夜变化）
    ════════════════════════════════════════════════════════════ */
 const WINTER_SKY=['#071226','#12294e','#264b7c','rgba(135,175,240,.22)'];
-const WINTER_FOG=0x0e1c34, WINTER_FOG_D=.0022;
+const WINTER_FOG=0x0d1c34, WINTER_FOG_D=.0036;
 
 /* 建筑占地（随馆体适当扩展 x:-9.6..12.1, z:-11.6..7.6 + 门廊雨棚），雪花不能落进室内 */
 function inBuildingXZ(x,z){
@@ -10722,9 +10726,10 @@ function updateOuterCrowd(dt,t){
 
 function updateAerialHaze(dt,t){
   const cx=camera.position.x, cy=camera.position.y, cz=camera.position.z;
-  // A. 超清通透远景（乘坐云霄飞车高空俯瞰时保持极致通透明亮）
-  const baseD=scene.userData.baseFogD!==undefined?scene.userData.baseFogD:0.0022;
-  const heightFactor=THREE.MathUtils.clamp(1.0-(cy-6.0)/34.0, 0.45, 0.85);
+  // A. UE5 级前中后景空气透视纵深：平地漫步时远雾更有空间层次(0.0036)，乘坐云霄飞车高空俯瞰时自动适度减薄保持通透明亮
+  const baseD=scene.userData.baseFogD!==undefined?scene.userData.baseFogD:0.0036;
+  const onCoaster=!!(wheelSys.riding&&wheelSys.kind==='coaster');
+  const heightFactor=THREE.MathUtils.clamp(1.0-(cy-6.0)/38.0, 0.48, 0.96)*(onCoaster?0.72:1.0);
   scene.fog.density=baseD*heightFactor;
 
   // B. 玩家前景随行轮廓暖光：在低空/乘坐过山车时紧贴前方 4.2m 柔和照亮前景
