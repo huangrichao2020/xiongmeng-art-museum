@@ -10261,9 +10261,16 @@ function animate(){
     sw.m.scale.setScalar((.45+u*.85)*(1-u*.7));
   }
 
-  /* NPC 维尼小熊群物理运动引擎（避障分离、礼让玩家与车流、点击/碰撞弹性跳跃、室外踩雪扬尘） */
+  /* NPC 维尼小熊群物理运动引擎（视距+室内外剔除、避障分离、礼让玩家与车流、弹性跳跃） */
+  const camX=camera.position.x, camZ=camera.position.z;
+  const camNearMuseum=Math.abs(camX)<18&&camZ>-15&&camZ<15;
+  const maxNpcD2=(wheelSys.riding&&wheelSys.kind==='coaster')?1936:3025; // 云霄飞车44m / 常态55m
   for(let ni=0;ni<npcs.length;ni++){
     const n=npcs[ni];
+    const cdx=n.p.position.x-camX, cdz=n.p.position.z-camZ;
+    const vis=n.indoor?camNearMuseum:((cdx*cdx+cdz*cdz)<maxNpcD2);
+    if(n.p.visible!==vis)n.p.visible=vis;
+    if(!vis)continue;
     if(n.happyT>0)n.happyT-=dt;
     if(n.puffCd>0)n.puffCd-=dt;
     if(n.jumpY>0||n.vy!==0){
@@ -11101,6 +11108,7 @@ const RIDE_EXITS={
 };
 function stopFacilityRide(){
   if(wheelSys.cab&&wheelSys.cab.userData.rods)wheelSys.cab.userData.rods.forEach(r=>r.visible=true);
+  if(wheelSys.kind==='coaster'){renderer.setPixelRatio(HI_DPR);composer.setPixelRatio(HI_DPR);}
   const ex=RIDE_EXITS[wheelSys.kind]||[4,24];
   wheelSys.riding=false;wheelSys.cab=null;wheelSys.kind=null;wheelSys.car=null;
   fp.x=ex[0];fp.z=ex[1];fp.y=0;fp.vx=fp.vz=0;
@@ -11112,6 +11120,7 @@ function toggleRideFacility(info){
   if(!fp.on)enterWalk();
   wheelSys.kind=info.kind;wheelSys.car=info.car||null;wheelSys.heli=info.heli||null;wheelSys.label=info.label||'游乐设施';
   wheelSys.riding=true;
+  if(info.kind==='coaster'){renderer.setPixelRatio(1);composer.setPixelRatio(1);}
   if(info.kind==='sleigh'){fp.yaw=flyingSleigh.rotation.y+Math.PI;fp.pitch=-.16;}
   sfx.blip(988,.14,.08);
 }
