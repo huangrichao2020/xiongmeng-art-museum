@@ -161,7 +161,6 @@
   body.walk.off #joystick,body.walk.off #w-run,body.walk.off #w-back,body.walk.off #w-sound{display:none}
   /* 触屏设备：无论沉浸还是沙盒，摇杆与跳按钮都在（默认纯净也不藏操作） */
   body.touch #joystick,body.touch #w-run{display:block!important}
-  body.touch #wtop{display:flex!important}
   #joystick{
     position:fixed;left:22px;bottom:26px;z-index:27;display:none;
     width:118px;height:118px;border-radius:50%;
@@ -190,11 +189,16 @@
     touch-action:none;cursor:pointer;
   }
   #w-run.hold{background:rgba(104,208,245,.28);border-color:rgba(160,220,250,.8);color:#fff}
+  /* 沉浸模式内的圆形工具组（#wtop）已停用：
+     它和右上角常驻的 .wtools 位置几乎重合（right 20/top 18 vs right 14/top 14），
+     两套一起显示就会叠成一团圆圈 —— 手机端更糟：
+     body.touch #wtop{display:flex!important} 用的是 id 选择器，特异性压过了
+     body.touch .wtop{display:none!important}，导致触屏端也照样显示。
+     现在统一只保留 .wtools（同样的「视角切换 + 声音」功能，胶囊样式不重叠）。
+     DOM 节点保留，JS 里的引用不受影响。 */
   .wtop{
-    position:fixed;right:20px;top:18px;z-index:27;display:none;gap:10px;
+    position:fixed;right:20px;top:18px;z-index:27;display:none!important;gap:10px;
   }
-  body.walk .wtop{display:flex}
-  body.walk.off .wtop{display:none}
   .wtop button{
     width:46px;height:46px;border-radius:50%;
     background:rgba(12,20,28,.5);border:1px solid rgba(160,210,240,.32);
@@ -203,9 +207,6 @@
   }
   .wtop button:hover{color:#fff;border-color:rgba(160,220,250,.7);background:rgba(104,208,245,.2)}
   .wtop button.on{color:var(--accent);border-color:rgba(104,208,245,.55)}
-  /* 触屏：右上常驻工具组（切视角 / 声音），保证纯净模式下也能切换 */
-  body.touch .wtop{right:14px;top:max(12px,env(safe-area-inset-top));gap:8px}
-  body.touch .wtop button{width:44px;height:44px;font-size:12px}
   /* 常驻小工具条：纯净模式下也能切视角/开关声音（永远可见，不受 clean 影响） */
   .wtools{
     position:fixed;right:14px;top:14px;z-index:28;display:flex;gap:7px;
