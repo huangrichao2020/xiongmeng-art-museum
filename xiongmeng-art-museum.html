@@ -1427,28 +1427,21 @@ function paintSky(top,mid,bot,glow){
     const rg=g.createRadialGradient(256,150,0,256,150,230);
     rg.addColorStop(0,glow);rg.addColorStop(1,'rgba(0,0,0,0)');
     g.fillStyle=rg;g.fillRect(0,0,512,256);
-    // 新海诚斜向银河星云微光带
-    g.save();g.translate(256,95);g.rotate(-.28);
-    const mg=g.createLinearGradient(0,-34,0,34);
-    mg.addColorStop(0,'rgba(120,165,240,0)');
-    mg.addColorStop(.5,'rgba(155,195,255,.14)');
-    mg.addColorStop(1,'rgba(120,165,240,0)');
-    g.fillStyle=mg;g.fillRect(-300,-34,600,68);
-    g.restore();
-  }
-  /* 边缘镜像对齐：把最左 6 列镜像到最右 6 列。
-     斜向银河光带会超出画布左右边界，若不处理，接缝处左右像素不一致，
-     即使开了 RepeatWrapping 仍会看到一条色差硬线。 */
-  const id=g.getImageData(0,0,512,256);
-  const d=id.data;
-  for(let y=0;y<256;y++){
-    for(let k=0;k<6;k++){
-      const s=(y*512+k)*4;
-      const t=(y*512+511-k)*4;
-      d[t]=d[s];d[t+1]=d[s+1];d[t+2]=d[s+2];d[t+3]=d[s+3];
+    /* 银河微光带：按列绘制，中心线随经度正弦起伏。
+       旧写法是 rotate(-.28) 后 fillRect(-300,-34,600,68) —— 斜带横跨整幅画布，
+       在左右边缘的纵向位置错开约 100px。贴到球面上后，经度接缝两侧
+       一个有光带一个没有，天上就割出一条笔直的竖直暗带（站在中央往西望最明显）。
+       现在按列画：中心线周期 = 画布宽度，左右边缘像素天然连续，接缝处无色差。 */
+    const bandSpan=34, bandAmp=46;
+    for(let x=0;x<512;x++){
+      const cy=95+bandAmp*Math.sin(2*Math.PI*x/512-0.6);
+      const mg=g.createLinearGradient(0,cy-bandSpan,0,cy+bandSpan);
+      mg.addColorStop(0,'rgba(120,165,240,0)');
+      mg.addColorStop(.5,'rgba(155,195,255,.14)');
+      mg.addColorStop(1,'rgba(120,165,240,0)');
+      g.fillStyle=mg;g.fillRect(x,cy-bandSpan,1,bandSpan*2);
     }
   }
-  g.putImageData(id,0,0);
   skyTex.needsUpdate=true;
 }
 let envRT=null;
@@ -6976,26 +6969,26 @@ const _radT1=new THREE.Vector3(0,1,0).cross(RADIANT).normalize();
 const _radT2=RADIANT.clone().cross(_radT1).normalize();
 const meteorWave={cooldown:3.5};
 {
-  const tailGeo=new THREE.CylinderGeometry(.088,.002,1.0,6,1,false);
+  const tailGeo=new THREE.CylinderGeometry(.055,.002,1.0,6,1,false);
   tailGeo.translate(0,-.5,0);
   const posAttr=tailGeo.attributes.position, tCols=new Float32Array(posAttr.count*3);
   for(let i=0;i<posAttr.count;i++){
     const k=Math.max(0,Math.min(1,posAttr.getY(i)+1)); // y=-1 -> 0, y=0 -> 1
-    const f=Math.pow(k,2.6);
+    const f=Math.pow(k,3.2);
     tCols[i*3]=f;tCols[i*3+1]=f;tCols[i*3+2]=f;
   }
   tailGeo.setAttribute('color',new THREE.BufferAttribute(tCols,3));
   const tailMat=new THREE.MeshBasicMaterial({
-    color:0xffffff,vertexColors:true,transparent:true,opacity:.92,
+    color:0xffffff,vertexColors:true,transparent:true,opacity:.52,
     blending:THREE.AdditiveBlending,depthWrite:false,fog:false
   });
   meteorTails=new THREE.InstancedMesh(tailGeo,tailMat,METEOR_N);
   meteorTails.frustumCulled=false;meteorTails.userData.noReflect=true;
   scene.add(meteorTails);
 
-  const headGeo=new THREE.SphereGeometry(.22,8,6);
+  const headGeo=new THREE.SphereGeometry(.15,8,6);
   const headMat=new THREE.MeshBasicMaterial({
-    color:0xffffff,transparent:true,opacity:.96,
+    color:0xffffff,transparent:true,opacity:.8,
     blending:THREE.AdditiveBlending,depthWrite:false,fog:false
   });
   meteorHeads=new THREE.InstancedMesh(headGeo,headMat,METEOR_N);
