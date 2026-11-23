@@ -8381,9 +8381,9 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     amusement.coaster={curve,cars,t:0,sampleTrackUp};
   }
 
-  /* ── 巨型圣诞老人地标雕塑（带大理石鎏金底座、礼物袋与挥手致意） ── */
+  /* ── 巨型圣诞老人地标雕塑（带大理石鎏金底座、礼物袋与挥手致意，向东挪至 (38.5, 0, 52.5) 留出宽敞间距） ── */
   {
-    const g=new THREE.Group();g.position.set(32,0,52);g.rotation.y=-2.45;fair.add(g);
+    const g=new THREE.Group();g.position.set(38.5,0,52.5);g.rotation.y=-2.45;fair.add(g);
     const baseStone=M(0xe8e4dc,{roughness:.75,metalness:.06});
     const redCoat=M(0xd62828,{roughness:.62});
     const furWhite=M(0xfafcff,{roughness:.85});
@@ -8434,13 +8434,13 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       add(g,BX(.75,.65,.75),M(boxCols[b],{roughness:.65}),-1.1+b*1.1,1.32,1.05);
     }
     pool(g,4.2,.03,.19,0xffd68a);
-    OUTDOOR_OBS.push([32,52,2.8]);
+    OUTDOOR_OBS.push([38.5,52.5,2.8]);
     // 异步懒加载 Blender 5.2.2 LTS 精雕版圣诞老人雕塑替换临时拼接体（永不阻塞首屏加载）
     import('three/addons/loaders/GLTFLoader.js').then(({GLTFLoader})=>{
       const gltfL=new GLTFLoader();
       gltfL.load('./models/santa_monument.glb',gltf=>{
         const mdl=gltf.scene;
-        mdl.position.set(32,0,52);
+        mdl.position.set(38.5,0,52.5);
         mdl.rotation.y=-2.45;
         mdl.scale.setScalar(1.18);
         mdl.traverse(o=>{
@@ -8455,13 +8455,12 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     }).catch(()=>{});
   }
 
-  /* ── 圣诞高空弹射跳伞塔 (23, 0, 52)
-     ① 移到与巨型圣诞老人雕塑同一条深度线（z=52），x 退到 23 让两者并排不打架
+  /* ── 圣诞高空弹射跳伞塔 (27.5, 0, 52.5)
+     ① 向东挪开至 x=27.5，底座左缘 (21.65) 完全脱离碰碰车场东侧围栏 (x=19.0)，彻底消除穿模
      ② 整体转 180°（g.rotation.y=PI），发射轨道朝场地内侧
-     ③ 规模 1.42x → 1.8x，塔架本体 12.2m → 14.6m（世界高度约 26m）
-     ④ 标牌从 11.3m 高空挪到塔前地面的小立牌上 ── */
+     ③ 规模 1.8x，与移至 x=38.5 的巨型圣诞老人雕塑并排留出宽敞间距 ── */
   {
-    const g=new THREE.Group();g.position.set(23,0,52);g.rotation.y=Math.PI;g.scale.setScalar(1.8);fair.add(g);
+    const g=new THREE.Group();g.position.set(27.5,0,52.5);g.rotation.y=Math.PI;g.scale.setScalar(1.8);fair.add(g);
     const padM=M(0x28313c,{roughness:.65,metalness:.25});
     const redTower=M(0xd22f2f,{roughness:.48,metalness:.28});
     add(g,new THREE.CylinderGeometry(2.9,3.25,.26,16),padM,0,.13,0);
@@ -8502,7 +8501,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     g.userData.keep=true;
     g.userData.physObj={type:'launch',ref:g};
     amusement.dyn.add(g);
-    OUTDOOR_OBS.push([23,52,4.9]);
+    OUTDOOR_OBS.push([27.5,52.5,4.9]);
   }
 
   /* ── 圣诞树林：沿围栏内侧一圈，全部复用 buildChristmasTree ── */
@@ -11591,7 +11590,7 @@ function toggleRideWheel(cab){
   sfx.blip(988,.14,.08);
 }
 /* ══ 圣诞高空弹射跳伞（弹射冲上 42m+ 高空，自动开伞滑翔，WASD 全程可控降落方向） ══ */
-const launchSys={active:false,stage:'idle',timer:0,x:23,y:1.5,z:52,vx:0,vy:0,vz:0,openK:0};
+const launchSys={active:false,stage:'idle',timer:0,x:27.5,y:1.5,z:52.5,vx:0,vy:0,vz:0,openK:0};
 const chuteGrp=(()=>{
   const g=new THREE.Group();g.visible=false;scene.add(g);
   const redC=M(0xd62828,{roughness:.55,side:THREE.DoubleSide});
@@ -11624,7 +11623,7 @@ function startLaunchRide(){
   launchSys.active=true;
   launchSys.stage='charge';
   launchSys.timer=0.65;
-  launchSys.x=23;launchSys.y=1.4;launchSys.z=52.5;
+  launchSys.x=27.5;launchSys.y=1.4;launchSys.z=53.0;
   launchSys.vx=0;launchSys.vy=0;launchSys.vz=0;
   launchSys.openK=0;
   chuteGrp.visible=false;
