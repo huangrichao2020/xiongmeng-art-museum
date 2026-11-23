@@ -11899,18 +11899,25 @@ const helis=[];
       new THREE.MeshBasicMaterial({color:cfg.beam,transparent:true,opacity:.9,
         blending:THREE.AdditiveBlending,depthWrite:false}),0,-.05,.06);
     beamDot.castShadow=false;
-    /* 地面光池（跟随机腹下方，随高度变大变淡） */
-    const poolM=new THREE.MeshBasicMaterial({color:cfg.beam,transparent:true,opacity:.30,
+    /* 地面落点光斑：真实探照灯打到地面的应该是一个柔和的小亮斑，
+       不是一整块生硬的平色圆盘（原来半径 9.4m，边缘还是硬的，
+       远看就是"地面上巨大的光影"）。改用 glowTex 软边贴图，半径收到 ~1.8m，
+       位置跟随光锥的实际落点（光锥有俯仰和左右摆动，落点不在正下方）。 */
+    const poolM=new THREE.MeshBasicMaterial({
+      map:glowTex,color:cfg.beam,transparent:true,opacity:.42,
       blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
-    const beamPool=new THREE.Mesh(new THREE.CircleGeometry(1,28),poolM);
+    const beamPool=new THREE.Mesh(new THREE.PlaneGeometry(1,1),poolM);
     beamPool.rotation.x=-Math.PI/2;beamPool.castShadow=false;beamPool.raycast=()=>{};
+    beamPool.scale.set(3.6,3.6,1);
     beamPool.position.y=.03;
+    beamPool.renderOrder=2;
     scene.add(beamPool);
-    const item={g,rotor,tRotor,spot,cfg,beamPool,poolM};
+    const item={g,rotor,tRotor,spot,cfg,beamPool,poolM,beamCone,beamH};
     g.userData.physObj={type:'ride',ref:{kind:'heli',heli:item,label:cfg.name}};
     helis.push(item);
   }
 }
+const _bdV=new THREE.Vector3();
 function updateHelis(dt){
   for(let i=0;i<helis.length;i++){
     const h=helis[i],c=h.cfg;
@@ -11922,12 +11929,19 @@ function updateHelis(dt){
     h.g.rotation.y=Math.atan2(vx,vz);
     h.g.rotation.x=.09; // 前倾巡航姿态
     h.rotor.rotation.y+=dt*22;
-    if(h.beamPool){
-      // 光池投在机腹正下方的地面：直径随高度变大、亮度随高度衰减
-      h.beamPool.position.set(h.g.position.x,.04,h.g.position.z);
-      const rad=2.4+Math.max(0,c.y-8)*.52;
-      h.beamPool.scale.setScalar(rad);
-      h.poolM.opacity=Math.max(.06,.34-Math.max(0,c.y-8)*.010);
+    if(h.beamCone){
+      /* 光锥始终从灯口打到地面：按当前飞行高度动态拉伸锥长
+         （原来长度固定，飞机一浮沉，光锥就悬空或插进地里） */
+      const hh=Math.max(5,h.g.position.y+.34);
+      h.beamCone.scale.y=hh/h.beamH;
+      h.beamCone.position.y=-hh/2;
+      if(h.beamPool){
+        /* 光斑落在光锥真正的地面落点上：光锥有俯仰和左右摆动，
+           落点并不在机腹正下方 */
+        _bdV.set(0,-1,0).applyEuler(h.spot.rotation).applyEuler(h.g.rotation);
+        const len=hh/Math.max(.25,-_bdV.y);
+        h.beamPool.position.set(h.g.position.x+_bdV.x*len,.04,h.g.position.z+_bdV.z*len);
+      }
     }
     h.tRotor.rotation.x+=dt*26;
     // 探照灯来回摆动扫射地面
