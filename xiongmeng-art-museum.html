@@ -11336,8 +11336,8 @@ function updateTrain(dt){
           vec3 _shadowCold=gl_FragColor.rgb*vec3(0.76,0.85,1.12)+vec3(0.018,0.026,0.062);
           float _darkMask=1.0-smoothstep(0.05,0.32,_lum);
           vec3 _styled=mix(_celCol,_shadowCold,_darkMask*0.48);
-          // 强烈日系二次元边缘轮廓光 (Anime Rim Light)
-          float _rim=pow(1.0-clamp(abs(dot(normalize(vNormal),normalize(vViewPosition))),0.0,1.0),3.2);
+          // 强烈日系二次元边缘轮廓光 (Anime Rim Light，使用 Three.js 标准视图空间法线 normal)
+          float _rim=pow(1.0-clamp(abs(dot(normalize(normal),normalize(vViewPosition))),0.0,1.0),3.2);
           _styled+=vec3(0.56,0.80,1.0)*_rim*0.26*(1.0-smoothstep(0.45,0.95,_lum));
           gl_FragColor.rgb=mix(gl_FragColor.rgb,_styled,0.68);
         }
