@@ -8825,7 +8825,7 @@ const sfx={
     const pn=c.createStereoPanner?c.createStereoPanner():null;
     if(pn){pn.pan.value=pan;filt.connect(env);env.connect(pn);pn.connect(this.musicBus);}
     else{filt.connect(env);env.connect(this.musicBus);}
-    for(const [mult,amp,det] of [[1,.74,0],[2,.20,1.5],[3,.06,-1.2]]){
+    for(const [mult,amp,det] of [[1,.74,0],[2,.25,1.5],[3,.07,-1.2]]){
       const o=c.createOscillator();o.type='sine';o.frequency.setValueAtTime(f*mult,t);
       if(det)o.detune.setValueAtTime(det,t);
       const og=c.createGain();og.gain.value=amp;
@@ -8845,18 +8845,12 @@ const sfx={
     o.connect(lp);lp.connect(g);g.connect(this.musicBus);
     o.start(t);o.stop(t+dur+.05);
   },
-  // 圣诞温暖弦乐长音 + 丝滑流水竖琴分解琶音
-  playWarmChord(chord,t){
-    const c=this.ctx;
+  // 丝滑流水竖琴分解琶音铺底
+  /* 原来这里还有一层三角波"温暖弦乐长音"（4 个音各 1.25s），
+     和竖琴琶音、钢琴叠在一起就糊成一片，很吵 —— 已去掉弦乐层，只留竖琴。 */
+  playHarpPad(chord,t){
     for(let i=0;i<chord.length;i++){
-      const o=c.createOscillator();o.type='triangle';o.frequency.setValueAtTime(this.midiHz(chord[i]),t);
-      const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=460;
-      const g=c.createGain();
-      g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.018,t+.14);
-      g.gain.exponentialRampToValueAtTime(.0003,t+1.25);
-      o.connect(lp);lp.connect(g);g.connect(this.musicBus);
-      o.start(t);o.stop(t+1.3);
-      this.playLead(chord[i],t+i*.072,.42,.034,-.18+i*.09);
+      this.playLead(chord[i],t+i*.072,.42,.042,-.18+i*.09);
     }
   },
   // 极轻柔圣诞雪橇铃（每两拍温柔点缀）
@@ -8876,7 +8870,7 @@ const sfx={
   schedNote(midi,t,dur,chord){
     if(chord){
       this.curChord=chord;
-      this.playWarmChord(chord,t);
+      this.playHarpPad(chord,t);
     }
     if(midi>0){
       this.playLead(midi,t,dur,.115,.08);
@@ -8913,10 +8907,14 @@ const sfx={
     const dur=Math.max(.2,beats*stepDur);
     if(chord){
       /* 和弦垫音每两步触发一次（否则 1.2s 的长音会叠成糊墙），贝斯每步都在 */
-      if(i%2===0)this.playWarmChord(chord,t);
+      if(i%2===0)this.playHarpPad(chord,t);
       this.playBass(chord[0],t,Math.min(dur,1.3));
     }
-    if(midi>0)this.playLead(midi,t,dur,.105,.08);
+    if(midi>0){
+      this.playLead(midi,t,dur,.105,.08);
+      /* 轻八度装饰（延迟 160ms 叠在上面），八音盒/钟琴的叮咚感，很轻不抢主旋律 */
+      if(i%2===0)this.playLead(midi+12,t+.16,dur*.55,.026,.12);
+    }
     if(i%4===0)this.playSleighBell(t,i%8===0);   // 每四拍点缀一次雪橇铃
   },
   bgmTracks:null,
@@ -8961,7 +8959,7 @@ const sfx={
     const tRock=rockK*.12;
     const tPark=inMus?0:.09*(1-rockK*.85);
     /* 合成圣诞乐器 BGM 音量：馆内更饱满，户外收小当远景音乐 */
-    const tSyn=inMus?.46:.26;
+    const tSyn=inMus?.50:.28;
     if(this.musicBus){
       this.synth.gain+=(tSyn-this.synth.gain)*Math.min(1,dt*1.5);
       this.musicBus.gain.value=this.synth.gain;
