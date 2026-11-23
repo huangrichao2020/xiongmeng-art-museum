@@ -11891,7 +11891,12 @@ function updateSaltlinePhysics(dt){
 const helis=[];
 {
   const configs=[
-    {col:0xf0f3f8,stripe:0x2b456e,trim:0xe8c16a,beam:0xffe6b3,cx:4,cz:36,rx:28,rz:14,y:21.5,spd:.24,ph:0,name:'星夜珍珠领航机'},
+    /* 珍珠领航机航线：cx/cz/rx/rz = -14 / 48 / 24 / 12
+       原来走 cx4 cz36 rx28 rz14 → 椭圆东端最远到 x=32，正好从摩天轮中间穿过
+       （21.5m 高度上摩天轮轮圈占 x 14.4~39.6，z 34~38）。
+       现在整条椭圆北移：航线 x -38~10 / z 36~60，东半段从摩天轮北边绕过去，
+       实测在摩天轮 z 带内还有 12.5m 余量，同时离跳伞塔(23,52) 也有 9.5m。 */
+    {col:0xf0f3f8,stripe:0x2b456e,trim:0xe8c16a,beam:0xffe6b3,cx:-14,cz:48,rx:24,rz:12,y:21.5,spd:.24,ph:0,name:'星夜珍珠领航机'},
     {col:0x273f66,stripe:0xdce6f2,trim:0xe8c16a,beam:0xa8dcff,cx:0,cz:0,rx:34,rz:18,y:23.5,spd:-.20,ph:2.1,name:'极光靛蓝巡航机'}
   ];
   const goldM=M(0xe8c16a,{roughness:.30,metalness:.75,envMapIntensity:.65});
