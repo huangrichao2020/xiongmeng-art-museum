@@ -808,23 +808,19 @@ const animeOutlineShader={
       vec3 ink=vec3(0.08,0.10,0.18);
       vec3 col=mix(base.rgb,ink,edge*edgeMask*0.16);
       col*=(1.0+clamp((centerL-avgL)*0.28,-0.08,0.08));
-      // UE5 电影级高光柔化肩部曲线 (Filmic Highlight Shoulder) + 新海诚/光遇冷暖分级：
-      // 自动压住强光区域的地面过曝，保留暗部深邃蔚蓝层次，前中后景与视觉中心对比鲜明
+      // 新海诚雪夜高通透冷暖分级：保持云霄飞车与全园璀璨通透亮度，不压暗高光
       float g=luma(col);
-      vec3 hiShoulder=col/(vec3(1.0)+max(col-vec3(0.66),vec3(0.0))*0.56);
-      col=mix(col,hiShoulder,smoothstep(0.58,0.96,g));
-      g=luma(col);
-      vec3 shinkaiShadow=mix(col,col*vec3(0.80,0.90,1.20),(0.38+0.12*uHQ)*(1.0-smoothstep(0.04,0.44,g)));
-      vec3 shinkaiWarm=mix(shinkaiShadow,shinkaiShadow*vec3(1.08,1.02,0.91),smoothstep(0.46,0.95,g)*(0.40+0.14*uHQ));
-      col=mix(vec3(g),shinkaiWarm,1.12+0.06*uHQ);
+      vec3 shinkaiShadow=mix(col,col*vec3(0.82,0.91,1.18),(0.36+0.12*uHQ)*(1.0-smoothstep(0.04,0.42,g)));
+      vec3 shinkaiWarm=mix(shinkaiShadow,shinkaiShadow*vec3(1.07,1.02,0.92),smoothstep(0.48,0.96,g)*(0.38+0.14*uHQ));
+      col=mix(vec3(g),shinkaiWarm,1.10+0.06*uHQ);
       if(uHQ>0.5){
         // 高画质抗闪烁柔光滤镜：采用 9 邻域预滤波均值稳定提取高光，彻底消除移动时细小路灯亚像素闪烁
-        col=max(vec3(0.0),(col-0.010)*1.032);
+        col=max(vec3(0.0),(col-0.010)*1.035);
         float filteredL=mix(centerL,avgL,0.68);
         float pureLight=smoothstep(0.82,0.98,filteredL);
-        col+=max(avgCol-vec3(0.74),vec3(0.0))*vec3(1.12,0.96,0.78)*pureLight*0.20;
+        col+=max(avgCol-vec3(0.74),vec3(0.0))*vec3(1.12,0.96,0.78)*pureLight*0.22;
       }
-      float vig=1.0-smoothstep(0.38,0.95,length(vUv-vec2(0.5)))*(0.12+0.03*uHQ);
+      float vig=1.0-smoothstep(0.40,0.96,length(vUv-vec2(0.5)))*(0.10+0.03*uHQ);
       col*=vig;
       gl_FragColor=vec4(col,base.a);
     }
@@ -2582,10 +2578,55 @@ strip.position.set(0,4.28,9.24);shop.add(strip);
   add(shop,new THREE.CylinderGeometry(.32,.95,.22,18),snowCapM,-7.6,roofY+2.34,-9.2);
   for(const s of [[-.62,-.62],[.62,-.62],[-.62,.62],[.62,.62]])
     add(shop,BX(.11,1.1,.11),M(0x4a5158,{roughness:.7}),-7.6+s[0],roofY+.55,-9.2+s[1]);
-  // 排气管靠右后角
+  // 排气管靠右后角 + 前排两侧复古黄铜热水锅炉蒸汽烟囱（持续喷涌烧热水般的绵密白蒸汽）
   for(let i=0;i<3;i++){
     add(shop,new THREE.CylinderGeometry(.15,.15,1.35,12),M(0x6d757d,{roughness:.55,metalness:.6}),7.6+i*.7,roofY+.68,-9.5);
     add(shop,new THREE.CylinderGeometry(.25,.25,.09,12),snowCapM,7.6+i*.7,roofY+1.41,-9.5);
+  }
+  const boilerStackM=M(0x3b434c,{roughness:.45,metalness:.72});
+  const boilerBrassM=M(0xd8a24a,{roughness:.30,metalness:.82});
+  for(const [bx,bz] of [[-7.8,5.2],[9.2,5.2]]){
+    add(shop,new THREE.CylinderGeometry(.26,.32,.42,14),M(0x2a3138,{roughness:.6}),bx,roofY+.21,bz);
+    add(shop,new THREE.CylinderGeometry(.15,.18,1.25,14),boilerStackM,bx,roofY+.95,bz);
+    add(shop,new THREE.TorusGeometry(.18,.032,8,16),boilerBrassM,bx,roofY+1.52,bz).rotation.x=Math.PI/2;
+    add(shop,new THREE.CylinderGeometry(.22,.14,.14,14,1,true),boilerBrassM,bx,roofY+1.60,bz);
+  }
+  // 艺术馆楼顶热水蒸汽喷涌粒子系统（模拟烧开水般从烟囱口急促喷出、向上翻滚膨胀并随风飘散的浓密白雾）
+  const roofSteamTex=(()=>{
+    const [sc,sx]=cv(128,128);
+    const g=sx.createRadialGradient(64,64,4,64,64,62);
+    g.addColorStop(0,'rgba(255,253,248,.92)');
+    g.addColorStop(.38,'rgba(242,248,255,.64)');
+    g.addColorStop(.72,'rgba(218,232,248,.22)');
+    g.addColorStop(1,'rgba(200,220,245,0)');
+    sx.fillStyle=g;sx.fillRect(0,0,128,128);
+    return ctex(sc);
+  })();
+  window._roofSteamPuffs=[];
+  const steamVents=[
+    {x:-7.8, y:roofY+1.68, z:5.2,  h:4.2, sc:1.25, spd:.52, n:9},  // 前左热水锅炉蒸汽口（正面清晰可见）
+    {x: 9.2, y:roofY+1.68, z:5.2,  h:4.2, sc:1.25, spd:.50, n:9},  // 前右热水锅炉蒸汽口（正面清晰可见）
+    {x:-7.6, y:roofY+2.45, z:-9.2, h:4.6, sc:1.35, spd:.46, n:8},  // 后左大热水箱泄压阀
+    {x: 7.6, y:roofY+1.48, z:-9.5, h:3.8, sc:1.05, spd:.55, n:6},  // 后右排气管 1
+    {x: 8.3, y:roofY+1.48, z:-9.5, h:4.0, sc:1.10, spd:.52, n:6},  // 后右排气管 2
+    {x: 9.0, y:roofY+1.48, z:-9.5, h:3.6, sc:1.00, spd:.58, n:6},  // 后右排气管 3
+    {x: 0.6, y:roofY+1.42, z:-9.3, h:3.5, sc:1.15, spd:.44, n:6}   // 中央暖通热气口
+  ];
+  for(const v of steamVents){
+    for(let i=0;i<v.n;i++){
+      const smat=new THREE.SpriteMaterial({
+        map:roofSteamTex,color:0xf4f8ff,transparent:true,opacity:.55,
+        depthWrite:false,fog:false
+      });
+      const sp=new THREE.Sprite(smat);
+      sp.position.set(v.x,v.y,v.z);
+      sp.userData.keep=true;
+      scene.add(sp);
+      window._roofSteamPuffs.push({
+        sp,mat:smat,x0:v.x,y0:v.y,z0:v.z,h:v.h,sc:v.sc,
+        spd:v.spd*R(.92,1.08),ph:i/v.n,wob:R(0,6.28)
+      });
+    }
   }
   // 天窗（避开右侧上天台楼梯洞）
   add(shop,BX(3.6,.16,2.2),new THREE.MeshPhysicalMaterial({color:0xbfe0f0,transparent:true,opacity:.36,roughness:.08,clearcoat:1,depthWrite:false}),5.8,roofY+.08,-5.2);
@@ -5050,12 +5091,12 @@ const animePark=new THREE.Group();animePark.userData.tag='park';scene.add(animeP
   }
   // 东侧动漫园地面矮灯柱与高柱天幕彩球已全部清除，保留中央广角主灯保持画面干净通透
 
-  // 6. 东园视觉中心物理衰减主灯（UE 平方反比柔和衰减，聚焦中心雕塑群，四周自然过渡不泛白）
+  // 6. 合并为 1 盏广角中心主灯（砍掉 3 盏零散 PointLight，大幅加速全场 PBR 片元着色）
   const parkLights=[
-    [PX,     8.5, PZ,     0xffe0a6, 86, 32]
+    [PX,     7.5, PZ,     0xffe4b0, 155, 38]
   ];
   for(const [lx,ly,lz,col,base,dist] of parkLights){
-    const pl=new THREE.PointLight(col,base,dist,1.75);
+    const pl=new THREE.PointLight(col,base,dist,1.5);
     pl.position.set(lx,ly,lz);scene.add(pl);
     shopLights.push({l:pl,base,street:false,delay:1.5});
   }
@@ -5503,9 +5544,9 @@ let fireflyMat=null;
     const d2=buildReindeer({rudolph:false,fur:0xb57b4e});d2.scale.setScalar(1.05);
     d2.position.set(SX+2.4,.16,SZ+3.4);d2.rotation.y=-.48;westGarden.add(d2);
     const wSm=buildSnowman(1.08);wSm.position.set(SX+3.9,.16,SZ+.5);wSm.rotation.y=-.35;westGarden.add(wSm);
-    // 巨树视觉中心暖金物理衰减补光
-    const mtPl=new THREE.PointLight(0xffcf80,68,26,1.75);mtPl.position.set(SX,7.4,SZ+1.2);
-    scene.add(mtPl);shopLights.push({l:mtPl,base:68,street:false,delay:1.6});
+    // 巨树专享暖金补光
+    const mtPl=new THREE.PointLight(0xffcf80,95,28,1.45);mtPl.position.set(SX,6.8,SZ+1.2);
+    scene.add(mtPl);shopLights.push({l:mtPl,base:95,street:false,delay:1.6});
   }
 
   // 4. 冬日覆雪灌木 + 冰川景石 + 260 簇圣诞红白金一品红花海
@@ -5597,11 +5638,11 @@ let fireflyMat=null;
   fireflies.userData.noReflect=true;fireflies.frustumCulled=false;
   westGarden.add(fireflies);
 
-  // 6. 西侧雪园地灯柱已移除，仅保留中心主灯照亮雪园（UE 物理衰减聚焦喷泉中心）
+  // 6. 西侧雪园地灯柱已移除，仅保留中心主灯照亮雪园
   for(const [lx,ly,lz,col,inten] of [
-    [GX, 4.8, GZ, 0xffe09a, 58]
+    [GX, 3.8, GZ, 0xffe09a, 82]
   ]){
-    const pl=new THREE.PointLight(col,inten,24,1.75);
+    const pl=new THREE.PointLight(col,inten,24,1.45);
     pl.position.set(lx,ly,lz);
     scene.add(pl);shopLights.push({l:pl,base:inten,street:false,delay:1.5});
   }
@@ -7133,7 +7174,7 @@ const clouds=[];
    10. 圣诞飘雪天气与冬夜星空系统（全天候下雪 + 24h 昼夜变化）
    ════════════════════════════════════════════════════════════ */
 const WINTER_SKY=['#071226','#12294e','#264b7c','rgba(135,175,240,.22)'];
-const WINTER_FOG=0x0d1c34, WINTER_FOG_D=.0036;
+const WINTER_FOG=0x0e1c34, WINTER_FOG_D=.0022;
 
 /* 建筑占地（随馆体适当扩展 x:-9.6..12.1, z:-11.6..7.6 + 门廊雨棚），雪花不能落进室内 */
 function inBuildingXZ(x,z){
@@ -8809,15 +8850,14 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     });
   }
 
-  /* ── 游乐园 UE 级视觉中心主照明（旋转木马暖金中心 + 摩天轮暖珀中心 + 皇家溜冰场光遇冰蓝冷暖对比，平方反比自然衰减） ── */
+  /* ── 游乐园广域主照明（恢复云霄飞车西区与摩天轮东区璀璨暖金主光，配合光遇光雾营造梦幻高度感） ── */
   {
     const fairAreaLights=[
-      [4.0, 9.5, 31.0, 0xffcf82, 86, 34],
-      [22.0, 10.5, 41.0, 0xffd896, 92, 36],
-      [-18.0, 8.0, 38.6, 0x82ccff, 44, 28]
+      [-8,8.5,34,0xffd68a,145,44],
+      [18,9.0,42,0xffe0a0,150,46]
     ];
     for(const [lx,ly,lz,col,inten,dist] of fairAreaLights){
-      const fl=new THREE.PointLight(col,inten,dist,1.80);
+      const fl=new THREE.PointLight(col,inten,dist,1.45);
       fl.position.set(lx,ly,lz);
       scene.add(fl);
       shopLights.push({l:fl,base:inten,street:true});
@@ -10682,17 +10722,16 @@ function updateOuterCrowd(dt,t){
 
 function updateAerialHaze(dt,t){
   const cx=camera.position.x, cy=camera.position.y, cz=camera.position.z;
-  // A. UE5 级前中后景空气透视纵深：近景清澈锐利，中景视觉中心光雾聚焦，远景柔和融入深蓝夜幕
-  const baseD=scene.userData.baseFogD!==undefined?scene.userData.baseFogD:0.0036;
-  const heightFactor=THREE.MathUtils.clamp(1.0-(cy-6.0)/38.0, 0.50, 0.96);
+  // A. 超清通透远景（乘坐云霄飞车高空俯瞰时保持极致通透明亮）
+  const baseD=scene.userData.baseFogD!==undefined?scene.userData.baseFogD:0.0022;
+  const heightFactor=THREE.MathUtils.clamp(1.0-(cy-6.0)/34.0, 0.45, 0.85);
   scene.fog.density=baseD*heightFactor;
 
-  // B. 玩家前景微柔轮廓补光（仅在室外低空漫步时轻柔勾勒前景立体感，靠近艺术馆门口自动淡出）
+  // B. 玩家前景随行轮廓暖光：在低空/乘坐过山车时紧贴前方 4.2m 柔和照亮前景
   camera.getWorldDirection(aerialHaze._fwd);
-  aerialHaze.playerFill.position.set(cx+aerialHaze._fwd.x*3.6, Math.max(1.8,cy+.3), cz+aerialHaze._fwd.z*3.6);
-  const nearGround=THREE.MathUtils.clamp(1.0-(cy-4.0)/16.0, 0, 1);
-  const nearMuseum=THREE.MathUtils.smoothstep(Math.hypot(cx-1.0,cz-2.0), 11.0, 18.0);
-  aerialHaze.playerFill.intensity=0.28*nearGround*nearMuseum;
+  aerialHaze.playerFill.position.set(cx+aerialHaze._fwd.x*4.2, Math.max(1.8,cy+.3), cz+aerialHaze._fwd.z*4.2);
+  const nearGround=THREE.MathUtils.clamp(1.0-(cy-4.0)/16.0, 0.35, 1);
+  aerialHaze.playerFill.intensity=0.52*nearGround;
 
   // C. 《光遇》风格视觉中心体积光雾：前景 (<14m) 完全退散保持极致清晰，中远景在地标中心绽放柔和呼吸光晕
   const mistHeightAtten=THREE.MathUtils.clamp(1.10-(cy-6.0)/48.0, .42, 1.0);
@@ -11049,6 +11088,23 @@ function animate(){
     const u=((t*.42+sw.ph)%1);
     sw.m.position.set(sw.x0+Math.sin(t*2.2+sw.ph*3)*.06,.92+u*.42,sw.z0+Math.cos(t*1.8+sw.ph)*.04);
     sw.m.scale.setScalar((.45+u*.85)*(1-u*.7));
+  }
+  // 艺术馆楼顶烧热水般翻滚升腾的浓密白蒸汽云团
+  if(window._roofSteamPuffs){
+    for(let i=0;i<window._roofSteamPuffs.length;i++){
+      const p=window._roofSteamPuffs[i];
+      const u=((t*p.spd+p.ph)%1);
+      // 喷口处急促冲出，随后翻滚膨胀并随冬夜微风向东北飘散
+      const lift=Math.pow(u,.82)*p.h;
+      const driftX=u*1.25+Math.sin(t*2.6+p.wob+u*4.2)*.26*u;
+      const driftZ=-u*.55+Math.cos(t*2.1+p.wob+u*3.6)*.22*u;
+      p.sp.position.set(p.x0+driftX, p.y0+lift, p.z0+driftZ);
+      const radius=(0.38+Math.pow(u,.75)*2.15)*p.sc;
+      p.sp.scale.set(radius, radius*(0.88+0.24*u), 1);
+      const fadeIn=Math.min(1,u/.12);
+      const fadeOut=Math.pow(1-u,1.35);
+      p.mat.opacity=0.62*fadeIn*fadeOut;
+    }
   }
 
   /* NPC 维尼小熊群物理运动引擎（视距+室内外剔除、避障分离、礼让玩家与车流、弹性跳跃） */
