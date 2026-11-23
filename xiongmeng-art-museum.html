@@ -513,11 +513,13 @@
 <button id="w-run" data-label="跳"></button>
 <div class="wtop" id="wtop">
   <button id="w-view" title="沉浸 / 沙盘" data-label="沙盘"></button>
+  <button id="w-quality-top" class="on" title="高画质光滤镜开关" data-label="高画质"></button>
   <button id="w-sound" class="on" title="声音" data-label="♪"></button>
 </div>
 <div class="wtools" id="wtools">
   <button id="w-mode" title="沉浸 / 沙盘" data-label="沉浸"></button>
   <button id="w-fpv" title="FPV 穿越机特技模式 (F)" data-label="穿越"></button>
+  <button id="w-quality" class="on" title="高画质光滤镜开关" data-label="高画质"></button>
   <button id="w-audio" class="on" title="声音" data-label="♪"></button>
 </div>
 <div id="fpv-osd">
@@ -613,7 +615,7 @@ function M(color,o={}){
   if(color===undefined||color===null)color=0xffffff;
   const k=color+'|'+JSON.stringify(o);
   if(matCache.has(k))return matCache.get(k);
-  const m=new THREE.MeshStandardMaterial(Object.assign({color,flatShading:false,roughness:.88,metalness:0,envMapIntensity:.24},o));
+  const m=new THREE.MeshStandardMaterial(Object.assign({color,flatShading:false,roughness:.76,metalness:.06,envMapIntensity:.85},o));
   matCache.set(k,m);return m;
 }
 function add(parent,geo,mat,x=0,y=0,z=0){
@@ -738,7 +740,7 @@ renderer.outputColorSpace=THREE.SRGBColorSpace;
 host.appendChild(renderer.domElement);
 
 const scene=new THREE.Scene();
-scene.fog=new THREE.FogExp2(0x0c192c,0.0068);
+scene.fog=new THREE.FogExp2(0x0c192c,0.0022);
 
 /* 竖屏时垂直 FOV 放大，补偿被压扁的横向视野（移动端 3D 常规做法） */
 function fovForAspect(){
@@ -806,19 +808,18 @@ const animeOutlineShader={
       vec3 ink=vec3(0.08,0.10,0.18);
       vec3 col=mix(base.rgb,ink,edge*edgeMask*0.16);
       col*=(1.0+clamp((centerL-avgL)*0.28,-0.08,0.08));
-      // 新海诚雪夜冷暖调色分级 + 高画质柔光胶片光晕滤镜 (Halation & Soft Glow Filter)
+      // 新海诚雪夜高通透冷暖分级：绝不抬高灰雾底色，压实暗部通透感，仅让纯发光体与暖光绽放
       float g=luma(col);
-      vec3 shinkaiShadow=mix(col,col*vec3(0.82,0.91,1.18),(0.38+0.12*uHQ)*(1.0-smoothstep(0.05,0.46,g)));
-      vec3 shinkaiWarm=mix(shinkaiShadow,shinkaiShadow*vec3(1.08,1.02,0.91),smoothstep(0.42,0.95,g)*(0.42+0.16*uHQ));
-      col=mix(vec3(g),shinkaiWarm,1.08+0.07*uHQ);
+      vec3 shinkaiShadow=mix(col,col*vec3(0.82,0.91,1.18),(0.36+0.12*uHQ)*(1.0-smoothstep(0.04,0.42,g)));
+      vec3 shinkaiWarm=mix(shinkaiShadow,shinkaiShadow*vec3(1.07,1.02,0.92),smoothstep(0.48,0.96,g)*(0.38+0.14*uHQ));
+      col=mix(vec3(g),shinkaiWarm,1.10+0.06*uHQ);
       if(uHQ>0.5){
-        // 高画质专属光滤镜：高光暖金柔焦溢光 (Halation) + 梦幻暗部天光透亮感
-        float hi=smoothstep(0.55,0.96,max(centerL,avgL));
-        vec3 halation=max(avgCol-vec3(0.42),vec3(0.0))*vec3(1.14,0.96,0.78);
-        col+=halation*hi*0.24;
-        col=pow(max(col,vec3(0.0)),vec3(0.965));
+        // 高画质通透对比滤镜：压清暗部薄雾感 + 仅对 >0.84 的真光源做纯净星芒增艳
+        col=max(vec3(0.0),(col-0.012)*1.035);
+        float pureLight=smoothstep(0.84,1.0,centerL);
+        col+=max(avgCol-vec3(0.78),vec3(0.0))*vec3(1.12,0.96,0.78)*pureLight*0.22;
       }
-      float vig=1.0-smoothstep(0.36,0.94,length(vUv-vec2(0.5)))*(0.13+0.03*uHQ);
+      float vig=1.0-smoothstep(0.40,0.96,length(vUv-vec2(0.5)))*(0.10+0.03*uHQ);
       col*=vig;
       gl_FragColor=vec4(col,base.a);
     }
@@ -826,20 +827,20 @@ const animeOutlineShader={
 };
 const animePass=new ShaderPass(animeOutlineShader);
 composer.addPass(animePass);
-/* ── 还原并优化 GitHub 初版高画质梦幻光滤镜：
-   采用 0.25 倍四分之一分辨率宽半径泛光（strength:0.34, radius:0.82, threshold:0.76），
-   像素填充开销仅为半分辨率的 1/4，却能让所有暖窗、圣诞树星芒、花窗、灯笼与烟花拥有浓郁柔和的新海诚大光晕！ ── */
+/* ── 还原并优化 GitHub 初版高画质纯净光滤镜：
+   0.25x 四分之一分辨率泛光，阈值提高到 0.86（高于雪地亮度，确保白雪与建筑绝不发雾泛白），
+   仅对花窗、圣诞树星芒、彩灯、暖窗与烟花产生纯净通透的新海诚光晕！ ── */
 const BLOOM_SCALE=0.25;
-const bloom=new UnrealBloomPass(new THREE.Vector2(Math.max(64,Math.round(innerWidth*BLOOM_SCALE)),Math.max(64,Math.round(innerHeight*BLOOM_SCALE))),.34,.82,.76);
+const bloom=new UnrealBloomPass(new THREE.Vector2(Math.max(64,Math.round(innerWidth*BLOOM_SCALE)),Math.max(64,Math.round(innerHeight*BLOOM_SCALE))),.28,.72,.86);
 const _bloomSetSize=bloom.setSize.bind(bloom);
 bloom.setSize=(w,h)=>_bloomSetSize(Math.max(64,Math.round(w*BLOOM_SCALE)),Math.max(64,Math.round(h*BLOOM_SCALE)));
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 composer.setPixelRatio(renderer.getPixelRatio());
 
-/* ── 灯光（冬夜钴蓝天光 + 地面暖雪反弹光 GroundBounce，消除死黑与生硬明暗） ─────────── */
-const ambient=new THREE.AmbientLight(0x364d6b,.44); scene.add(ambient);
-const hemi=new THREE.HemisphereLight(0x6c96cc,0x423a35,.78); scene.add(hemi);
+/* ── 灯光（冬夜清澈天光补色，消除灰雾感，保持夜景高对比通透度） ─────────── */
+const ambient=new THREE.AmbientLight(0x324966,.46); scene.add(ambient);
+const hemi=new THREE.HemisphereLight(0x5c82b0,0x162230,.62); scene.add(hemi);
 const key=new THREE.DirectionalLight(0xc2dbf6,.52);
 key.castShadow=true;
 key.shadow.mapSize.set(IS_TOUCH_DEV?1024:1536,IS_TOUCH_DEV?1024:1536);
@@ -7128,7 +7129,7 @@ const clouds=[];
    10. 圣诞飘雪天气与冬夜星空系统（全天候下雪 + 24h 昼夜变化）
    ════════════════════════════════════════════════════════════ */
 const WINTER_SKY=['#071226','#12294e','#264b7c','rgba(135,175,240,.22)'];
-const WINTER_FOG=0x162b4c, WINTER_FOG_D=.0068;
+const WINTER_FOG=0x0e1c34, WINTER_FOG_D=.0022;
 
 /* 建筑占地（随馆体适当扩展 x:-9.6..12.1, z:-11.6..7.6 + 门廊雨棚），雪花不能落进室内 */
 function inBuildingXZ(x,z){
@@ -9875,6 +9876,14 @@ function applyQualityMode(on){
     btn.classList.toggle('on',state.quality);
     btn.textContent=state.quality?'高画质':'标准';
   }
+  for(const id of ['w-quality','w-quality-top']){
+    const wb=document.getElementById(id);
+    if(wb){
+      wb.classList.toggle('on',state.quality);
+      wb.dataset.label=state.quality?'高画质':'标准';
+      wb.textContent='';
+    }
+  }
   const targetDpr=state.quality?HI_DPR:LO_DPR;
   renderer.setPixelRatio(targetDpr);
   composer.setPixelRatio(targetDpr);
@@ -9882,17 +9891,25 @@ function applyQualityMode(on){
     animePass.uniforms.uHQ.value=state.quality?1.0:0.0;
     animePass.uniforms.uRes.value.set(Math.max(1,innerWidth*targetDpr),Math.max(1,innerHeight*targetDpr));
   }
-  bloom.enabled=true;
-  bloom.strength=state.quality?.34:.14;
-  bloom.radius=state.quality?.82:.35;
-  bloom.threshold=state.quality?.76:.90;
-  renderer.toneMappingExposure=state.quality?(IS_TOUCH_DEV?1.20:1.16):1.08;
+  bloom.enabled=state.quality;
+  bloom.strength=.28;
+  bloom.radius=.72;
+  bloom.threshold=.86;
+  renderer.toneMappingExposure=state.quality?(IS_TOUCH_DEV?1.14:1.12):1.06;
   renderer.shadowMap.needsUpdate=true;
 }
 document.getElementById('t-quality').onclick=function(){
   applyQualityMode(!state.quality);
   sfx.blip(state.quality?780:520,.08,.06);
 };
+for(const id of ['w-quality','w-quality-top']){
+  const wb=document.getElementById(id);
+  if(wb)wb.onclick=e=>{
+    e.preventDefault();e.stopPropagation();
+    applyQualityMode(!state.quality);
+    sfx.blip(state.quality?780:520,.08,.06);
+  };
+}
 applyQualityMode(true);
 document.getElementById('t-lights').onclick=function(){
   state.lights=!state.lights;this.classList.toggle('on',state.lights);
@@ -10661,26 +10678,20 @@ function updateOuterCrowd(dt,t){
 
 function updateAerialHaze(dt,t){
   const cx=camera.position.x, cy=camera.position.y, cz=camera.position.z;
-  // A. 动态空气透视 FogExp2：低空/第一人称视角空气透视最强（前中后景分明），高空沙盘俯瞰自动减雾保持通透
-  const baseD=scene.userData.baseFogD!==undefined?scene.userData.baseFogD:0.0082;
-  const heightFactor=THREE.MathUtils.clamp(1.0-(cy-6.0)/34.0, 0.56, 1.16);
+  // A. 超清通透远景：大幅降低指数雾浓度，消除画面灰白雾感
+  const baseD=scene.userData.baseFogD!==undefined?scene.userData.baseFogD:0.0022;
+  const heightFactor=THREE.MathUtils.clamp(1.0-(cy-6.0)/34.0, 0.45, 0.85);
   scene.fog.density=baseD*heightFactor;
 
   // B. 玩家前景随行轮廓暖光：在低空漫步时紧贴玩家前方 4m 柔和照亮前景，拉高视角时平滑淡出
   camera.getWorldDirection(aerialHaze._fwd);
   aerialHaze.playerFill.position.set(cx+aerialHaze._fwd.x*4.2, Math.max(1.8,cy+.3), cz+aerialHaze._fwd.z*4.2);
   const nearGround=THREE.MathUtils.clamp(1.0-(cy-4.0)/16.0, 0, 1);
-  aerialHaze.playerFill.intensity=0.62*nearGround;
+  aerialHaze.playerFill.intensity=0.52*nearGround;
 
-  // C. 低空空气透视薄雾：前景 (<18m) 完全透明清晰；中/后景按距离递增空气透视薄雾层
-  const mistHeightAtten=THREE.MathUtils.clamp(1.15-(cy-5.0)/45.0, .35, 1.0);
+  // C. 停用遮挡视线的巨型半透明薄雾贴片，确保全图通透清澈
   for(const m of aerialHaze.mists){
-    const d=Math.hypot(m.x-cx, m.z-cz);
-    const fgClear=THREE.MathUtils.smoothstep(d,16,38);
-    const farFade=1.0-THREE.MathUtils.smoothstep(d,180,280);
-    m.sp.position.x=m.x+Math.sin(t*.16+m.phase)*1.6;
-    m.mat.opacity=m.baseOp*fgClear*farFade*mistHeightAtten;
-    m.sp.visible=m.mat.opacity>.005;
+    m.sp.visible=false;
   }
 }
 
