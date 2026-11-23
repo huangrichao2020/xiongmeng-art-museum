@@ -7958,8 +7958,8 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     return poolMatCache.get(k);
   };
   const pool=(parent,r,y,op,col)=>{
-    const p=new THREE.Mesh(poolGeo,poolMat(col||0xffb765,op||.26));
-    p.scale.set(r*2,r*2,1);p.rotation.x=-Math.PI/2;p.position.y=y;p.castShadow=false;parent.add(p);return p;};
+    const p=new THREE.Mesh(poolGeo,poolMat(col||0xffb765,(op||.24)*.42));
+    p.scale.set(r*1.55,r*1.55,1);p.rotation.x=-Math.PI/2;p.position.y=y;p.castShadow=false;parent.add(p);return p;};
   /* 高灯柱：柱身 + 双层暖彩灯珠 + 较大地面光斑 */
   const lightPost=(x,z,h)=>{
     const g=new THREE.Group();g.position.set(x,0,z);fair.add(g);
@@ -8404,8 +8404,8 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
   /* ── 碰碰车场（24×16m 扩大一倍，小车体环绕跑） ── */
   {
     const g=new THREE.Group();g.position.set(7,0,45);fair.add(g);
-    add(g,BX(24,.1,16),M(0xd6ecf6,{roughness:.34,metalness:.06,emissive:0x38617a,emissiveIntensity:.4}),0,.05,0).castShadow=false;
-    for(let i=0;i<11;i++)add(g,BX(.45,.02,14.8),M(0xf6fbfe,{roughness:.6}),-10+i*2,.115,0).castShadow=false;
+    add(g,BX(24,.1,16),M(0xa6c4d8,{roughness:.40,metalness:.06,emissive:0x244254,emissiveIntensity:.16}),0,.05,0).castShadow=false;
+    for(let i=0;i<11;i++)add(g,BX(.45,.02,14.8),M(0xc4d8e6,{roughness:.65}),-10+i*2,.115,0).castShadow=false;
     const arenaRailM=M(0x2d3848,{roughness:.72,metalness:.25,envMapIntensity:.25});
     const arenaCapM=M(0x9fb0c4,{roughness:.55,metalness:.35,envMapIntensity:.3});
     for(const [ax,az,len,rot] of [[0,-8,24,0],[0,8,24,0],[-12,0,16,Math.PI/2],[12,0,16,Math.PI/2]]){
@@ -8587,24 +8587,24 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
   {
     const RX=-18.0, RZ=38.6, R_A=10.6, R_B=14.2;
     const rg=new THREE.Group();rg.position.set(RX,0,RZ);fair.add(rg);
-    // 手绘晶莹冰川蓝花样滑冰场冰面纹理（含同心8字冰刀划痕与中央雪花冰徽）
+    // 手绘晶莹冰川蓝花样滑冰场冰面纹理（含同心8字冰刀划痕与中央雪花冰徽，压低高光防过曝）
     const [ic,ix]=cv(512,512);
     const ig=ix.createRadialGradient(256,256,18,256,256,256);
-    ig.addColorStop(0,'#dff4ff');ig.addColorStop(.52,'#a8daf7');ig.addColorStop(.88,'#7ec0ea');ig.addColorStop(1,'#5ea4d4');
+    ig.addColorStop(0,'#b2dcf5');ig.addColorStop(.52,'#88c0e6');ig.addColorStop(.88,'#68a3cf');ig.addColorStop(1,'#4e88b5');
     ix.fillStyle=ig;ix.fillRect(0,0,512,512);
     // 冰刀弧线划痕与中央花滑冰晶徽章
-    ix.strokeStyle='rgba(255,255,255,.42)';ix.lineWidth=2.2;
+    ix.strokeStyle='rgba(255,255,255,.32)';ix.lineWidth=2.0;
     for(const rad of [62,118,168,212]){
       ix.beginPath();ix.arc(256,256,rad,0,Math.PI*2);ix.stroke();
     }
-    ix.strokeStyle='rgba(255,255,255,.32)';ix.lineWidth=1.8;
+    ix.strokeStyle='rgba(255,255,255,.24)';ix.lineWidth=1.6;
     for(let k=0;k<8;k++){
       const a=k*Math.PI/4;
       ix.beginPath();ix.arc(256+Math.cos(a)*74,256+Math.sin(a)*74,74,0,Math.PI*2);ix.stroke();
     }
     const iceTex=ctex(ic);
     const iceMat=new THREE.MeshPhysicalMaterial({
-      map:iceTex,color:0xe8f7ff,roughness:.07,metalness:.10,clearcoat:1.0,clearcoatRoughness:.04,envMapIntensity:1.35
+      map:iceTex,color:0xc6e2f5,roughness:.12,metalness:.08,clearcoat:.85,clearcoatRoughness:.08,envMapIntensity:.85
     });
     const iceDisc=add(rg,new THREE.CylinderGeometry(1,1,.07,56),iceMat,0,.035,0);
     iceDisc.scale.set(R_A,1,R_B);iceDisc.castShadow=false;iceDisc.receiveShadow=true;
@@ -9800,7 +9800,8 @@ function updateBrand(){
 }
 function initWinter(){
   rSeason.textContent='圣诞';
-  ground.material.color.setHex(0xeaf2f9);
+  ground.material.color.setHex(0xd0ddeb);
+  ground.material.userData.noToon=true;
   road.material.color.setHex(0x8e99a4);road.material.roughness=.62;
   roadFar.material.color.setHex(0x8e99a4);roadFar.material.roughness=.62;
   wetRegistry.forEach(r=>{r.m.userData.u.uWetAmt.value=r.base*.12;});
