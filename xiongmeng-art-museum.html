@@ -5085,20 +5085,23 @@ const lampPools=[];
   }
 }
 
-/* 限速牌 / 停车牌 */
+/* 限速牌 / 停车牌（规范双面正字圆盘 + 底部立杆支撑，前后观看均不镜像、立杆不挡字） */
 {
-  const g=new THREE.Group();g.position.set(9.6,0,10.6);street.add(g);
-  add(g,new THREE.CylinderGeometry(.06,.06,3.0,8),M(0x9aa4ad,{roughness:.4,metalness:.8}),0,1.5,0);
-  const disc=new THREE.Mesh(new THREE.CircleGeometry(.52,20),new THREE.MeshStandardMaterial({
-    map:spdTex,emissiveMap:spdTex,emissive:0xffffff,emissiveIntensity:.35,roughness:.5,side:THREE.DoubleSide}));
-  disc.position.set(0,2.85,0);disc.rotation.y=Math.PI;g.add(disc);
-  const ring=new THREE.Mesh(new THREE.RingGeometry(.52,.56,24),M(0xc8352c,{roughness:.5}));
-  ring.position.set(0,2.85,-.01);ring.rotation.y=Math.PI;g.add(ring);
-  const g2=new THREE.Group();g2.position.set(9.6,0,19.5);g2.rotation.y=Math.PI;street.add(g2);
-  add(g2,new THREE.CylinderGeometry(.06,.06,3.0,8),M(0x9aa4ad,{roughness:.4,metalness:.8}),0,1.5,0);
-  const d2=new THREE.Mesh(new THREE.CircleGeometry(.52,20),new THREE.MeshStandardMaterial({
-    map:spdTex,emissiveMap:spdTex,emissive:0xffffff,emissiveIntensity:.35,roughness:.5,side:THREE.DoubleSide}));
-  d2.position.set(0,2.85,0);g2.add(d2);
+  const spdMat=new THREE.MeshStandardMaterial({
+    map:spdTex,emissiveMap:spdTex,emissive:0xffffff,emissiveIntensity:.35,roughness:.45,side:THREE.FrontSide
+  });
+  const plateM=M(0xc8352c,{roughness:.45,metalness:.3});
+  const poleM=M(0x9aa4ad,{roughness:.4,metalness:.8});
+  for(const [sx,sz,ry] of [[9.6,10.6,0],[9.6,19.5,Math.PI]]){
+    const g=new THREE.Group();g.position.set(sx,0,sz);g.rotation.y=ry;street.add(g);
+    add(g,new THREE.CylinderGeometry(.055,.06,2.35,10),poleM,0,1.175,0);
+    const body=add(g,new THREE.CylinderGeometry(.54,.54,.04,24),plateM,0,2.85,0);
+    body.rotation.x=Math.PI/2;
+    const f1=new THREE.Mesh(new THREE.CircleGeometry(.52,24),spdMat);
+    f1.position.set(0,2.85,.024);g.add(f1);
+    const f2=new THREE.Mesh(new THREE.CircleGeometry(.52,24),spdMat);
+    f2.position.set(0,2.85,-.024);f2.rotation.y=Math.PI;g.add(f2);
+  }
 }
 {
   // 规范双面不透背「P」停车标牌，移至停车场出入口东侧路牙旁 (-10.75, 0.26, 11.2)
@@ -8381,6 +8384,86 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     amusement.coaster={curve,cars,t:0,sampleTrackUp};
   }
 
+  /* ── 云霄飞车中央腹地：星夜极光皇家花样溜冰场 (-17.8, 0, 39.0) + 6 位花样滑冰大师 NPC ── */
+  {
+    const RX=-17.8, RZ=39.0, R_A=6.2, R_B=9.0;
+    const rg=new THREE.Group();rg.position.set(RX,0,RZ);fair.add(rg);
+    // 手绘晶莹冰川蓝花样滑冰场冰面纹理（含同心8字冰刀划痕与中央雪花冰徽）
+    const [ic,ix]=cv(512,512);
+    const ig=ix.createRadialGradient(256,256,18,256,256,256);
+    ig.addColorStop(0,'#dff4ff');ig.addColorStop(.52,'#a8daf7');ig.addColorStop(.88,'#7ec0ea');ig.addColorStop(1,'#5ea4d4');
+    ix.fillStyle=ig;ix.fillRect(0,0,512,512);
+    // 冰刀弧线划痕与中央花滑冰晶徽章
+    ix.strokeStyle='rgba(255,255,255,.42)';ix.lineWidth=2.2;
+    for(const rad of [62,118,168,212]){
+      ix.beginPath();ix.arc(256,256,rad,0,Math.PI*2);ix.stroke();
+    }
+    ix.strokeStyle='rgba(255,255,255,.32)';ix.lineWidth=1.8;
+    for(let k=0;k<8;k++){
+      const a=k*Math.PI/4;
+      ix.beginPath();ix.arc(256+Math.cos(a)*74,256+Math.sin(a)*74,74,0,Math.PI*2);ix.stroke();
+    }
+    const iceTex=ctex(ic);
+    const iceMat=new THREE.MeshPhysicalMaterial({
+      map:iceTex,color:0xe8f7ff,roughness:.07,metalness:.10,clearcoat:1.0,clearcoatRoughness:.04,envMapIntensity:1.35
+    });
+    const iceDisc=add(rg,new THREE.CylinderGeometry(1,1,.07,48),iceMat,0,.035,0);
+    iceDisc.scale.set(R_A,1,R_B);iceDisc.castShadow=false;iceDisc.receiveShadow=true;
+    // 外围低矮胡桃木与暖金弧形围挡（留出北侧与东侧两个宽敞冰场入口，方便玩家自由滑入）
+    const rinkWoodM=M(0x4a2e1e,{roughness:.62,metalness:.12});
+    const rinkSnowM=M(0xf2f7fc,{roughness:.90});
+    const segN=36;
+    for(let i=0;i<segN;i++){
+      const a0=(i/segN)*Math.PI*2, a1=((i+1)/segN)*Math.PI*2, am=(a0+a1)*.5;
+      // 留出东侧 (am≈0) 与北侧 (am≈-PI/2) 两个宽敞出入口
+      if(Math.abs(Math.sin(am))<.22&&Math.cos(am)>.85)continue;
+      if(Math.abs(Math.cos(am))<.22&&Math.sin(am)<-.85)continue;
+      const x0=Math.cos(a0)*(R_A+.18), z0=Math.sin(a0)*(R_B+.18);
+      const x1=Math.cos(a1)*(R_A+.18), z1=Math.sin(a1)*(R_B+.18);
+      const mx=(x0+x1)*.5, mz=(z0+z1)*.5, sl=Math.hypot(x1-x0,z1-z0);
+      const wall=add(rg,BX(sl+.06,.38,.22),rinkWoodM,mx,.19,mz);
+      wall.rotation.y=-Math.atan2(z1-z0,x1-x0);
+      const cap=addNS(rg,BX(sl+.08,.07,.26),gldM,mx,.40,mz);
+      cap.rotation.y=wall.rotation.y;
+    }
+    // 冰场东侧入口欢迎小立牌
+    const [rc,rx]=cv(512,112);
+    rx.fillStyle='#13263a';rx.fillRect(0,0,512,112);
+    rx.strokeStyle='#f4c56a';rx.lineWidth=6;rx.strokeRect(6,6,500,100);
+    rx.fillStyle='#e8f7ff';rx.font='700 32px '+HK;rx.textAlign='center';
+    rx.fillText('⛸️ 星夜皇家溜冰场 · 步入即开启溜冰模式',256,66);
+    for(const sx of [-.95,.95])add(rg,BX(.08,.85,.08),gldM,R_A+.35,.42,sx+2.3);
+    const rSign=signPanel(rg,2.1,.46,ctex(rc),R_A+.35,.86,2.3,.95);
+    rSign.rotation.y=Math.PI/2;
+    pool(rg,8.5,.025,.16,0x9fe8ff);
+
+    // ★ 6 位花样滑冰大师 NPC（独立挂载于 scene 防止静态合批冻结四肢骨骼）
+    const skaterGrp=new THREE.Group();skaterGrp.position.set(RX,0,RZ);scene.add(skaterGrp);
+    const bladeM=M(0xeef6ff,{roughness:.15,metalness:.92});
+    const masterSpecs=[
+      {role:'pairA',col:0xd63648,acc:'santa',name:'花滑冰舞大师·安娜',ph:0},
+      {role:'pairB',col:0x2b5c9e,acc:'beret',name:'花滑冰舞大师·里奥',ph:Math.PI},
+      {role:'spiral',col:0x8e44ad,acc:'bow',name:'燕式平衡大师·克拉拉',ph:1.2},
+      {role:'axel',col:0xe69c28,acc:'beanie',name:'阿克塞尔三周跳大师·羽生',ph:2.4},
+      {role:'spin',col:0x238c6e,acc:'earmuff',name:'贝尔曼高速旋转大师·索菲',ph:3.8},
+      {role:'edge',col:0xc85a32,acc:'headphone',name:'冰刃极速压步大师·马克',ph:5.0}
+    ];
+    amusement.skaters=[];
+    for(const sp of masterSpecs){
+      const p=makePerson(sp.col,0xfbe2cf,{scale:.96,acc:sp.acc});
+      // 在左右脚底加装亮银金属花样冰刀
+      for(const leg of [p.userData.legL,p.userData.legR]){
+        if(leg){
+          addNS(leg,BX(.032,.045,.25),bladeM,0,-.22,.02);
+        }
+      }
+      p.userData.keep=true;
+      skaterGrp.add(p);
+      amusement.skaters.push({p,role:sp.role,ph:sp.ph,name:sp.name,prevX:0,prevZ:0,spinAng:0,puffCd:0});
+    }
+    amusement.rink={x:RX,z:RZ,rx:R_A,rz:R_B};
+  }
+
   /* ── 巨型圣诞老人地标雕塑（带大理石鎏金底座、礼物袋与挥手致意，向东挪至 (38.5, 0, 52.5) 留出宽敞间距） ── */
   {
     const g=new THREE.Group();g.position.set(38.5,0,52.5);g.rotation.y=-2.45;fair.add(g);
@@ -8518,7 +8601,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
 
   /* ── 精选雪人（精简冗余杂物，只保留核心拍照点位，给园内留白呼吸感） ── */
   {
-    const spots=[[-11.5,27.5],[14,50],[24,30]];
+    const spots=[[-10.2,25.8],[14,50],[24,30]];
     const hats=['santa','beanie','top'];
     const scarves=[0xdc2f2f,0x2563eb,0xeab308];
     spots.forEach(([sx,sz],i)=>{
@@ -9805,8 +9888,17 @@ function fpExit(){
   camera.position.copy(HOME.pos);controls.target.copy(HOME.tgt);controls.update();
 }
 const _physV=new THREE.Vector3();
+function inIceRink(x,z){
+  const rk=amusement&&amusement.rink;
+  if(!rk)return false;
+  const nx=(x-rk.x)/rk.rx, nz=(z-rk.z)/rk.rz;
+  return (nx*nx+nz*nz)<=1.02;
+}
 function fpUpdate(dt){
-  let sp=(fp.keys['ShiftLeft']||fp.keys['ShiftRight'])?6.4:3.2;
+  const onIce=inIceRink(fp.x,fp.z);
+  let sp=onIce
+    ?((fp.keys['ShiftLeft']||fp.keys['ShiftRight'])?9.2:5.8)
+    :((fp.keys['ShiftLeft']||fp.keys['ShiftRight'])?6.4:3.2);
   let f=0,s=0;
   if(fp.keys['KeyW']||fp.keys['ArrowUp'])f+=1;
   if(fp.keys['KeyS']||fp.keys['ArrowDown'])f-=1;
@@ -9815,18 +9907,40 @@ function fpUpdate(dt){
   // 虚拟摇杆：上推前进、右推横移，力度越大越快
   if(joy.mag>0.02){
     f+=-joy.dy*1.15;s+=joy.dx*1.15;
-    sp=joy.mag>.78?6.4:3.4;
+    sp=onIce?(joy.mag>.78?9.0:5.8):(joy.mag>.78?6.4:3.4);
   }
   const fx=-Math.sin(fp.yaw),fz=-Math.cos(fp.yaw),rx=Math.cos(fp.yaw),rz=-Math.sin(fp.yaw);
   let dx=fx*f+rx*s,dz=fz*f+rz*s;
   const l=Math.hypot(dx,dz);
   if(l>0){dx/=l;dz/=l;}
-  const acc=Math.min(1,dt*12);
+  // 溜冰模式：超低冰面阻尼，松开按键后保持丝滑长距离惯性滑行；普通陆地保持高响应止动
+  const acc=onIce?Math.min(1,dt*(l>0?3.4:0.75)):Math.min(1,dt*12);
   fp.vx+=(dx*sp*Math.min(1,l)-fp.vx)*acc;
   fp.vz+=(dz*sp*Math.min(1,l)-fp.vz)*acc;
   fpStep(fp.vx*dt,fp.vz*dt);
-  // 第一人称轻跳跃物理 + 室外踩雪碎雪尘
-  if(fp.keys['Space']&&fp.jumpY<=0.001){fp.jumpVy=4.6;sfx.blip(520,.08,.04);}
+  // 步入/离开溜冰场 HUD 状态切换提示
+  if(onIce!==!!fp._wasOnIce){
+    fp._wasOnIce=onIce;
+    if(onIce&&!trainSys.riding&&!wheelSys.riding&&!launchSys.active){
+      trainHud.classList.add('show');
+      trainMsgEl.textContent='⛸️ 已进入星夜溜冰场 · 溜冰模式开启（冰面惯性滑行 · 空格键 360° 花样旋转跳 · Shift 极速冲刺）';
+      trainBtnEl.textContent='花样旋转跳 (Space)';
+      trainBtnEl.onclick=()=>{if(fp.jumpY<=0.001){fp.jumpVy=5.8;fp.skateSpin=Math.PI*2;}};
+    }else if(!onIce&&!trainSys.riding&&!wheelSys.riding&&!launchSys.active){
+      trainHud.classList.remove('show');
+    }
+  }
+  // 第一人称轻跳跃物理（冰面起跳触发 360° 阿克塞尔花样旋转跳！）
+  if(fp.keys['Space']&&fp.jumpY<=0.001){
+    fp.jumpVy=onIce?5.8:4.6;
+    if(onIce)fp.skateSpin=Math.PI*2;
+    sfx.blip(onIce?660:520,.08,.04);
+  }
+  if(fp.skateSpin>0){
+    const dSpin=Math.min(fp.skateSpin,dt*9.5);
+    fp.yaw+=dSpin;
+    fp.skateSpin-=dSpin;
+  }
   if(fp.jumpY>0||fp.jumpVy!==0){
     fp.jumpVy-=13.8*dt;fp.jumpY+=fp.jumpVy*dt;
     if(fp.jumpY<=0){
@@ -10920,6 +11034,106 @@ function animate(){
   }
   if(amusement.carousel)amusement.carousel.rotation.y+=dt*.45;
   if(amusement.horses){for(const h of amusement.horses)h.g.position.y=h.baseY+Math.sin(t*2.8+h.ph)*.26;}
+  if(amusement.skaters){
+    for(const sk of amusement.skaters){
+      const p=sk.p, u=p.userData;
+      let x=0, z=0, y=.08, yaw=0, pitch=0, roll=0;
+      if(sk.role==='pairA'||sk.role==='pairB'){
+        // 双人冰舞华尔兹组合：绕中庭圆心同步公转 + 手拉手面对面高速华尔兹对旋
+        const w=t*1.15, cx=Math.cos(w*.45)*1.4, cz=Math.sin(w*.45)*2.2;
+        const pairAng=w*2.6+sk.ph;
+        x=cx+Math.cos(pairAng)*.62;
+        z=cz+Math.sin(pairAng)*.62;
+        yaw=Math.atan2(-Math.cos(pairAng),-Math.sin(pairAng));
+        roll=(sk.role==='pairA'?1:-1)*.16;
+        if(u.armL&&u.armR){
+          u.armL.rotation.set(-1.35,0,.35);
+          u.armR.rotation.set(-1.35,0,-.35);
+          u.legL.rotation.x=.12;
+          u.legR.rotation.x=-.78+Math.sin(w*2)*.22; // 外侧腿优雅后扬
+        }
+      }else if(sk.role==='spiral'){
+        // 大 8 字燕式平衡大师（Arabesque Spiral）：单腿滑行、后腿高高平举、双臂展翅
+        const s=t*.78+sk.ph;
+        x=Math.sin(s)*4.2;
+        z=Math.sin(s*2)*5.8;
+        const vx=Math.cos(s)*4.2, vz=Math.cos(s*2)*11.6;
+        yaw=Math.atan2(vx,vz);
+        pitch=.34;
+        roll=-Math.cos(s)*.24;
+        if(u.armL&&u.armR){
+          u.armL.rotation.set(-1.45,0,.78);
+          u.armR.rotation.set(-1.45,0,-.78);
+          u.legL.rotation.x=-.18;
+          u.legR.rotation.x=1.22; // 燕式平衡高抬后腿
+        }
+      }else if(sk.role==='axel'){
+        // 阿克塞尔三周跳大师（Triple Axel）：椭圆助滑 + 每 3.2s 腾空跃起高速三周自转
+        const s=t*1.08+sk.ph;
+        x=Math.cos(s)*4.6;
+        z=Math.sin(s)*6.8;
+        const vx=-Math.sin(s)*4.6, vz=Math.cos(s)*6.8;
+        const cyc=(t+sk.ph)%3.2;
+        if(cyc<0.82){
+          const jp=cyc/0.82;
+          y=.08+Math.sin(jp*Math.PI)*.92;
+          yaw=Math.atan2(vx,vz)+jp*Math.PI*6; // 空中高速三周跳
+          if(u.armL&&u.armR){
+            u.armL.rotation.set(-.95,0,-.28);
+            u.armR.rotation.set(-.95,0,.28);
+            u.legL.rotation.x=.15;u.legR.rotation.x=-.25;
+          }
+        }else{
+          yaw=Math.atan2(vx,vz);
+          roll=.26;
+          if(u.armL&&u.armR){
+            const sw=Math.sin(t*4.8)*.65;
+            u.armL.rotation.set(sw,0,.25);u.armR.rotation.set(-sw,0,-.25);
+            u.legL.rotation.x=-sw*.85;u.legR.rotation.x=sw*.85;
+          }
+        }
+      }else if(sk.role==='spin'){
+        // 贝尔曼高速原地旋转大师（Pirouette Spin）：滑行与每秒 2.8 圈高速芭蕾立转交替
+        const cyc=(t+sk.ph)%4.0;
+        const s=t*.65+sk.ph;
+        x=Math.cos(s)*2.8;
+        z=-3.2+Math.sin(s)*2.8;
+        if(cyc<2.2){
+          sk.spinAng+=dt*17.5;
+          yaw=sk.spinAng;
+          if(u.armL&&u.armR){
+            u.armL.rotation.set(-2.65,0,.18);
+            u.armR.rotation.set(-2.65,0,-.18);
+            u.legL.rotation.x=0;u.legR.rotation.x=.95;
+          }
+        }else{
+          const vx=-Math.sin(s)*2.8, vz=Math.cos(s)*2.8;
+          yaw=Math.atan2(vx,vz);
+          sk.spinAng=yaw;
+          if(u.armL&&u.armR){
+            u.armL.rotation.set(-1.2,0,.55);u.armR.rotation.set(-1.2,0,-.55);
+            u.legL.rotation.x=Math.sin(t*4)*.45;u.legR.rotation.x=-Math.sin(t*4)*.45;
+          }
+        }
+      }else{
+        // 外圈极速交叉压步大师：沿大椭圆外圈反向压弯疾驰
+        const s=-t*1.28+sk.ph;
+        x=Math.cos(s)*5.3;
+        z=Math.sin(s)*7.9;
+        const vx=Math.sin(s)*5.3, vz=-Math.cos(s)*7.9;
+        yaw=Math.atan2(vx,vz);
+        pitch=.18;
+        roll=-.28;
+        if(u.armL&&u.armR){
+          const sw=Math.sin(t*6.2)*.75;
+          u.armL.rotation.set(sw-.3,0,.18);u.armR.rotation.set(-sw-.3,0,-.18);
+          u.legL.rotation.x=-sw*.92;u.legR.rotation.x=sw*.92;
+        }
+      }
+      p.position.set(x,y,z);
+      p.rotation.set(pitch,yaw,roll,'YXZ');
+    }
+  }
   if(amusement.coaster){
     const co=amusement.coaster;
     if(!co._vP){co._vP=new THREE.Vector3();co._vT=new THREE.Vector3();co._vL=new THREE.Vector3();co._vU=new THREE.Vector3();}
