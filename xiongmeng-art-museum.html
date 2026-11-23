@@ -128,12 +128,18 @@
 
   /* ---------- 沉浸视角 ---------- */
   body.fp #hint,body.fp #tip{display:none!important}
-  /* 纯净模式：画面上一个 UI 都不留（双击画面才唤回） */
+  /* 纯净模式：画面上只留操作控件（摇杆 / 跳 / 返回 / 声音），其余 UI 全部隐去 */
   body.clean #rail,body.clean #info,body.clean #hint,
-  body.clean #tip,body.clean #cross,body.clean #joystick,body.clean #w-run{display:none!important}
-  /* 沉浸模式：游戏式操作控件（左手摇杆 / 右下按键 / 右上返回） */
+  body.clean #tip,body.clean #cross,body.clean #dock,body.clean #panel{display:none!important}
+  /* 纯净时仍要能走能转头：操作控件不受 clean 影响 */
+  body.clean.walk #joystick,body.clean.walk #w-run,
+  body.clean.walk #w-back,body.clean.walk #w-sound{display:block!important}
+  /* 操作控件（左手摇杆 / 右下跳 / 右上工具）——触屏端常驻，纯净模式也保留 */
   body.walk #joystick,body.walk #w-run,body.walk #w-back,body.walk #w-sound{display:block}
   body.walk.off #joystick,body.walk.off #w-run,body.walk.off #w-back,body.walk.off #w-sound{display:none}
+  /* 触屏设备：无论沉浸还是沙盒，摇杆与跳按钮都在（默认纯净也不藏操作） */
+  body.touch #joystick,body.touch #w-run{display:block!important}
+  body.touch #wtop{display:flex!important}
   #joystick{
     position:fixed;left:22px;bottom:26px;z-index:27;display:none;
     width:118px;height:118px;border-radius:50%;
@@ -175,6 +181,36 @@
   }
   .wtop button:hover{color:#fff;border-color:rgba(160,220,250,.7);background:rgba(104,208,245,.2)}
   .wtop button.on{color:var(--accent);border-color:rgba(104,208,245,.55)}
+  /* 触屏：右上常驻工具组（切视角 / 声音），保证纯净模式下也能切换 */
+  body.touch .wtop{right:14px;top:max(12px,env(safe-area-inset-top));gap:8px}
+  body.touch .wtop button{width:44px;height:44px;font-size:12px}
+  /* 常驻小工具条：纯净模式下也能切视角/开关声音（永远可见，不受 clean 影响） */
+  .wtools{
+    position:fixed;right:14px;top:14px;z-index:28;display:flex;gap:7px;
+  }
+  .wtools button{
+    min-width:38px;height:34px;padding:0 9px;border-radius:17px;
+    background:rgba(10,18,26,.42);border:1px solid rgba(160,210,240,.26);
+    color:#bcd6e8;font-family:var(--han);font-size:11.5px;letter-spacing:.04em;
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);cursor:pointer;transition:.18s;
+  }
+  .wtools button:hover{color:#fff;border-color:rgba(160,220,250,.6);background:rgba(104,208,245,.18)}
+  .wtools button.on{color:var(--accent);border-color:rgba(104,208,245,.5)}
+  body.touch .wtools{right:max(12px,env(safe-area-inset-right));top:max(12px,env(safe-area-inset-top))}
+  body.touch .wtools button{min-width:44px;height:40px;border-radius:20px;font-size:12px}
+  /* 触屏：沉浸内的 .wtop 隐藏，统一用常驻 .wtools，避免两套按钮叠在一起 */
+  body.touch .wtop{display:none!important}
+  /* ── 触屏端视觉优化 ──
+     手机屏像素密度高（1px 扫描线会变摩尔纹），混合模式暗角在 OLED 上发闷，
+     所以触屏端去掉扫描线、换成普通 rgba 暗角，并把整体色调提亮一点。 */
+  body.touch #scan{display:none!important}
+  body.touch #grain{
+    mix-blend-mode:normal;
+    background:radial-gradient(125% 95% at 50% 44%, rgba(0,0,0,0) 46%, rgba(4,10,18,.34) 100%);
+  }
+  /* 触屏：右下「跳」按钮更靠边、更好按 */
+  body.touch #w-run{right:max(18px,env(safe-area-inset-right));bottom:max(28px,env(safe-area-inset-bottom));width:72px;height:72px}
+  body.touch #joystick{left:max(16px,env(safe-area-inset-left));bottom:max(22px,env(safe-area-inset-bottom));width:112px;height:112px}
   #cross{
     position:fixed;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;z-index:26;
     pointer-events:none;opacity:0;transition:opacity .2s;
@@ -388,7 +424,6 @@
     <input id="hour" type="range" min="0" max="24" step="0.1" value="21.5" />
     <div class="toggles">
       <button id="t-fp">沉浸</button>
-      <button id="t-clean">纯净</button>
       <button id="t-sound" class="on">圣诞音</button>
       <button id="t-stars" class="on">流星雨</button>
       <button id="t-lights" class="on">圣诞灯</button>
@@ -406,20 +441,6 @@
   <dl class="rows" id="info-rows"></dl>
 </div>
 
-<div id="dock" class="panel">
-  <button data-view="home" class="on">全景总览</button>
-  <button data-view="sign">圣诞门头</button>
-  <button data-view="workshop">主展厅</button>
-  <button data-view="reception">收藏室与画室</button>
-  <button data-view="roof">屋顶圣诞熊展</button>
-  <button data-view="park">圣诞动漫雪园</button>
-  <button data-view="west">圣诞喷泉鹿园</button>
-  <button data-view="street">飘雪圣诞街</button>
-  <button data-view="market">圣诞市集</button>
-  <button data-view="shops">北街小店</button>
-  <button data-view="fair">圣诞游乐园</button>
-</div>
-
 <div id="hint" class="panel">
   <span><kbd>拖拽</kbd>旋转</span>
   <span><kbd>滚轮</kbd>缩放</span>
@@ -431,7 +452,15 @@
 <div id="tip"></div>
 <div id="cross"></div>
 <div id="joystick"><i id="stick"></i></div>
-<button id="w-run">跑</button>
+<button id="w-run">跳</button>
+<div class="wtop" id="wtop">
+  <button id="w-view" title="沉浸 / 沙盘">沙盘</button>
+  <button id="w-sound" class="on" title="声音">♪</button>
+</div>
+<div class="wtools" id="wtools">
+  <button id="w-mode" title="沉浸 / 沙盘">沉浸</button>
+  <button id="w-audio" class="on" title="声音">♪</button>
+</div>
 <div id="train-hud"><span id="train-msg">圣诞观光小火车运行中</span><button id="train-btn">上车</button></div>
 <div id="gift-modal" aria-hidden="true">
   <div id="gift-card">
@@ -610,8 +639,15 @@ function mergeStatic(root,skip){
    ════════════════════════════════════════════════════════════ */
 const host=document.getElementById('stage');
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance',stencil:false});
-const HI_DPR=Math.min(devicePixelRatio||1,1.55);
-const LO_DPR=Math.min(HI_DPR,1.05);
+/* ── 渲染分辨率分端策略 ──
+   手机 DPR 通常是 2~3，1.55 的像素比在 6.7 寸屏上意味着渲染 ~3800×2000，
+   再叠加 Bloom 的多级全屏 pass，填充率直接爆掉 → 掉帧、发热。
+   触屏设备压到 1.15（画面依然锐利，渲染量降到桌面的 ~55%），
+   并把泛光降到 0.35 倍分辨率，再配合阴影降频，手机上才跑得动。 */
+const _forceMobile=new URLSearchParams(location.search).has('mobile');
+const IS_TOUCH_DEV=_forceMobile||('ontouchstart' in window)||(navigator.maxTouchPoints>0)||innerWidth<820;
+const HI_DPR=IS_TOUCH_DEV?Math.min(devicePixelRatio||1,1.15):Math.min(devicePixelRatio||1,1.55);
+const LO_DPR=Math.min(HI_DPR,IS_TOUCH_DEV?.92:1.05);
 renderer.setPixelRatio(HI_DPR);
 renderer.setSize(innerWidth,innerHeight);
 renderer.shadowMap.enabled=true;
@@ -619,27 +655,38 @@ renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.shadowMap.autoUpdate=false;
 renderer.shadowMap.needsUpdate=true;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=1.12;
+renderer.toneMappingExposure=IS_TOUCH_DEV?1.18:1.12;
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 host.appendChild(renderer.domElement);
 
 const scene=new THREE.Scene();
 scene.fog=new THREE.FogExp2(0x0c192c,0.0068);
 
-const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,700);
+/* 竖屏时垂直 FOV 放大，补偿被压扁的横向视野（移动端 3D 常规做法） */
+function fovForAspect(){
+  const a=innerWidth/innerHeight;
+  if(!IS_TOUCH_DEV)return 60;
+  if(a<0.62)return 78;      // 极窄竖屏
+  if(a<0.85)return 70;      // 常规竖屏
+  return 62;                // 横屏 / 平板
+}
+const camera=new THREE.PerspectiveCamera(fovForAspect(),innerWidth/innerHeight,.1,700);
 camera.position.set(26,19,28);
 
 const controls=new OrbitControls(camera,renderer.domElement);
 controls.enableDamping=true;controls.dampingFactor=.055;
 controls.minDistance=11;controls.maxDistance=95;
 controls.maxPolarAngle=1.44;controls.minPolarAngle=.18;
+/* 触屏端沙盒：相机完全由 fp.yaw/pitch + 自管半径接管，
+   OrbitControls 在触屏端整体停用（避免双重旋转 / 抢 pointer） */
+if(IS_TOUCH_DEV)controls.enableRotate=false;
 controls.target.set(0,3.4,0);
 controls.autoRotateSpeed=.55;
 
 const HOME={pos:camera.position.clone(),tgt:controls.target.clone()};
 
 /* ── 后期：日系二次元电影感三渲二管线 (2x MSAA Render -> 柔化细描边&新海诚调色 -> 柔和Bloom -> ACES) ── */
-const _msaaSamples=Math.min(2,renderer.capabilities.maxSamples||2);
+const _msaaSamples=IS_TOUCH_DEV?0:Math.min(2,renderer.capabilities.maxSamples||2);   // 触屏关 MSAA，像素比已降，开着白费
 const _composerRT=new THREE.WebGLRenderTarget(Math.max(1,Math.round(innerWidth*HI_DPR)),Math.max(1,Math.round(innerHeight*HI_DPR)),{type:THREE.HalfFloatType,samples:_msaaSamples});
 const composer=new EffectComposer(renderer,_composerRT);
 composer.addPass(new RenderPass(scene,camera));
@@ -688,7 +735,8 @@ const animeOutlineShader={
 };
 const animePass=new ShaderPass(animeOutlineShader);
 composer.addPass(animePass);
-const bloom=new UnrealBloomPass(new THREE.Vector2(Math.max(64,Math.round(innerWidth*.5)),Math.max(64,Math.round(innerHeight*.5))),.16,.36,.90);
+const BLOOM_SCALE=IS_TOUCH_DEV?.35:.5;   // 触屏端泛光降到 0.35 倍分辨率，省一大截填充率
+const bloom=new UnrealBloomPass(new THREE.Vector2(Math.max(64,Math.round(innerWidth*BLOOM_SCALE)),Math.max(64,Math.round(innerHeight*BLOOM_SCALE))),.16,.36,.90);
 const _bloomSetSize=bloom.setSize.bind(bloom);
 bloom.setSize=(w,h)=>_bloomSetSize(Math.max(64,Math.round(w*.5)),Math.max(64,Math.round(h*.5)));
 composer.addPass(bloom);
@@ -700,10 +748,13 @@ const ambient=new THREE.AmbientLight(0x364d6b,.44); scene.add(ambient);
 const hemi=new THREE.HemisphereLight(0x6c96cc,0x423a35,.78); scene.add(hemi);
 const key=new THREE.DirectionalLight(0xc2dbf6,.52);
 key.castShadow=true;
-key.shadow.mapSize.set(1536,1536);
+key.shadow.mapSize.set(IS_TOUCH_DEV?1024:1536,IS_TOUCH_DEV?1024:1536);
 key.shadow.radius=3.2;
-key.shadow.camera.left=-56;key.shadow.camera.right=56;
-key.shadow.camera.top=56;key.shadow.camera.bottom=-56;
+{ // 阴影相机：触屏端收窄到 ±38m，阴影贴图精度直接提升约 2 倍
+  const SH=IS_TOUCH_DEV?38:56;
+  key.shadow.camera.left=-SH;key.shadow.camera.right=SH;
+  key.shadow.camera.top=SH;key.shadow.camera.bottom=-SH;
+}
 key.shadow.camera.near=1;key.shadow.camera.far=160;
 key.shadow.bias=-.0004;key.shadow.normalBias=.055;
 scene.add(key);scene.add(key.target);
@@ -9171,7 +9222,7 @@ const TIMES=[
   {k:'dusk', name:'暮',h:17.5,weather:'雪霞',sky:['#263b68','#995878','#f0a46c','rgba(255,176,105,.65)'],fog:0x9b746a,fogD:.0082},
   {k:'night',name:'夜',h:21.5,weather:'雪夜',sky:WINTER_SKY,fog:WINTER_FOG,fogD:WINTER_FOG_D}
 ];
-const state={timeKey:'night',hour:21.5,lights:true,quality:true,envDirty:true,stars:true,clean:false};
+const state={timeKey:'night',hour:21.5,lights:true,quality:true,envDirty:true,stars:true,clean:true};
 let rainLevel=0,resetPerf=true;
 const rSeason=document.getElementById('r-season'),rWeather=document.getElementById('r-weather'),
       rTime=document.getElementById('r-time'),rTemp=document.getElementById('r-temp'),
@@ -9271,7 +9322,6 @@ document.getElementById('t-stars').onclick=function(){
 document.getElementById('t-fp').onclick=function(){
   if(fp.on)exitWalk();else enterWalk();
 };
-document.getElementById('t-clean').onclick=function(){toggleClean();};
 /* 底部快捷导览：漫游模式把人送过去，沙盘模式飞相机 */
 function setDockActive(key){
   document.querySelectorAll('#dock button').forEach(b=>b.classList.toggle('on',b.dataset.view===key));
@@ -9302,7 +9352,6 @@ addEventListener('keydown',e=>{
   else if(k==='4')jumpView('reception');
   else if(k==='5')jumpView('street');
   else if(k==='r')jumpView('home');
-  else if(k==='h')toggleClean();
 });
 document.getElementById('railToggle').onclick=()=>{
   document.body.classList.toggle('rail-min');
@@ -9311,18 +9360,21 @@ document.getElementById('railToggle').onclick=()=>{
 function syncFpBtn(){
   const b=document.getElementById('t-fp');
   if(b)b.textContent=fp.on?'沙盘':'沉浸';
+  if(typeof setViewBtn==='function')setViewBtn();
 }
-/* 「跑」按钮：按住加速 */
+/* 「跳」按钮：点击起跳（复用 fp 的 Space 跳跃物理） */
 (function(){
   const b=document.getElementById('w-run');
-  const on=()=>{fp.keys['ShiftLeft']=true;b.classList.add('hold');};
-  const off=()=>{fp.keys['ShiftLeft']=false;b.classList.remove('hold');};
-  b.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();on();},{passive:false});
-  b.addEventListener('touchend',e=>{e.preventDefault();off();},{passive:false});
-  b.addEventListener('touchcancel',off);
-  b.addEventListener('pointerdown',e=>{e.preventDefault();on();});
-  b.addEventListener('pointerup',off);
-  b.addEventListener('pointerleave',off);
+  const jump=()=>{
+    if(fp.jumpY>0.001)return;          // 空中不重复触发
+    fp.jumpVy=4.6;
+    b.classList.add('hold');
+    setTimeout(()=>b.classList.remove('hold'),160);
+    sfx.blip(520,.08,.04);
+  };
+  b.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();jump();},{passive:false});
+  b.addEventListener('pointerdown',e=>{e.preventDefault();jump();});
+  b.addEventListener('click',e=>{e.preventDefault();});
 })();
 document.getElementById('t-reset').onclick=()=>{
   flyTo({pos:[HOME.pos.x,HOME.pos.y,HOME.pos.z],tgt:[HOME.tgt.x,HOME.tgt.y,HOME.tgt.z]});
@@ -9466,7 +9518,8 @@ function fpEnter(noLock){
 }
 function fpExit(){
   fp.on=false;fp.locked=false;fp.keys={};
-  controls.enabled=true;controls.autoRotate=fp.wasAuto;
+  controls.enabled=!IS_TOUCH_DEV;   // 触屏端沙盒：OrbitControls 停用，相机走 touchCam
+  controls.autoRotate=fp.wasAuto;
   document.body.classList.remove('fp');
   if(document.pointerLockElement)document.exitPointerLock();
   camera.position.copy(HOME.pos);controls.target.copy(HOME.tgt);controls.update();
@@ -9572,13 +9625,13 @@ window.diorama={cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.t
 };
 
 /* ══ 纯净模式：画面零 UI + 可走动 ══ */
-const isTouch=('ontouchstart' in window)||(navigator.maxTouchPoints>0);
-const isSmall=innerWidth<820;
+const isTouch=IS_TOUCH_DEV;
+const isSmall=innerWidth<820||IS_TOUCH_DEV;
 function showFpHint(){
   const el=document.getElementById('fphint');
   el.textContent=(isTouch||isSmall)
-    ? '左下摇杆走 · 右侧拖动转头 · 右下跑 · 双击隐藏控件'
-    : 'WASD 走 · 按住左键或右键拖动转头 · Shift 加速 · Q 退出 · 点击盲盒拆礼物 · 按 E 上下小火车';
+    ? '左下摇杆走 · 右侧拖动转头 · 右下跳 · 右上切沙盘'
+    : 'WASD 走 · 按住左键或右键拖动转头 · 空格跳 · Q 退出 · 点击盲盒拆礼物 · 按 E 上下小火车';
   if(!state.clean)return;
   el.style.opacity='1';
   clearTimeout(showFpHint._t);
@@ -9592,15 +9645,15 @@ function setClean(on){
   const el=document.getElementById('fphint');
   if(!on)el.style.opacity='0';
   const btn=document.getElementById('t-clean');
-  if(btn)btn.classList.toggle('on',on);
+  if(btn)btn.classList.toggle('on',on);   // 按钮已移除，保留容错
 }
-function toggleClean(){setClean(!state.clean);}
+function toggleClean(){setClean(!state.clean);if(typeof setViewBtn==='function')setViewBtn();}
 /* 进入沉浸：信息层全部藏起来，只留底部操作条 */
 function enterWalk(){
   intro.active=false;intro.t=intro.dur;camTween=null;
   fpEnter(isTouch);
   document.body.classList.add('walk','rail-min');
-  setClean(false);        // 沉浸 ≠ 纯净：左栏收成窄条，开关还在
+  setClean(true);         // 沉浸默认纯净：画面只剩摇杆/跳/返回，视线不被面板挡住
   syncFpBtn();
   showFpHint();
 }
@@ -9608,7 +9661,8 @@ function enterWalk(){
 function exitWalk(){
   document.body.classList.remove('walk','off','rail-min');
   fpExit();
-  setClean(false);
+  setClean(true);         // 沙盒同样默认纯净，但摇杆与转头始终可用
+  if(IS_TOUCH_DEV)touchCamSync();
   syncFpBtn();
 }
 
@@ -9649,7 +9703,26 @@ joyEl.addEventListener('pointerleave',joyReset);
    —— 画面上一根手指 = 纯转视角；两根手指 = 纵向推拉前进（此时不转视角）。
    鼠标另走 document 的 mousemove（按住左键拖），两边互不重复。 */
 const lookPts=new Map();          // pointerId -> {x,y,resync}
-let pinchBaseY=null;
+let pinchBaseY=null, pinchBaseD=0;
+/* 触屏沙盒自管轨道相机：yaw 方位 / pitch 俯仰 / rad 半径 */
+const touchCam={yaw:0,pitch:0.55,rad:40};
+function touchCamSync(){
+  // 从当前相机位置反推出轨道参数（进入沙盒时对齐一次）
+  const rx=camera.position.x-controls.target.x;
+  const ry=camera.position.y-controls.target.y;
+  const rz=camera.position.z-controls.target.z;
+  touchCam.rad=Math.max(11,Math.hypot(rx,ry,rz));
+  touchCam.yaw=Math.atan2(rx,rz);
+  touchCam.pitch=Math.asin(Math.max(-1,Math.min(1,ry/touchCam.rad)));
+}
+function touchCamApply(){
+  const cp=Math.cos(touchCam.pitch),sp=Math.sin(touchCam.pitch);
+  camera.position.set(
+    controls.target.x+Math.sin(touchCam.yaw)*cp*touchCam.rad,
+    controls.target.y+sp*touchCam.rad,
+    controls.target.z+Math.cos(touchCam.yaw)*cp*touchCam.rad);
+  camera.lookAt(controls.target);
+}
 function lookMidY(){
   let sy=0,n=0;
   lookPts.forEach(p=>{sy+=p.y;n++;});
@@ -9657,8 +9730,14 @@ function lookMidY(){
 }
 renderer.domElement.addEventListener('pointerdown',e=>{
   if(e.pointerType==='mouse')return;   // 鼠标交给 document 的 mousemove
+  // 触屏沙盒：相机旋转由 fp.yaw/pitch 接管，挡住 OrbitControls 的 pointerdown，
+  // 否则两者同时转 → 视角乱跳。缩放仍交给 controls。
   lookPts.set(e.pointerId,{x:e.clientX,y:e.clientY,resync:false});
-  if(lookPts.size===2)pinchBaseY=lookMidY();
+  if(lookPts.size===2){pinchBaseY=lookMidY();
+    const ps=Array.from(lookPts.values());
+    pinchBaseD=Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y);}
+  // 单指旋转由 fp.yaw/pitch 接管（OrbitControls 的单指旋转已在触屏端关闭，
+  // 这里额外在捕获阶段挡一道，避免它仍收到 pointer 事件）
 },{passive:true});
 renderer.domElement.addEventListener('pointermove',e=>{
   if(e.pointerType==='mouse')return;
@@ -9669,9 +9748,28 @@ renderer.domElement.addEventListener('pointermove',e=>{
   if(lookPts.size===1){
     fp.yaw-=dx*.0045;fp.pitch-=dy*.0045;
     fp.pitch=Math.max(-1.4,Math.min(1.4,fp.pitch));
+    // 触屏沙盒：沉浸之外，单指拖动改为绕沙盘 target 转镜头
+    if(!fp.on&&IS_TOUCH_DEV){
+      touchCam.yaw-=dx*.0045;
+      touchCam.pitch=Math.max(-0.35,Math.min(1.45,touchCam.pitch+dy*.005));
+      touchCamApply();
+    }
   }else if(lookPts.size===2){
     const my=lookMidY();
     if(pinchBaseY!==null&&my!==null){fp.touchFwd=(fp.touchFwd||0)+(pinchBaseY-my);pinchBaseY=my;}
+    // 触屏沙盒：双指 pinch 缩放（OrbitControls 已关闭，这里自己算）
+    if(IS_TOUCH_DEV&&!fp.on){
+      const pts=Array.from(lookPts.values());
+      if(pts.length===2){
+        const dNow=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
+        if(pinchBaseD>0){
+          const k=pinchBaseD/Math.max(1,dNow);
+          touchCam.rad=Math.max(11,Math.min(95,touchCam.rad*k));
+          touchCamApply();
+        }
+        pinchBaseD=dNow;
+      }
+    }
   }
 },{passive:true});
 function lookEnd(e){
@@ -9686,12 +9784,44 @@ addEventListener('pointerup',lookEnd);          // 手指在画布外抬起也�
 addEventListener('pointercancel',lookEnd);
 document.addEventListener('gesturestart',e=>e.preventDefault());
 
-/* 手机/平板默认进纯净模式；?clean=1 强制，?ui=1 强制保留界面 */
+/* ══ 触屏端：标记 body.touch，让操作控件常驻 ══ */
+if(isTouch||isSmall)document.body.classList.add('touch');
+
+/* ══ 视角切换 / 声音按钮（常驻工具条 + 沉浸内工具组，两套共用） ══ */
+function setViewBtn(){
+  const t=fp.on?'沙盘':'沉浸';
+  for(const id of ['w-mode','w-view']){const b=document.getElementById(id);if(b)b.textContent=t;}
+  for(const id of ['w-audio','w-sound']){
+    const b=document.getElementById(id);
+    if(b)b.classList.toggle('on',sfx.on);
+  }
+}
+function toggleView(){
+  if(fp.on)exitWalk();else enterWalk();
+  sfx.blip(640,.08,.05);
+  setViewBtn();
+}
+function toggleAudio(){
+  sfx.setOn(!sfx.on);
+  setViewBtn();
+}
+(function bindViewBtns(){
+  for(const id of ['w-mode','w-view']){
+    const b=document.getElementById(id);
+    if(b)b.onclick=e=>{e.preventDefault();e.stopPropagation();toggleView();};
+  }
+  for(const id of ['w-audio','w-sound']){
+    const b=document.getElementById(id);
+    if(b)b.onclick=e=>{e.preventDefault();e.stopPropagation();toggleAudio();};
+  }
+})();
+
+/* 手机/平板：默认进沉浸视角 + 纯净；?clean=1 强制纯净，?ui=1 强制保留界面 */
 (function autoMode(){
   const q=new URLSearchParams(location.search);
-  if(q.has('ui')){setTimeout(()=>{setClean(false);exitWalk();},120);return;}
-  if(q.has('clean')){setTimeout(()=>{setClean(true);},120);return;}
-  setTimeout(enterWalk,120);      // 默认就是沉浸视角
+  if(q.has('ui')){setTimeout(()=>{setClean(false);exitWalk();setViewBtn();},120);return;}
+  if(q.has('clean')){setTimeout(()=>{setClean(true);setViewBtn();},120);return;}
+  setTimeout(()=>{enterWalk();setViewBtn();},120);   // 默认沉浸 + 纯净
 })();
 
 function keyToCode(e){
@@ -10550,8 +10680,10 @@ function animate(){
     if(fp.keys['KeyS']||fp.keys['ArrowDown'])f-=1;
     if(fp.keys['KeyA']||fp.keys['ArrowLeft'])s-=1;
     if(fp.keys['KeyD']||fp.keys['ArrowRight'])s+=1;
+    // 触屏沙盒：虚拟摇杆也能平移沙盘视角（上推前进 / 右推横移）
+    if(joy.mag>0.02){f+=-joy.dy*1.15;s+=joy.dx*1.15;}
     if(f||s){
-      intro.active=false;camTween=null;controls.enabled=true;
+      intro.active=false;camTween=null;
       const fwd=new THREE.Vector3();
       camera.getWorldDirection(fwd);fwd.y=0;
       if(fwd.lengthSq()>1e-6)fwd.normalize();else fwd.set(0,0,-1);
@@ -10560,11 +10692,19 @@ function animate(){
       if(move.lengthSq()>0){
         const spd=(fp.keys['ShiftLeft']||fp.keys['ShiftRight'])?28:14;
         move.normalize().multiplyScalar(spd*dt);
-        camera.position.add(move);
-        controls.target.add(move);
+        if(IS_TOUCH_DEV){
+          // 触屏沙盒：平移 orbit 中心，再重新贴回相机
+          controls.target.add(move);
+          touchCamApply();
+        }else{
+          controls.enabled=true;
+          camera.position.add(move);
+          controls.target.add(move);
+        }
       }
     }
-    controls.update();
+    if(IS_TOUCH_DEV){ if(!fp.on)touchCamApply(); }
+    else controls.update();
   }
   updateTrain(dt);
   updateWheelRide(dt);
@@ -10612,10 +10752,12 @@ function baseKeyIntensity(){
 
 /* 尺寸 */
 addEventListener('resize',()=>{
-  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  camera.aspect=innerWidth/innerHeight;
+  camera.fov=fovForAspect();
+  camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
   composer.setSize(innerWidth,innerHeight);
-  bloom.setSize(innerWidth,innerHeight);
+  bloom.setSize(Math.max(64,Math.round(innerWidth*BLOOM_SCALE)),Math.max(64,Math.round(innerHeight*BLOOM_SCALE)));
   if(animePass&&animePass.uniforms&&animePass.uniforms.uRes){
     animePass.uniforms.uRes.value.set(Math.max(1,innerWidth*HI_DPR),Math.max(1,innerHeight*HI_DPR));
   }
