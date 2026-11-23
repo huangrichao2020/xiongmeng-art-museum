@@ -5022,6 +5022,21 @@ const lampPools=[];
     new THREE.Vector3(0,5.95,1.25)
   ]);
   const poleGeo=new THREE.TubeGeometry(poleCurve,20,.068,10,false);
+  /* 路灯光幕锥体：所有路灯共用同一份几何与材质 */
+  const lampConeGeo=(()=>{
+    const geo=new THREE.ConeGeometry(2.6,5.8,32,1,true);
+    const pa=geo.attributes.position, cols=new Float32Array(pa.count*3);
+    for(let i=0;i<pa.count;i++){
+      const t=(pa.getY(i)+2.9)/5.8;      // 0 = 地面端, 1 = 灯口
+      const f=Math.pow(t,2.0)*.9+.06;    // 灯口最亮，向地面迅速衰减
+      cols[i*3]=f;cols[i*3+1]=f;cols[i*3+2]=f;
+    }
+    geo.setAttribute('color',new THREE.BufferAttribute(cols,3));
+    return geo;
+  })();
+  const lampConeMat=new THREE.MeshBasicMaterial({
+    color:0xffd79a,vertexColors:true,transparent:true,opacity:.17,
+    blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false});
   for(const x of lx){
     const g=new THREE.Group();g.position.set(x,0,11.45);street.add(g);
     add(g,poleGeo,poleM,0,0,0);
@@ -5037,11 +5052,14 @@ const lampPools=[];
     halo.rotation.x=-Math.PI/2;halo.position.set(0,.05,1.40);g.add(halo);
     halo.userData.noReflect=true;
     lampPools.push(halo);
-    /* 灯罩光锥：去掉锥体网格，改成灯罩下方的柔光小球 + 地面光池（上方已有 halo），
-       避免从下往上看灯罩时出现一条生硬的实心白带 */
-    const lampGlow=new THREE.Mesh(new THREE.SphereGeometry(.42,12,8),new THREE.MeshBasicMaterial({
-      color:0xffd79a,transparent:true,opacity:.34,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
-    lampGlow.position.set(0,2.9,1.40);lampGlow.castShadow=false;g.add(lampGlow);
+    /* 灯罩光幕：圆锤形锥体，从灯口落到地面的柔光锥。
+       上次把它换成柔光球，光幕感没了。现在恢复锥体，但比原来干净：
+       - 32 段（原 16 段）→ 轮廓不再有折线硬角
+       - 顶点色沿轴向渐变：灯口最亮，越往下越淡 → 不会有"实心白楔形"
+       - 双面可见（玩家站在锥下往上看也能看到内侧），但整体透明度压低 */
+    const cone=new THREE.Mesh(lampConeGeo,lampConeMat);
+    cone.position.set(0,2.9,1.40);cone.castShadow=false;cone.raycast=()=>{};
+    g.add(cone);
     if(x===-19.5||x===9.5||x===26.8){
       const pl=new THREE.PointLight(0xffd9a4,68,34,1.65);
       pl.position.set(x,5.8,12.85);scene.add(pl);shopLights.push({l:pl,base:68,street:true});
