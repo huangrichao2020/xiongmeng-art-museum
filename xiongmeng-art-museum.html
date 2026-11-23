@@ -11721,14 +11721,20 @@ function updateWheelRide(dt){
       wp.set(2.1,-3.65,0).applyMatrix4(amusement.ship.matrixWorld);
     }else if(wheelSys.kind==='coaster'&&amusement.coaster){
       const co=amusement.coaster, car0=co.cars[0];
-      if(!co._camL){co._camL=new THREE.Vector3();co._camU=new THREE.Vector3();}
+      if(!co._camL){co._camL=new THREE.Vector3();co._camU=new THREE.Vector3();co._camDir=new THREE.Vector3();co._camDirS=null;}
+      // 车厢矩阵本帧刚更新过位置：先同步 matrixWorld，避免相机用上一帧矩阵导致俯冲高速段一帧滞后抖动
+      car0.updateMatrixWorld(true);
       wp.set(0,.70,.24).applyMatrix4(car0.matrixWorld);
       fp.x=wp.x;fp.z=wp.z;fp.y=wp.y-FP_EYE;
       camera.position.copy(wp);
       co._camL.set(0,.56,8.0).applyMatrix4(car0.matrixWorld);
+      // 视线方向做指数平滑：过顶转俯冲时不再瞬间折角“顿一下”
+      co._camDir.subVectors(co._camL,wp).normalize();
+      if(!co._camDirS)co._camDirS=co._camDir.clone();
+      co._camDirS.lerp(co._camDir,1-Math.exp(-dt*9)).normalize();
       co.sampleTrackUp(co.t%1,co._camU);
       camera.up.copy(co._camU);
-      camera.lookAt(co._camL);
+      camera.lookAt(co._camL.copy(wp).addScaledVector(co._camDirS,8));
       trainHud.classList.add('show');
       trainMsgEl.textContent='正在乘坐 '+wheelSys.label+'（车头锁定第一视角 · 高度 '+wp.y.toFixed(1)+'m）';
       trainBtnEl.textContent='下来 (E)';
