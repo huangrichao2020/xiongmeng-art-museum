@@ -8120,15 +8120,18 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     const g=new THREE.Group();g.position.set(7,0,45);fair.add(g);
     add(g,BX(24,.1,16),M(0xd6ecf6,{roughness:.34,metalness:.06,emissive:0x38617a,emissiveIntensity:.4}),0,.05,0).castShadow=false;
     for(let i=0;i<11;i++)add(g,BX(.45,.02,14.8),M(0xf6fbfe,{roughness:.6}),-10+i*2,.115,0).castShadow=false;
+    const arenaRailM=M(0x2d3848,{roughness:.72,metalness:.25,envMapIntensity:.25});
+    const arenaCapM=M(0x9fb0c4,{roughness:.55,metalness:.35,envMapIntensity:.3});
     for(const [ax,az,len,rot] of [[0,-8,24,0],[0,8,24,0],[-12,0,16,Math.PI/2],[12,0,16,Math.PI/2]]){
       const f2=new THREE.Group();f2.position.set(ax,0,az);f2.rotation.y=rot;g.add(f2);
-      for(let i=0;i<=Math.round(len/1.5);i++){
-        const px=-len/2+i*(len/Math.round(len/1.5));
-        add(f2,BX(.14,1.6,.14),M(0xd23b32,{roughness:.55}),px,.8,0);
-        add(f2,new THREE.ConeGeometry(.14,.22,6),snowM,px,1.7,0).castShadow=false;
-        bulb(f2,px,1.85,.05,.1,i*3);
+      const cnt=Math.round(len/2.0);
+      for(let i=0;i<=cnt;i++){
+        const px=-len/2+i*(len/cnt);
+        add(f2,BX(.09,.82,.09),arenaRailM,px,.41,0);
+        add(f2,BX(.12,.04,.12),arenaCapM,px,.83,0).castShadow=false;
       }
-      for(let i=0;i<3;i++)add(f2,BX(len,.09,.09),M(0xd23b32,{roughness:.55}),0,.45+i*.55,0);
+      add(f2,BX(len,.06,.06),arenaCapM,0,.78,0);
+      add(f2,BX(len,.045,.045),arenaRailM,0,.42,0);
     }
     const bumperCols=[0xc94a4a,0x3b7a62,0xd8a24a,0x4b6fa8,0xc87a96,0x7c4e6c,0xc94a4a,0xd8a24a];
     const rubberM=M(0x28323e,{roughness:.88,metalness:.04,envMapIntensity:.16});
