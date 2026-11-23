@@ -5093,7 +5093,7 @@ const lampPools=[];
 /* 交通灯 */
 const trafficLight={};
 {
-  const g=new THREE.Group();g.position.set(19.6,0,10.7);street.add(g);
+  const g=new THREE.Group();g.position.set(19.6,0,10.7);g.userData.keep=true;street.add(g);
   add(g,new THREE.CylinderGeometry(.1,.13,5.6,8),M(0x252b31,{roughness:.5,metalness:.6}),0,2.8,0);
   add(g,BX(.34,1.0,.3),M(0x1c2228,{roughness:.6}),0,5.2,0);
   const lamps=[];
@@ -7234,6 +7234,7 @@ function makePerson(color,skin,opts={}){
     addNS(g,BX(.14,.16,.05),M(0x1f2937,{roughness:.7}),.22,.50,.10);
   }
 
+  mergeStatic(g,new Set([legL,legR,armL,armR]));
   if(opts.scale)g.scale.setScalar(opts.scale);
   g.userData={legL,legR,armL,armR};
   return g;
@@ -8583,6 +8584,10 @@ mergeStatic(fair,amusement.dyn);
 for(const d of amusement.dyn)mergeStatic(d);
 /* 店铺街全是静态的：合批 */
 mergeStatic(shopRow);
+mergeStatic(roofExpo);
+mergeStatic(animePark);
+mergeStatic(street);
+mergeStatic(westGarden);
 const sfx={
   ctx:null,master:null,musicBus:null,on:false,noiseBuf:null,windGain:null,
   nextCar:7,songIdx:0,stepIdx:0,nextNoteT:0,nextStepT:0,curChord:[48,60,64,67],timerId:null,
