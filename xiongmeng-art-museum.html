@@ -8828,45 +8828,58 @@ const sfx={
       this.playLead(midi,t,dur,.115,.08);
     }
   },
-  pump(){
-    if(!this.on||!this.ctx)return;
-    if(this.ctx.state==='suspended')this.ctx.resume();
-    const beat=.27, stepDur=.27, lookAhead=.28; // 更轻快丝滑的圣诞游乐园节奏
-    const now=this.ctx.currentTime;
-    if(this.nextNoteT<now)this.nextNoteT=now+.04;
-    if(this.nextStepT<now)this.nextStepT=now+.04;
-    while(this.nextNoteT<now+lookAhead){
-      const [midi,beats,chord]=this.SONG[this.songIdx%this.SONG.length];
-      this.schedNote(midi,this.nextNoteT,beats*beat,chord);
-      this.nextNoteT+=beats*beat;
-      this.songIdx++;
-    }
-    // 丝滑原声流动伴奏：竖琴音阶流 + 温暖木贝斯 + 轻柔雪橇铃
-    while(this.nextStepT<now+lookAhead){
-      const s=this.stepIdx%4;
-      const ch=this.curChord||[48,60,64,67];
-      const arpNote=ch[s%ch.length];
-      this.playLead(arpNote,this.nextStepT,.36,.032,-.14+(s%3)*.12);
-      if(s===0){this.playBass(ch[0],this.nextStepT,.52);this.playSleighBell(this.nextStepT,true);}
-      else if(s===2){this.playBass(ch[0]+7,this.nextStepT,.48);this.playSleighBell(this.nextStepT,false);}
-      this.nextStepT+=stepDur;
-      this.stepIdx++;
-    }
+  bgmTracks:null,
+  initBgmTracks(){
+    if(this.bgmTracks)return;
+    const mk=(src)=>{const a=new Audio(src);a.loop=true;a.preload='auto';a.volume=0;return a;};
+    this.bgmTracks={
+      museum:mk('./audio/museum_piano.mp3'),
+      park:mk('./audio/park_wonderland.mp3'),
+      rock:mk('./audio/rock_festival.mp3'),
+      v:{museum:0,park:0,rock:0}
+    };
   },
+  updateBgmMix(dt){
+    if(!this.bgmTracks)return;
+    const tr=this.bgmTracks;
+    if(!this.on){
+      for(const k of ['museum','park','rock']){tr.v[k]=Math.max(0,tr.v[k]-dt*1.6);tr[k].volume=tr.v[k];}
+      return;
+    }
+    const cx=camera.position.x, cy=camera.position.y, cz=camera.position.z;
+    const inMus=cx>-10.5&&cx<12.5&&cz>-12.0&&cz<8.5&&cy<9.5;
+    const dRock=Math.hypot(cx-39.5,cz-36.5);
+    const rockK=inMus?0:Math.max(0,Math.min(1,1-(dRock-9)/16));
+    const tMus=inMus?.44:0;
+    const tRock=rockK*.46;
+    const tPark=inMus?0:.36*(1-rockK*.85);
+    const k=Math.min(1,dt*2.4);
+    tr.v.museum+=(tMus-tr.v.museum)*k;
+    tr.v.park+=(tPark-tr.v.park)*k;
+    tr.v.rock+=(tRock-tr.v.rock)*k;
+    tr.museum.volume=Math.max(0,Math.min(1,tr.v.museum));
+    tr.park.volume=Math.max(0,Math.min(1,tr.v.park));
+    tr.rock.volume=Math.max(0,Math.min(1,tr.v.rock));
+  },
+  pump(){},
   setRain(){},
   setHum(){},
   setOn(on){
     this.on=on;
-    if(on&&!this.boot())return;
-    if(this.ctx){
-      if(on&&this.ctx.state==='suspended')this.ctx.resume();
-      this.master.gain.setTargetAtTime(on?.92:0,this.ctx.currentTime,.20);
-      if(on){
-        this.nextNoteT=this.ctx.currentTime+.06;
-        if(!this.timerId)this.timerId=setInterval(()=>this.pump(),75);
-        this.pump();
-      }else if(this.timerId){
-        clearInterval(this.timerId);this.timerId=null;
+    this.initBgmTracks();
+    if(on){
+      this.boot();
+      if(this.ctx&&this.ctx.state==='suspended')this.ctx.resume();
+      if(this.master&&this.ctx)this.master.gain.setTargetAtTime(.92,this.ctx.currentTime,.20);
+      if(this.bgmTracks){
+        for(const k of ['museum','park','rock']){
+          this.bgmTracks[k].play().catch(()=>{});
+        }
+      }
+    }else{
+      if(this.master&&this.ctx)this.master.gain.setTargetAtTime(0,this.ctx.currentTime,.20);
+      if(this.bgmTracks){
+        for(const k of ['museum','park','rock'])this.bgmTracks[k].pause();
       }
     }
   },
@@ -11625,6 +11638,7 @@ const snowSparkles=(()=>{
 
 function updateSaltlinePhysics(dt){
   snowSparkles.opacity=.32+Math.abs(Math.sin(t*2.6))*.36;
+  sfx.updateBgmMix(dt);
 }
 
 /* ══ 新海诚冬夜航空器造型：ExtrudeGeometry 一体流线机身 + 暮蓝玻璃座舱 + 涵道尾桨 ══ */
