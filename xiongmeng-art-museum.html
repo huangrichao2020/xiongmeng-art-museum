@@ -2831,10 +2831,22 @@ function buildCar(color,o={}){
   add(chassis,BX(W*.52,.17,.05),dark,0,.58,hz+.04);
   add(chassis,BX(W*.48,.025,.06),trimM,0,.61,hz+.05);
 
+  const bodyFaceX=bw/2+.06; // 挤出含倒角的车身外侧面 X 坐标
+  const sillM=M(0x1b212b,{roughness:.88,metalness:.05,envMapIntensity:.12});
   for(const s of [-1,1]){
-    // 后视镜（落在 A 柱根部肩线上）+ 门把手
-    add(chassis,BX(.20,.085,.10),bodyM,s*(W*.48),.95,L*.09);
-    add(chassis,BX(.035,.03,.15),trimM,s*(W*.50),.82,L*.01);
+    // B柱窗框隔条（让侧窗有真实车门框感，不再是光秃一块玻璃）
+    add(chassis,BX(.04,.46,.07),sillM,s*(cabW/2+.02),1.13,-L*.08).rotation.x=.06;
+    // 车门纵向下摆线 + 前后车门接缝线 + 贴合门面的隐藏式门把手（不再悬空浮在车外）
+    add(chassis,BX(.02,.038,L*.46),sillM,s*(bodyFaceX+.004),.53,-L*.07);
+    for(const dz of [L*.14,-L*.08,-L*.24]){
+      add(chassis,BX(.016,.42,.016),sillM,s*(bodyFaceX+.002),.69,dz);
+    }
+    add(chassis,BX(.022,.026,.14),trimM,s*(bodyFaceX+.008),.82,L*.02);
+    add(chassis,BX(.022,.026,.14),trimM,s*(bodyFaceX+.008),.82,-L*.16);
+    // 流线后视镜（带支架稳接 A 柱三角区）
+    add(chassis,BX(.08,.03,.04),sillM,s*(bodyFaceX+.01),.93,L*.11);
+    const mir=add(chassis,BX(.14,.065,.085),bodyM,s*(bodyFaceX+.08),.95,L*.09);
+    mir.rotation.y=-s*.18;
     // 车灯：透镜大灯 + 日行灯条 + 尾灯
     add(chassis,BX(.30,.10,.06),hl,s*W*.29,.71,hz+.02);
     add(chassis,BX(.34,.028,.07),hl_day,s*W*.29,.78,hz+.025);
@@ -2848,30 +2860,40 @@ function buildCar(color,o={}){
   add(chassis,BX(.44,.11,.03),M(0xdbe3ea,{roughness:.4}),0,.50,hz+.055);
   add(chassis,BX(.44,.11,.03),M(0xdbe3ea,{roughness:.4}),0,.55,-hz-.035);
 
-  // 精细车轮（胎壁 + 可视辐条轮毂 + 刹车卡钳 + 轮眉）
-  const wg=new THREE.CylinderGeometry(.34,.34,.22,20);
-  const rimG=new THREE.CylinderGeometry(.21,.21,.24,16);
-  const capG=new THREE.CylinderGeometry(.06,.06,.25,10);
-  const wheels=[];
+  // 精细车轮：齐平车身轮拱罩 + 凹面轮辋 + 5 辐合金轮毂 + 刹车卡钳 + 前轮转向枢轴
+  const tireG=new THREE.CylinderGeometry(.33,.33,.21,22);
+  const dishG=new THREE.CylinderGeometry(.22,.22,.16,18);
+  const rimLipG=new THREE.TorusGeometry(.215,.022,8,20);
+  const hubG=new THREE.CylinderGeometry(.055,.055,.20,10);
+  const wellG=new THREE.CylinderGeometry(.375,.375,.14,18);
+  const wheels=[], steerPivots=[];
   for(const sx of [-1,1])for(const sz of [-1,1]){
-    const wx=sx*(W/2-.01), wz=sz*L*.305;
-    const wG=new THREE.Group();wG.position.set(wx,.34,wz);g.add(wG);
-    add(wG,wg,dark,0,0,0).rotation.z=Math.PI/2;
-    add(wG,rimG,trimM,sx*.008,0,0).rotation.z=Math.PI/2;
-    add(wG,capG,dark,sx*.01,0,0).rotation.z=Math.PI/2;
-    // 十字运动轮辐（让车轮高速转动与刹车减速一目了然）
-    for(let k=0;k<2;k++){
-      const spk=add(wG,BX(.24,.035,.36),dark,sx*.009,0,0);
-      spk.rotation.x=k*Math.PI/2;
+    const wx=sx*(bodyFaceX-.075), wz=sz*L*.305;
+    // 深色内衬轮窝遮挡车身侧面，彻底消除车轮穿模
+    add(chassis,wellG,sillM,sx*(bodyFaceX-.035),.34,wz).rotation.z=Math.PI/2;
+    const arch=add(chassis,new THREE.TorusGeometry(.38,.026,6,18,Math.PI),bodyM,sx*(bodyFaceX+.005),.34,wz);
+    arch.rotation.y=Math.PI/2;
+    // 转向关节组（前轮可随弯道真实左右偏转）
+    const steerG=new THREE.Group();steerG.position.set(wx,.34,wz);g.add(steerG);
+    if(sz>0)steerPivots.push(steerG);
+    const wG=new THREE.Group();steerG.add(wG);
+    add(wG,tireG,dark,0,0,0).rotation.z=Math.PI/2;
+    add(wG,dishG,sillM,sx*.015,0,0).rotation.z=Math.PI/2;
+    const lip=add(wG,rimLipG,trimM,sx*.098,0,0);lip.rotation.y=Math.PI/2;
+    add(wG,hubG,trimM,sx*.018,0,0).rotation.z=Math.PI/2;
+    // 5 辐合金运动轮辐（收在轮辋凹槽内，不再粗丑外凸）
+    for(let k=0;k<5;k++){
+      const ang=(k/5)*Math.PI*2;
+      const spk=add(wG,BX(.024,.19,.036),trimM,sx*.095,Math.sin(ang)*.11,Math.cos(ang)*.11);
+      spk.rotation.x=-ang;
     }
     wheels.push(wG);
-    add(chassis,BX(.06,.11,.09),caliperM,wx-sx*.04,.38,wz-sz*.08);
-    const arch=add(chassis,new THREE.TorusGeometry(.39,.055,6,16,Math.PI),bodyM,sx*(W/2+.015),.35,wz);
-    arch.rotation.y=Math.PI/2;
+    add(steerG,BX(.045,.10,.08),caliperM,-sx*.02,.04,-sz*.09);
   }
   g.userData.hood=bodyMesh;
   g.userData.chassis=chassis;
   g.userData.wheels=wheels;
+  g.userData.steerPivots=steerPivots;
   g.userData.tlMat=tl;
   return g;
 }
@@ -10011,10 +10033,14 @@ function animate(){
       const ch=tr.c.userData.chassis;
       ch.position.y=tr.heave;ch.rotation.x=tr.pitch;ch.rotation.z=tr.roll;
     }
-    // 车轮随实测线速度真实转动 + 刹车尾灯增亮
-    tr.wheelAng+=(tr.curSpd*dt)/.34;
+    // 车轮随实测线速度真实转动 + 前轮随转向角真实偏转 + 刹车尾灯增亮
+    tr.wheelAng+=(tr.curSpd*dt)/.33;
     if(tr.c.userData.wheels){
       for(const w of tr.c.userData.wheels)w.rotation.x=tr.wheelAng;
+    }
+    if(tr.c.userData.steerPivots){
+      const steer=Math.max(-.32,Math.min(.32,omega*.34));
+      for(const sp of tr.c.userData.steerPivots)sp.rotation.y+=(steer-sp.rotation.y)*Math.min(1,dt*12);
     }
     const wantBrake=(tr.accel<-1.6||tr.curSpd<.4)?1:0;
     tr.brakeAmt+=(wantBrake-tr.brakeAmt)*Math.min(1,dt*10);
