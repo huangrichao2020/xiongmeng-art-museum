@@ -7977,24 +7977,8 @@ for(const st of STALLS){
   const pl=new THREE.PointLight(0xffb765,15,10,1.7);
   pl.position.set(lx,1.9,lz);scene.add(pl);
 }
-/* 市集入口牌坊（北侧东端，面向东） */
-{
-  const g=new THREE.Group();g.position.set(-19.4,0,-12.4);g.rotation.y=Math.PI/2;market.add(g);
-  const gateM2=M(0x1d242b,{roughness:.45,metalness:.75});
-  for(const s of [-1,1])add(g,BX(.34,4.2,.34),gateM2,s*2.1,2.1,0);
-  add(g,BX(4.9,.4,.44),gateM2,0,4.1,0);
-  add(g,BX(5.0,.14,.5),snowCapM,0,4.36,0);
-  const c=cv(512,96)[0],x=c.getContext('2d');
-  x.fillStyle='#14281e';x.fillRect(0,0,512,96);
-  x.strokeStyle='#f4c56a';x.lineWidth=4;x.strokeRect(6,6,500,84);
-  x.fillStyle='#ffe28a';x.font='700 32px '+HK;x.textAlign='center';
-  x.fillText('熊萌 · 圣诞市集',256,46);
-  x.fillStyle='#ff7070';x.font='700 15px monospace';
-  x.fillText('XM CHRISTMAS MARKET',256,76);
-  const tex=ctex(c);
-  signPanel(g,4.3,.8,tex,0,4.1,.24,.95);
-  OUTDOOR_OBS.push([-19.4,-12.4,1.5]);
-}
+/* 市集入口牌坊已删除：两根 4.2m 黑柱横跨通道只挡视线不挡人，整座牌坊连招牌一起去掉，
+   通道恢复成敞开的雪道（原碰撞圆 [-19.4,-12.4,1.5] 一并清除） */
 /* 市集步行街：摊位与花坛之间铺一条宽雪道（已移除两侧矮灯柱保持路面整洁） */
 {
   const paveM=M(0xe6ecf1,{roughness:.92});
@@ -9681,7 +9665,7 @@ const PANELS={
       ['街面','摊位与花园之间留出 3.7 米宽步行街，两侧排矮灯柱'],
       ['氛围','檐口挂冰柱与红绿金灯串，摊位在雪地上洇开一圈暖光'],
       ['人流','9 只维尼小熊在摊位间来回逛，有的驻足不挪步'],
-      ['入口','北侧「熊萌 · 圣诞市集」牌坊，跨 4.2 米通道']
+      ['通道','北侧东端开口直接进街，入口牌坊已拆除，视线与通行都敞亮']
     ]},
   shops:{eyebrow:'NORTH STREET / 北街小店',title:'马路对面的街边小店一条',
     rows:[
