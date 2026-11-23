@@ -8611,15 +8611,6 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       const cap=addNS(rg,BX(sl+.08,.07,.26),gldM,mx,.40,mz);
       cap.rotation.y=wall.rotation.y;
     }
-    // 冰场东侧入口欢迎小立牌
-    const [rc,rx]=cv(512,112);
-    rx.fillStyle='#13263a';rx.fillRect(0,0,512,112);
-    rx.strokeStyle='#f4c56a';rx.lineWidth=6;rx.strokeRect(6,6,500,100);
-    rx.fillStyle='#e8f7ff';rx.font='700 32px '+HK;rx.textAlign='center';
-    rx.fillText('⛸️ 星夜皇家溜冰场 · 步入即开启溜冰模式',256,66);
-    const signG=new THREE.Group();signG.position.set(R_A+.35,0,3.2);signG.rotation.y=Math.PI/2;rg.add(signG);
-    for(const sx of [-.95,.95])add(signG,BX(.08,.85,.08),gldM,sx,.42,0);
-    signPanel(signG,2.1,.46,ctex(rc),0,.86,0,.95);
     pool(rg,13.5,.025,.16,0x9fe8ff);
 
     // ★ 8 位花样滑冰大师 NPC（独立挂载于 scene 防止静态合批冻结四肢骨骼）
