@@ -2761,18 +2761,19 @@ function buildCar(color,o={}){
   const g=new THREE.Group();
   const chassis=new THREE.Group();g.add(chassis);
   const L=o.len||4.3, W=o.wid||1.86, hz=L/2;
+  const _carCol=new THREE.Color(color||0xe8edf4).lerp(new THREE.Color(0xcbd8ea),.16);
   const bodyM=new THREE.MeshPhysicalMaterial({
-    color,roughness:.22,metalness:.62,clearcoat:.92,clearcoatRoughness:.08,envMapIntensity:1.55
+    color:_carCol,roughness:.44,metalness:.16,clearcoat:.34,clearcoatRoughness:.24,envMapIntensity:.48
   });
-  const dark=M(0x14181d,{roughness:.85,flatShading:false});
-  const trimM=M(0xa6b1bc,{roughness:.24,metalness:.9,flatShading:false});
+  const dark=M(0x232b36,{roughness:.82,metalness:.05,envMapIntensity:.2,flatShading:false});
+  const trimM=M(0xd4dde8,{roughness:.28,metalness:.65,envMapIntensity:.65,flatShading:false});
   const caliperM=M(0xc9382b,{roughness:.4,metalness:.5});
   const glassM=new THREE.MeshPhysicalMaterial({
-    color:0x0f1c26,roughness:.04,metalness:.22,clearcoat:1,clearcoatRoughness:.03,envMapIntensity:2.2
+    color:0x244068,emissive:0x162b4a,emissiveIntensity:.38,roughness:.14,metalness:.10,clearcoat:.65,clearcoatRoughness:.12,envMapIntensity:.85
   });
-  const hl=new THREE.MeshBasicMaterial({color:0xfff4d6});
-  const tl=new THREE.MeshBasicMaterial({color:0xff2d20});
-  const hl_day=new THREE.MeshBasicMaterial({color:0xd8f4ff});
+  const hl=new THREE.MeshBasicMaterial({color:0xfff3d4});
+  const tl=new THREE.MeshBasicMaterial({color:0xff4d5a});
+  const hl_day=new THREE.MeshBasicMaterial({color:0xbce6ff});
 
   // Helper: 2D侧影(+X为车头) 挤出并旋转对齐 +Z 车头 / -Z 车尾，X 居中
   function extrudeProfile(shape, width, bev){
@@ -8129,22 +8130,43 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       }
       for(let i=0;i<3;i++)add(f2,BX(len,.09,.09),M(0xd23b32,{roughness:.55}),0,.45+i*.55,0);
     }
+    const bumperCols=[0xc94a4a,0x3b7a62,0xd8a24a,0x4b6fa8,0xc87a96,0x7c4e6c,0xc94a4a,0xd8a24a];
+    const rubberM=M(0x28323e,{roughness:.88,metalness:.04,envMapIntensity:.16});
+    const creamSeatM=M(0xf5ecdc,{roughness:.82,metalness:0,envMapIntensity:.14});
+    const chromeM=M(0xdce6f2,{roughness:.25,metalness:.78,envMapIntensity:.7});
     for(let i=0;i<8;i++){
       const car=new THREE.Group();
-      const col=[rndM,grnM,gldM,M(0x3f6ba8),M(0xd07a9a),M(0x8f3a68),rndM,gldM][i];
-      // 敞篷碰碰车：防撞橡胶底圈 + 敞篷驾驶舱 + 皮质座椅 + 方向盘 + 尾旗天线
-      add(car,BX(2.28,.34,2.88),M(0x181d24,{roughness:.85}),0,.36,0);
-      add(car,BX(2.04,.52,2.56),col,0,.64,0);
-      add(car,BX(1.36,.52,.85),M(0x2c333a,{roughness:.55}),0,1.02,-.58); // 座椅靠背
-      add(car,BX(1.32,.18,.82),M(0xe8e2d2,{roughness:.65}),0,.94,-.08); // 坐垫
-      add(car,new THREE.CylinderGeometry(.045,.045,.45,8),M(0x94a3b8,{roughness:.3,metalness:.8}),0,1.02,.52).rotation.x=.42;
-      add(car,new THREE.TorusGeometry(.16,.028,8,16),M(0x1f2937,{roughness:.4}),0,1.22,.42).rotation.x=.42; // 方向盘
-      for(const sx of [-1,1])for(const sz of [-1,1]){
-        const w=add(car,new THREE.CylinderGeometry(.30,.30,.24,12),M(0x2c333a,{roughness:.6}),sx*1.02,.28,sz*1.02);
-        w.rotation.z=Math.PI/2;
+      const bodyC=bumperCols[i];
+      const col=M(bodyC,{roughness:.46,metalness:.14,envMapIntensity:.38});
+      // 圆润椭圆防撞橡胶底圈 + 鎏金腰线饰条（告别方砖块）
+      const ring=add(car,new THREE.TorusGeometry(1.06,.21,12,28),rubberM,0,.28,0);
+      ring.rotation.x=Math.PI/2;ring.scale.set(1.02,1.30,.88);
+      const trimR=add(car,new THREE.TorusGeometry(1.08,.048,8,28),gldM,0,.43,0);
+      trimR.rotation.x=Math.PI/2;trimR.scale.set(1.02,1.30,.88);
+      // 椭圆流线玻璃钢车身 + 奶油白赛道条纹 + 前灯组
+      const hull=add(car,new THREE.CylinderGeometry(.92,1.04,.46,24),col,0,.56,0);
+      hull.scale.set(1.0,1,1.28);
+      const hood=add(car,new THREE.SphereGeometry(.86,18,12,0,Math.PI*2,0,Math.PI*.48),col,0,.76,.18);
+      hood.scale.set(.96,.30,1.12);
+      add(car,BX(.26,.08,1.35),creamSeatM,0,.84,.48);
+      for(const sx of [-1,1]){
+        addNS(car,new THREE.SphereGeometry(.10,10,8),new THREE.MeshBasicMaterial({color:0xfff3cc}),sx*.48,.58,1.24);
+        addNS(car,new THREE.SphereGeometry(.07,8,6),new THREE.MeshBasicMaterial({color:0xff5a66}),sx*.46,.58,-1.24);
       }
-      add(car,BX(.05,1.25,.05),M(0xe8e2d2,{roughness:.8}),.78,1.52,-.95);
-      const cf=add(car,new THREE.ConeGeometry(.16,.30,3),col,.95,2.08,-.95);cf.rotation.z=-Math.PI/2;cf.castShadow=false;
+      // 舒适软垫驾驶座 + 高靠背 + 金属方向盘 + 可爱小熊驾驶员
+      add(car,BX(1.06,.18,.78),creamSeatM,0,.78,-.16);
+      const back=add(car,new THREE.CylinderGeometry(.52,.56,.46,16,1,false,-Math.PI*.4,Math.PI*.8),creamSeatM,0,.96,-.56);
+      back.rotation.y=Math.PI;
+      add(car,new THREE.CylinderGeometry(.04,.04,.44,8),chromeM,0,.98,.52).rotation.x=.42;
+      add(car,new THREE.TorusGeometry(.16,.026,8,16),M(0x1f2937,{roughness:.5}),0,1.18,.42).rotation.x=.42;
+      const driver=makePerson(bodyC,0xe8c49a,{scale:.58,acc:i%2?'beanie':'beret'});
+      driver.position.set(0,.78,-.18);
+      driver.userData.legL.rotation.x=-1.15;driver.userData.legR.rotation.x=-1.15;
+      driver.userData.armL.rotation.x=-.78;driver.userData.armR.rotation.x=-.78;
+      car.add(driver);
+      // 经典碰碰车导电尾杆 + 顶部发光集电环
+      add(car,new THREE.CylinderGeometry(.026,.036,1.85,8),chromeM,.42,1.62,-.96);
+      addNS(car,new THREE.SphereGeometry(.085,8,6),getBulbMat(0xffe078,i),.42,2.56,-.96);
       car.scale.setScalar(.62);
       car.userData.keep=true;
       car.userData.physObj={type:'ride',ref:{kind:'bumper',car,label:'冰面碰碰车'}};
