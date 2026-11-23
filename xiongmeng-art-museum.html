@@ -38,6 +38,19 @@
   }
   /* 输入框要保留正常选中/粘贴能力（留言板） */
   input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+  /* 手机长按按钮会弹出系统「取词 + 朗读」浮层（几个深色圆圈把按钮文字圈住，
+     右下还跟一个♪朗读图标），糊在 3D 画面上很难看。
+     user-select:none 挡不住微信/Safari 那套取词（它能穿透到按钮文字），
+     所以把按钮上的文字全部改成伪元素生成 ——
+     伪元素不是真实文本节点，取词工具扫不到，长按就不会再弹那个气泡。 */
+  .wtools button[data-label]::after,
+  .wtop button[data-label]::after,
+  #w-run[data-label]::after{
+    content:attr(data-label);display:inline-block;pointer-events:none;
+  }
+  .wtools button[data-label],.wtop button[data-label],#w-run[data-label]{
+    -webkit-touch-callout:none;user-select:none;-webkit-user-select:none;
+  }
   html,body{overscroll-behavior:none}
   #stage{position:fixed;inset:0}
 
@@ -461,14 +474,14 @@
 <div id="tip"></div>
 <div id="cross"></div>
 <div id="joystick"><i id="stick"></i></div>
-<button id="w-run">跳</button>
+<button id="w-run" data-label="跳"></button>
 <div class="wtop" id="wtop">
-  <button id="w-view" title="沉浸 / 沙盘">沙盘</button>
-  <button id="w-sound" class="on" title="声音">♪</button>
+  <button id="w-view" title="沉浸 / 沙盘" data-label="沙盘"></button>
+  <button id="w-sound" class="on" title="声音" data-label="♪"></button>
 </div>
 <div class="wtools" id="wtools">
-  <button id="w-mode" title="沉浸 / 沙盘">沉浸</button>
-  <button id="w-audio" class="on" title="声音">♪</button>
+  <button id="w-mode" title="沉浸 / 沙盘" data-label="沉浸"></button>
+  <button id="w-audio" class="on" title="声音" data-label="♪"></button>
 </div>
 <div id="train-hud"><span id="train-msg">圣诞观光小火车运行中</span><button id="train-btn">上车</button></div>
 <div id="gift-modal" aria-hidden="true">
@@ -9852,7 +9865,10 @@ if(isTouch||isSmall)document.body.classList.add('touch');
 /* ══ 视角切换 / 声音按钮（常驻工具条 + 沉浸内工具组，两套共用） ══ */
 function setViewBtn(){
   const t=fp.on?'沙盘':'沉浸';
-  for(const id of ['w-mode','w-view']){const b=document.getElementById(id);if(b)b.textContent=t;}
+  for(const id of ['w-mode','w-view']){
+    const b=document.getElementById(id);
+    if(b){b.dataset.label=t;b.textContent='';}   // 文字走伪元素，避免被系统取词浮层圈住
+  }
   for(const id of ['w-audio','w-sound']){
     const b=document.getElementById(id);
     if(b)b.classList.toggle('on',sfx.on);
@@ -9875,6 +9891,10 @@ function toggleAudio(){
   for(const id of ['w-audio','w-sound']){
     const b=document.getElementById(id);
     if(b)b.onclick=e=>{e.preventDefault();e.stopPropagation();toggleAudio();};
+  }
+  /* 再挡一层：长按不要弹系统右键/取词菜单 */
+  for(const el of document.querySelectorAll('.wtools button,.wtop button,#w-run,#w-back')){
+    el.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();return false;});
   }
 })();
 
