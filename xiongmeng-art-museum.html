@@ -9044,57 +9044,28 @@ const sfx={
     if(this.bgmTracks)return;
     const c=this.ctx;
     if(!c)return;
-    /* BGM 走 Web Audio 而不是 HTMLAudio 直出：
-       直出时 mp3 的刺耳高频（镲片、齿音）会直接怼耳朵，而且没法统一控音量。
-       这里加 高通(90Hz 去掉隆隆声) + 低通(6.8kHz 削刺耳) + 独立增益，
-       让背景音乐是"垫底"而不是"抢戏"。 */
-    const mk=(src)=>{
-      const a=new Audio(src);a.loop=true;a.preload='auto';
-      const node=c.createMediaElementSource(a);
-      const hp=c.createBiquadFilter();hp.type='highpass';hp.frequency.value=90;
-      const lp=c.createBiquadFilter();lp.type="lowpass";lp.frequency.value=4800;lp.Q.value=.4;
-      const g=c.createGain();g.gain.value=0;
-      node.connect(hp);hp.connect(lp);lp.connect(g);g.connect(this.master);
-      return {a,g};
-    };
-    /* rock_festival.mp3 已停用：它是失真摇滚，4kHz 以上的高频贯穿整首
-       （分段能量全程 0.3~0.97），而且原文件 loop 接缝落差 78dB ——
-       每 24 秒就有一记从静默砸进重音的爆点，是"一直很吵"的一大来源。
-       文件还留在服务器上，想恢复只要把这一行加回去。 */
-    this.bgmTracks={
-      museum:mk('./audio/museum_piano.mp3'),
-      park:mk('./audio/park_wonderland.mp3'),
-      v:{museum:0,park:0}
-    };
+    /* 三条 mp3 已全部停用 —— 这就是那个"一直循环播放圣诞旋律、像弦乐、
+       而且比主奏钢琴还抢耳"的东西：
+         museum_piano.mp3  99 秒完整圣诞旋律，loop 播放
+         park_wonderland.mp3 另一首循环曲（马戏/铜管风）
+         rock_festival.mp3  失真摇滚，4k+ 高频贯穿整首，loop 接缝落差 78dB
+       它们是"两条同时循环的完整旋律"，而且直连 master、不过合成乐器的
+       音量控制（musicBus），所以存在感比主奏钢琴还强 —— 听起来就是一直很吵。
+       现在主 BGM 完全由真实钢琴 + 真实竖琴采样承担，这三条只当远景垫，
+       反而成了噪音源。音频文件还留在服务器上，想恢复把下面三行加回去即可。 */
+    this.bgmTracks={v:{}};
   },
   updateBgmMix(dt){
-    if(!this.bgmTracks)return;
-    const tr=this.bgmTracks;
-    const set=(k,v)=>{tr[k].g.gain.value=Math.max(0,Math.min(1,v));};
-    if(!this.on){
-      for(const k of ['museum','park']){tr.v[k]=Math.max(0,tr.v[k]-dt*1.6);set(k,tr.v[k]);}
-      return;
-    }
+    if(!this.on)return;
     const cx=camera.position.x, cy=camera.position.y, cz=camera.position.z;
     const inMus=cx>-10.5&&cx<12.5&&cz>-12.0&&cz<8.5&&cy<9.5;
-    const dRock=Math.hypot(cx-39.5,cz-36.5);
-    const rockK=inMus?0:Math.max(0,Math.min(1,1-(dRock-9)/16));
-    /* 剩下的两条 mp3 只当"远处环境垫"，主 BGM 是合成的圣诞乐器。
-       两条素材都重做过无缝 loop（接缝落差 160dB → ±3dB），并把 park 预烘焙
-       了 3.2kHz 低通，把刺耳的高频彻底压掉。 */
-    const tMus=inMus?.055:0;
-    const tPark=inMus?0:.032*(1-rockK*.85);
-    /* 合成圣诞乐器 BGM 音量：馆内更饱满，户外收小当远景音乐 */
-    const tSyn=inMus?.46:.26;
+    /* 合成圣诞乐器 BGM 音量：馆内更饱满，户外收小当远景音乐。
+       之前 mp3 垫底占掉了一部分听感份额，现在主 BGM 独自承担，略提一档。 */
+    const tSyn=inMus?.52:.30;
     if(this.musicBus){
       this.synth.gain+=(tSyn-this.synth.gain)*Math.min(1,dt*1.5);
       this.musicBus.gain.value=this.synth.gain;
     }
-    const k=Math.min(1,dt*2.4);
-    tr.v.museum+=(tMus-tr.v.museum)*k;
-    tr.v.park+=(tPark-tr.v.park)*k;
-    set('museum',tr.v.museum);
-    set('park',tr.v.park);
   },
   pump(){},
   setRain(){},
@@ -9111,17 +9082,10 @@ const sfx={
       this.startSynthBgm();          // 合成圣诞乐器 BGM（主）
       this.loadPiano();               // 真实钢琴采样（异步预载，没好就先用合成音）
       this.loadHarp();                // 真实竖琴采样（同上）
-      if(this.bgmTracks){
-        for(const k of ['museum','park']){
-          this.bgmTracks[k].a.play().catch(()=>{});
-        }
-      }
     }else{
       if(this.master&&this.ctx)this.master.gain.setTargetAtTime(0,this.ctx.currentTime,.20);
       this.stopSynthBgm();
-      if(this.bgmTracks){
-        for(const k of ['museum','park'])this.bgmTracks[k].a.pause();
-      }
+
     }
   },
   blip(f,dur,vol){
