@@ -10499,10 +10499,6 @@ function animate(){
     if(!co._vP){co._vP=new THREE.Vector3();co._vT=new THREE.Vector3();co._vL=new THREE.Vector3();co._vU=new THREE.Vector3();}
     co.curve.getPointAt(co.t%1,co._vP);
     const spd=Math.max(.028,.058+(7.0-co._vP.y)*.0048); // 正常物理高低势能变速，高处自然略慢、下坡加速，不刻意延迟
-    if(co._vP.y>10.5&&wheelSys.riding&&wheelSys.kind==='coaster'){
-      co._fwCd=(co._fwCd||0)-dt;
-      if(co._fwCd<=0&&window._triggerFwSalvo){window._triggerFwSalvo();co._fwCd=.85;}
-    }
     co.t=(co.t+spd*dt)%1;
     for(let ci=0;ci<co.cars.length;ci++){
       const u=(co.t-ci*.019+1)%1;
@@ -10572,8 +10568,8 @@ function animate(){
   _reflTick++;
   // 乘车高速俯瞰时冻结阴影重绘避免瞬时卡顿，平地走动时每 36 帧轻刷一次
   if(!ridingFast&&(_reflTick%36)===0)renderer.shadowMap.needsUpdate=true;
-  // 室外高空俯瞰时自动隐藏建筑 1F 内部细碎展品/射灯，减少中心视野片元负载
-  const hide1F=camera.position.y>9.5&&!inBuildingXZ(camera.position.x,camera.position.z);
+  // 乘车期间或高空远景稳定隐藏 1F 室内细碎展品，避免俯冲穿过 9.5m 临界高度时反复切换引发帧率抖动
+  const hide1F=(wheelSys.riding&&wheelSys.kind==='coaster')||(camera.position.z>22&&camera.position.y>14&&!inBuildingXZ(camera.position.x,camera.position.z));
   if(typeof shop1!=='undefined')shop1.visible=!hide1F;
 
   composer.render();
