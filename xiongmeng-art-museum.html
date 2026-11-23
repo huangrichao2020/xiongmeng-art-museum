@@ -429,6 +429,39 @@
     font-weight:700;font-size:12px;cursor:pointer;
   }
   #train-btn:hover{background:#ffd275}
+  /* ---------- FPV 穿越机特技模式 OSD 抬头显示 ---------- */
+  #fpv-osd{
+    position:fixed;inset:0;z-index:26;pointer-events:none;display:none;
+    font-family:var(--mono);color:#d8f6ff;text-shadow:0 1px 4px rgba(0,0,0,.85);
+  }
+  #fpv-osd.show{display:block}
+  #fpv-osd .corner{position:absolute;width:26px;height:26px;border-color:rgba(120,235,255,.55);border-style:solid}
+  #fpv-osd .c-tl{top:22px;left:22px;border-width:2px 0 0 2px}
+  #fpv-osd .c-tr{top:22px;right:22px;border-width:2px 2px 0 0}
+  #fpv-osd .c-bl{bottom:22px;left:22px;border-width:0 0 2px 2px}
+  #fpv-osd .c-br{bottom:22px;right:22px;border-width:0 2px 2px 0}
+  #fpv-top-l{position:absolute;top:32px;left:36px;display:flex;flex-direction:column;gap:4px;font-size:12px}
+  #fpv-rec{color:#ff4d5e;font-weight:700;letter-spacing:1px}
+  #fpv-top-r{position:absolute;top:32px;right:96px;text-align:right;display:flex;flex-direction:column;gap:4px;font-size:12px}
+  #fpv-horizon{
+    position:absolute;top:50%;left:50%;width:140px;height:140px;margin:-70px 0 0 -70px;
+    border-radius:50%;border:1px dashed rgba(120,235,255,.32);display:flex;align-items:center;justify-content:center;
+  }
+  #fpv-hbar{width:96px;height:2px;background:linear-gradient(90deg,#5ce1ff 0 32%,transparent 32% 68%,#5ce1ff 68% 100%);position:relative}
+  #fpv-hbar::after{content:'';position:absolute;left:50%;top:-4px;width:8px;height:8px;margin-left:-4px;border:1.5px solid #ffe478;border-radius:50%}
+  #fpv-bar{
+    position:absolute;bottom:24px;left:50%;transform:translateX(-50%);pointer-events:auto;
+    display:flex;align-items:center;gap:10px;padding:8px 16px;border-radius:22px;
+    background:rgba(8,18,30,.84);border:1px solid rgba(110,228,255,.55);backdrop-filter:blur(6px);
+    box-shadow:0 10px 28px rgba(0,0,0,.55);font-family:var(--han);font-size:12px;white-space:nowrap;
+  }
+  #fpv-trick{color:#7ef2ff;font-weight:700;margin-right:4px}
+  .fpv-btn{
+    padding:5px 12px;border-radius:14px;border:1px solid rgba(120,235,255,.45);
+    background:rgba(40,180,220,.22);color:#e6fbff;font-weight:700;font-size:12px;cursor:pointer;transition:.15s;
+  }
+  .fpv-btn:hover{background:rgba(60,210,255,.42)}
+  .fpv-btn.exit{background:rgba(235,85,85,.25);border-color:rgba(255,120,120,.55);color:#ffd6d6}
     #fphint{bottom:200px;max-width:calc(100vw - 24px);text-align:center;
       font-size:9.5px;line-height:1.8;padding:7px 12px}
   }
@@ -447,6 +480,7 @@
     <input id="hour" type="range" min="0" max="24" step="0.1" value="21.5" />
     <div class="toggles">
       <button id="t-fp">沉浸</button>
+      <button id="t-fpv">穿越机</button>
       <button id="t-sound" class="on">圣诞音</button>
       <button id="t-stars" class="on">流星雨</button>
       <button id="t-lights" class="on">圣诞灯</button>
@@ -482,7 +516,27 @@
 </div>
 <div class="wtools" id="wtools">
   <button id="w-mode" title="沉浸 / 沙盘" data-label="沉浸"></button>
+  <button id="w-fpv" title="FPV 穿越机特技模式 (F)" data-label="穿越"></button>
   <button id="w-audio" class="on" title="声音" data-label="♪"></button>
+</div>
+<div id="fpv-osd">
+  <i class="corner c-tl"></i><i class="corner c-tr"></i><i class="corner c-bl"></i><i class="corner c-br"></i>
+  <div id="fpv-top-l">
+    <span id="fpv-rec">● REC 4K 120FPS · ACRO FREESTYLE</span>
+    <span id="fpv-stage">STAGE 01 · 熊萌艺术馆门廊贴地穿掠</span>
+  </div>
+  <div id="fpv-top-r">
+    <span id="fpv-spd">SPD 86 KM/H</span>
+    <span id="fpv-alt">ALT 12.4 M</span>
+    <span id="fpv-att">ROLL +18° · PITCH -8°</span>
+  </div>
+  <div id="fpv-horizon"><div id="fpv-hbar"></div></div>
+  <div id="fpv-bar">
+    <span id="fpv-trick">🚁 FPV 穿越机特技巡航</span>
+    <button class="fpv-btn" id="fpv-roll-btn">⚡ 360° 桶滚 (Space)</button>
+    <button class="fpv-btn" id="fpv-boost-btn">🚀 狂暴加速</button>
+    <button class="fpv-btn exit" id="fpv-exit-btn">✕ 退出 (F)</button>
+  </div>
 </div>
 <div id="train-hud"><span id="train-msg">圣诞观光小火车运行中</span><button id="train-btn">上车</button></div>
 <div id="gift-modal" aria-hidden="true">
@@ -11174,7 +11228,9 @@ function animate(){
   if(intro.active)introUpdate(dt);
   updateSnowballFight(dt);
   updateGiftMountain(dt);
-  if(fp.on){
+  if(fpvSys.active){
+    updateFpvDrone(dt);
+  }else if(fp.on){
     if(!trainSys.riding&&!wheelSys.riding&&!launchSys.active)fpUpdate(dt);
   }else{
     let f=0,s=0;
@@ -11214,13 +11270,13 @@ function animate(){
   updateHelis(dt);
   updateFireworks(dt);
   updateAerialHaze(dt,t);
-  const ridingFast=(wheelSys.riding&&wheelSys.kind==='coaster')||trainSys.riding;
+  const ridingFast=fpvSys.active||(wheelSys.riding&&wheelSys.kind==='coaster')||trainSys.riding;
   if(!ridingFast||(_reflTick&1)===0)updateOuterCrowd(ridingFast?dt*2:dt,t);
   _reflTick++;
   // 乘车高速俯瞰时冻结阴影重绘避免瞬时卡顿，平地走动时每 36 帧轻刷一次
   if(!ridingFast&&(_reflTick%36)===0)renderer.shadowMap.needsUpdate=true;
   // 乘车期间或高空远景稳定隐藏 1F 室内细碎展品，避免俯冲穿过 9.5m 临界高度时反复切换引发帧率抖动
-  const hide1F=(wheelSys.riding&&wheelSys.kind==='coaster')||(camera.position.z>22&&camera.position.y>14&&!inBuildingXZ(camera.position.x,camera.position.z));
+  const hide1F=fpvSys.active||(wheelSys.riding&&wheelSys.kind==='coaster')||(camera.position.z>22&&camera.position.y>14&&!inBuildingXZ(camera.position.x,camera.position.z));
   if(typeof shop1!=='undefined')shop1.visible=!hide1F;
 
   composer.render();
@@ -11937,6 +11993,245 @@ function updateLaunchRide(dt){
     stopLaunchRide();
     sfx.blip(520,.1,.06);
   }
+}
+
+/* ════════════════════════════════════════════════════════════
+   16.5 FPV 穿越机 6-DOF 特技绕飞模式（Acro Freestyle Drone POV）
+   ════════════════════════════════════════════════════════════ */
+const fpvSys=(()=>{
+  const pts=[
+    new THREE.Vector3(  0.0,  3.2, 16.8), // 0. 北街低空起飞对准艺术馆大门
+    new THREE.Vector3(  0.0,  3.5,  8.6), // 1. 贴地穿掠艺术馆门廊雨棚
+    new THREE.Vector3(  1.2, 14.2, -1.5), // 2. 垂直拉升跃过艺术馆星空天台
+    new THREE.Vector3(-12.0, 11.5,  3.2), // 3. 刀锋侧倾俯冲西侧雪园
+    new THREE.Vector3(-24.4,  3.6,  0.4), // 4. 贴水掠过鲁道夫驯鹿喷泉
+    new THREE.Vector3(-32.5,  5.0, -1.2), // 5. 穿行圣诞市集暖光步行街
+    new THREE.Vector3(-44.0, 12.6, 21.5), // 6. 高速拉升直扑哥特大教堂
+    new THREE.Vector3(-49.0, 16.5, 36.0), // 7. ★ 哥特大教堂双塔钟楼穿缝 + 360° 桶滚
+    new THREE.Vector3(-42.5,  8.2, 46.0), // 8. Split-S 倒扣俯冲切入游乐园
+    new THREE.Vector3(-24.5,  3.0, 45.5), // 9. 切入巨型皇家溜冰场
+    new THREE.Vector3(-18.0,  2.2, 38.6), // 10. ★ 皇家溜冰场 2.2m 贴冰漂移掠过花滑大师
+    new THREE.Vector3(-12.5,  3.5, 29.8), // 11. 冰场北口拉起追逐云霄飞车
+    new THREE.Vector3(-21.0, 11.2, 23.0), // 12. 沿云霄飞车爬坡段并排攀升
+    new THREE.Vector3(-28.4, 14.4, 28.5), // 13. ★ 云霄飞车 14.4m 主峰刀锋追逐
+    new THREE.Vector3(-25.5, 12.2, 48.8), // 14. 西南高空驼峰掠飞
+    new THREE.Vector3( -7.2, 12.8, 41.5), // 15. 中央高架烟花走廊 + 360° 极速桶滚
+    new THREE.Vector3(  1.5,  5.4, 29.2), // 16. 俯冲切入中央旋转木马
+    new THREE.Vector3(  6.0,  3.2, 39.5), // 17. ★ 60° 刀锋压弯贴檐绕飞旋转木马
+    new THREE.Vector3( 15.0,  2.6, 46.2), // 18. 超低空贴地掠过碰碰车场
+    new THREE.Vector3( 24.5, 12.5, 36.0), // 19. 拉升对准摩天轮中心轴
+    new THREE.Vector3( 27.5, 14.0, 36.0), // 20. ★ 摩天轮轮心穿越 Powerloop
+    new THREE.Vector3( 30.5, 23.8, 48.5), // 21. 26m 弹射跳伞塔与巨型圣诞老人高空大回环
+    new THREE.Vector3( 37.5,  4.4, 36.0), // 22. ★ 俯冲穿过摇滚音乐节舞台旋转光束
+    new THREE.Vector3( 49.0,  9.6, 36.0), // 23. 刀锋掠过百老汇大剧院霓虹门头
+    new THREE.Vector3( 33.5,  5.2, 12.5), // 24. 高速切入东侧动漫园区
+    new THREE.Vector3( 25.0,  3.6, -1.5), // 25. ★ 动漫园区小黄人/马里奥雕塑 S 弯绕桩
+    new THREE.Vector3( 13.5,  6.8, 13.0)  // 26. 穿出动漫园回到北街主干道
+  ];
+  const curve=new THREE.CatmullRomCurve3(pts,true,'centripetal',.5);
+  const STAGES=[
+    [0.00,'STAGE 01 · 熊萌艺术馆门廊贴地穿掠 + 垂直跃顶'],
+    [0.12,'STAGE 02 · 西侧驯鹿喷泉贴水漂移 + 圣诞市集穿行'],
+    [0.23,'STAGE 03 · 哥特大教堂双塔穿缝 + 360° 极速桶滚'],
+    [0.34,'STAGE 04 · 21×28m 皇家溜冰场 2.2m 贴冰掠飞'],
+    [0.45,'STAGE 05 · 云霄飞车 14.4m 高架并排追逐 + 烟花穿云'],
+    [0.60,'STAGE 06 · 旋转木马 60° 刀锋压弯 + 碰碰车场超低空掠飞'],
+    [0.71,'STAGE 07 · 摩天轮轮心穿越 Powerloop + 26m 跳伞塔回环'],
+    [0.82,'STAGE 08 · 摇滚音乐节舞台光束俯冲 + 百老汇大剧院掠翼'],
+    [0.90,'STAGE 09 · 东侧动漫园区巨型手办 S 弯绕桩特技']
+  ];
+  // 预设 4 个自动 360° 炫技桶滚触发点 (u 坐标)
+  const AUTO_TRICKS=[
+    {u:0.26,dir:1,name:'⚡ 自动特技：教堂双塔 360° 极速副翼桶滚！'},
+    {u:0.54,dir:-1,name:'⚡ 自动特技：高空烟花走廊 360° 逆向横滚！'},
+    {u:0.76,dir:1,name:'⚡ 自动特技：摩天轮穿心 Powerloop 360° 桶滚！'},
+    {u:0.86,dir:-1,name:'⚡ 自动特技：摇滚舞台聚光灯束 360° 炫技横滚！'}
+  ];
+  return {
+    active:false,u:0,baseSpd:0.0175,boost:false,
+    bank:0,rollExtra:0,rollVel:0,manualRoll:0,fov:60,lastTrickIdx:-1,trickBannerT:0,
+    curve,STAGES,AUTO_TRICKS,
+    p:new THREE.Vector3(),pPrev:new THREE.Vector3(),pNext:new THREE.Vector3(),
+    t0:new THREE.Vector3(),t1:new THREE.Vector3(),t2:new THREE.Vector3(),
+    up:new THREE.Vector3(),right:new THREE.Vector3(),look:new THREE.Vector3()
+  };
+})();
+
+function triggerFpvBarrelRoll(dir=1,label='⚡ 特技触发：360° 极速副翼桶滚 (Aileron Barrel Roll)！'){
+  if(!fpvSys.active)return;
+  fpvSys.rollVel=(dir>=0?1:-1)*Math.PI*2;
+  fpvSys.trickBannerT=2.2;
+  const trEl=document.getElementById('fpv-trick');
+  if(trEl)trEl.textContent=label;
+  sfx.blip(784,.10,.05);
+}
+
+function toggleFpvMode(force){
+  const next=(typeof force==='boolean')?force:!fpvSys.active;
+  if(next===fpvSys.active)return;
+  if(next){
+    if(trainSys.riding)trainSys.riding=false;
+    if(wheelSys.riding)stopFacilityRide();
+    if(launchSys.active)stopLaunchRide();
+    intro.active=false;camTween=null;
+    fpvSys.wasFp=fp.on;
+    if(fp.on){fp.on=false;document.body.classList.remove('fp');}
+    controls.enabled=false;
+    fpvSys.active=true;
+    fpvSys.bank=0;fpvSys.rollExtra=0;fpvSys.rollVel=0;fpvSys.manualRoll=0;
+    fpvSys.fov=78;
+    renderer.setPixelRatio(LO_DPR);composer.setPixelRatio(LO_DPR);
+    document.getElementById('fpv-osd').classList.add('show');
+    const b1=document.getElementById('t-fpv'), b2=document.getElementById('w-fpv');
+    if(b1)b1.classList.add('on');
+    if(b2)b2.classList.add('on');
+    trainHud.classList.remove('show');
+    sfx.blip(880,.12,.06);
+  }else{
+    fpvSys.active=false;
+    document.getElementById('fpv-osd').classList.remove('show');
+    const b1=document.getElementById('t-fpv'), b2=document.getElementById('w-fpv');
+    if(b1)b1.classList.remove('on');
+    if(b2)b2.classList.remove('on');
+    camera.fov=60;camera.updateProjectionMatrix();
+    camera.up.set(0,1,0);
+    renderer.setPixelRatio(HI_DPR);composer.setPixelRatio(HI_DPR);
+    if(fpvSys.wasFp){
+      fpEnter(true);
+    }else{
+      controls.enabled=!IS_TOUCH_DEV;
+      camera.position.copy(HOME.pos);controls.target.copy(HOME.tgt);
+      if(!IS_TOUCH_DEV)controls.update();
+    }
+    sfx.blip(520,.10,.05);
+  }
+}
+
+function updateFpvDrone(dt){
+  const s=fpvSys;
+  // W/S 或 Shift 控制穿越机油门推力，A/D 控制手动副翼横滚
+  const shiftBoost=!!(fp.keys['ShiftLeft']||fp.keys['ShiftRight']||s.boost);
+  let throttle=shiftBoost?1.48:1.0;
+  if(fp.keys['KeyW']||fp.keys['ArrowUp'])throttle*=1.28;
+  if(fp.keys['KeyS']||fp.keys['ArrowDown'])throttle*=0.65;
+
+  // 先取当前高度计算重力俯冲加成（下坡更快、爬坡略收，更具真实穿越机动力感）
+  s.curve.getPointAt(s.u,s.p);
+  s.curve.getTangentAt(s.u,s.t1);
+  const diveBoost=clamp(1.0-s.t1.y*0.32,0.75,1.42);
+  const prevU=s.u;
+  s.u=(s.u+s.baseSpd*throttle*diveBoost*dt)%1;
+
+  // 检查是否经过自动特技桶滚触发点
+  for(let i=0;i<s.AUTO_TRICKS.length;i++){
+    const tk=s.AUTO_TRICKS[i];
+    if(prevU<tk.u&&s.u>=tk.u&&Math.abs(s.rollVel)<0.1){
+      triggerFpvBarrelRoll(tk.dir,tk.name);
+    }
+  }
+
+  // 采样前后切线，解算水平曲率离心压弯角（Knife-Edge Banking）
+  const du=0.008;
+  s.curve.getPointAt(s.u,s.p);
+  s.curve.getTangentAt((s.u-du+1)%1,s.t0);
+  s.curve.getTangentAt(s.u,s.t1);
+  s.curve.getTangentAt((s.u+du)%1,s.t2);
+  const turnRate=(s.t0.z*s.t2.x-s.t0.x*s.t2.z)*26.0;
+  const tgtBank=clamp(turnRate,-1.12,1.12); // 最大约 ±64° 压弯侧倾
+  s.bank+=(tgtBank-s.bank)*Math.min(1,dt*6.5);
+
+  // 手动 A/D 横滚叠加
+  let mRollInput=0;
+  if(fp.keys['KeyA']||fp.keys['ArrowLeft'])mRollInput-=1;
+  if(fp.keys['KeyD']||fp.keys['ArrowRight'])mRollInput+=1;
+  if(joy.mag>0.05)mRollInput+=joy.dx;
+  s.manualRoll+=(mRollInput*0.85-s.manualRoll)*Math.min(1,dt*8);
+
+  // 360° 极速桶滚角积分
+  if(Math.abs(s.rollVel)>0.01){
+    const step=s.rollVel*dt*1.55;
+    s.rollExtra+=step;
+    if(Math.abs(s.rollExtra)>=Math.PI*2){
+      s.rollExtra=0;s.rollVel=0;
+    }
+  }
+  if(s.trickBannerT>0){
+    s.trickBannerT-=dt;
+    if(s.trickBannerT<=0){
+      const trEl=document.getElementById('fpv-trick');
+      if(trEl)trEl.textContent='🚁 FPV 穿越机特技巡航';
+    }
+  }
+
+  // 动态广角 FOV（随空速与特技桶滚自动在 78°~90° 间呼吸伸缩）
+  const tgtFov=78+(throttle*diveBoost-1)*14+(Math.abs(s.rollVel)>0.1?6:0);
+  s.fov+=(clamp(tgtFov,75,92)-s.fov)*Math.min(1,dt*6);
+  if(Math.abs(camera.fov-s.fov)>0.08){
+    camera.fov=s.fov;
+    camera.updateProjectionMatrix();
+  }
+
+  // 无万向锁 6-DOF 相机姿态：围绕真实飞行切线 T 旋转 (压弯角 + 手动横滚 + 360° 桶滚)
+  const totalRoll=s.bank+s.manualRoll+s.rollExtra;
+  s.up.set(0,1,0);
+  s.right.crossVectors(s.t1,s.up);
+  if(s.right.lengthSq()<1e-5)s.right.set(1,0,0);else s.right.normalize();
+  s.up.crossVectors(s.right,s.t1).normalize();
+  s.up.applyAxisAngle(s.t1,totalRoll);
+
+  camera.position.copy(s.p);
+  camera.up.copy(s.up);
+  camera.lookAt(s.look.copy(s.p).addScaledVector(s.t1,12.0));
+
+  // 更新 FPV OSD 眼镜遥测数据与人工地平线
+  if((_reflTick&1)===0){
+    const kmh=Math.round(74*throttle*diveBoost);
+    const rollDeg=Math.round((totalRoll*180/Math.PI)%360);
+    const pitchDeg=Math.round(Math.asin(clamp(s.t1.y,-1,1))*180/Math.PI);
+    const spdEl=document.getElementById('fpv-spd');
+    const altEl=document.getElementById('fpv-alt');
+    const attEl=document.getElementById('fpv-att');
+    const stgEl=document.getElementById('fpv-stage');
+    const hbar=document.getElementById('fpv-hbar');
+    if(spdEl)spdEl.textContent='SPD '+kmh+' KM/H'+(shiftBoost?' [BOOST]':'');
+    if(altEl)altEl.textContent='ALT '+s.p.y.toFixed(1)+' M';
+    if(attEl)attEl.textContent='ROLL '+(rollDeg>=0?'+':'')+rollDeg+'° · PITCH '+(pitchDeg>=0?'+':'')+pitchDeg+'°';
+    if(hbar)hbar.style.transform='rotate('+(-totalRoll*180/Math.PI).toFixed(1)+'deg) translateY('+(pitchDeg*0.45).toFixed(1)+'px)';
+    if(stgEl){
+      let curStage=s.STAGES[0][1];
+      for(let i=0;i<s.STAGES.length;i++){
+        if(s.u>=s.STAGES[i][0])curStage=s.STAGES[i][1];
+      }
+      stgEl.textContent=curStage;
+    }
+  }
+}
+
+{
+  const b1=document.getElementById('t-fpv');
+  const b2=document.getElementById('w-fpv');
+  const bRoll=document.getElementById('fpv-roll-btn');
+  const bBoost=document.getElementById('fpv-boost-btn');
+  const bExit=document.getElementById('fpv-exit-btn');
+  if(b1)b1.onclick=()=>toggleFpvMode();
+  if(b2)b2.onclick=()=>toggleFpvMode();
+  if(bRoll)bRoll.onclick=()=>triggerFpvBarrelRoll(Math.random()>.5?1:-1);
+  if(bBoost)bBoost.onclick=()=>{
+    fpvSys.boost=!fpvSys.boost;
+    bBoost.textContent=fpvSys.boost?'🚀 狂暴加速: ON':'🚀 狂暴加速';
+  };
+  if(bExit)bExit.onclick=()=>toggleFpvMode(false);
+  addEventListener('keydown',e=>{
+    if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'))return;
+    if(e.code==='KeyF'){
+      toggleFpvMode();
+    }else if(fpvSys.active&&e.code==='Space'){
+      e.preventDefault();
+      triggerFpvBarrelRoll(1);
+    }else if(fpvSys.active&&e.code==='Escape'){
+      toggleFpvMode(false);
+    }
+  });
 }
 
 function updateWheelRide(dt){
