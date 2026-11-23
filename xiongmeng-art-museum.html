@@ -479,7 +479,6 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 /* ════════════════════════════════════════════════════════════
    0. 基础工具
@@ -8195,8 +8194,8 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     }
     pool(g,5.5,.03,.24,0xffd68a);
     OUTDOOR_OBS.push([32,52,2.8]);
-    // 异步加载 Blender 5.2.2 LTS 精雕版圣诞老人雕塑替换临时拼接体
-    try{
+    // 异步懒加载 Blender 5.2.2 LTS 精雕版圣诞老人雕塑替换临时拼接体（永不阻塞首屏加载）
+    import('three/addons/loaders/GLTFLoader.js').then(({GLTFLoader})=>{
       const gltfL=new GLTFLoader();
       gltfL.load('./models/santa_monument.glb',gltf=>{
         const mdl=gltf.scene;
@@ -8212,7 +8211,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
         scene.add(mdl);
         g.visible=false;
       });
-    }catch(e){}
+    }).catch(()=>{});
   }
 
   /* ── 圣诞高空弹射跳伞塔 (29.5, 0, 44.5)：位于摩天轮与圣诞老人雕塑中间，规模放大 1.42x ── */
