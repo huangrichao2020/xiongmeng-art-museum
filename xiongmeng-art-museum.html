@@ -573,6 +573,7 @@ function mergeStatic(root,skip){
   const walk=o=>{
     for(const ch of o.children){
       if(skip&&skip.has(ch))continue;
+      if(ch.isInstancedMesh)continue;              // InstancedMesh 自身已合批，严禁被拆成原点单例
       if(ch.userData&&ch.userData.keep)continue;   // 标记 keep 的整棵子树不参与合批
       if(ch.isMesh){
         let g=ch.geometry.clone();
@@ -7703,23 +7704,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
   add(fair,BX(68,.04,5.5),M(0xf8f7f2,{roughness:.92}),6,.016,22).castShadow=false;
   add(fair,BX(64,.04,5),M(0xf8f7f2,{roughness:.92}),6,.016,54).castShadow=false;
 
-  /* ── 围栏 ── */
-  const fenceRun=(x,z,len,rot)=>{
-    const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=rot;fair.add(g);
-    const fn=Math.round(len/2.6);
-    for(let i=0;i<=fn;i++){
-      const px=-len/2+i*(len/fn);
-      add(g,BX(.12,1.25,.12),postM,px,.62,0);
-      const cap=add(g,new THREE.ConeGeometry(.13,.2,6),gldM,px,1.32,0);cap.castShadow=false;
-      if(i%2)bulb(g,px,1.5,0,.11,i);
-    }
-    for(let i=0;i<2;i++)add(g,BX(len,.07,.07),postM,0,.45+i*.45,0);
-  };
-  fenceRun(-18,19.3,28,0);          // 北面左段
-  fenceRun(28,19.3,32,0);           // 北面右段（中间 8m 是入口）
-  fenceRun(-31.7,38,37.4,Math.PI/2);
-  fenceRun(43.7,38,37.4,Math.PI/2);
-  fenceRun(6,56.7,76,0);
+  /* ── 已去掉游乐园四周外围栏，保留正门牌坊，全园四面畅通无阻 ── */
 
   /* ── 游乐园大门：鎏金花格门楼（正对艺术馆正门）
      尺寸收小但做"贵"：柱础线脚 + 鎏金包边 + 柱头卷涡 +
@@ -7955,85 +7940,83 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     OUTDOOR_OBS.push([27,36,4.6]);
   }
 
-  /* ── 豪华圣诞海盗船（挪至西北广场，为云霄飞车腾出整片西侧黄金区） ── */
+  /* ── 冬夜音乐节 · 露天摇滚乐表演舞台（替代原海盗船，西北广场开阔现场） ── */
   {
     const g=new THREE.Group();g.position.set(-20.0,0,25.5);fair.add(g);
-    const hullDark=M(0x4b2b1a,{roughness:.72});
-    const hullMid=M(0x7c4527,{roughness:.68});
-    const hullGilt=M(0xe8b653,{roughness:.32,metalness:.8});
-    const sailM=M(0xfaf4e6,{roughness:.85,side:THREE.DoubleSide});
-    // 登船木质站台 + 踏步台阶 + 安全围栏
-    add(g,BX(7.4,.32,4.8),M(0x6b472d,{roughness:.85}),0,.16,0);
-    add(g,BX(7.6,.12,5.0),snowM,0,.35,0).castShadow=false;
-    add(g,BX(4.4,.18,1.1),M(0x8a5f3d,{roughness:.8}),0,.09,2.85);
-    for(let i=-3;i<=3;i++)add(g,BX(.08,.95,.08),gldM,i*1.1,.85,2.3);
-    add(g,BX(6.8,.07,.07),gldM,0,1.28,2.3);
-    // 前后（Z=±1.95）双侧 A 字形重型龙门支架 + 顶部承轴箱
-    for(const sz of [-1,1]){
-      const zz=sz*1.95;
-      for(const sx of [-1,1]){
-        const leg=add(g,new THREE.CylinderGeometry(.18,.26,9.8,10),postM,sx*1.9,4.7,zz);
-        leg.rotation.z=sx*.36;
-      }
-      add(g,BX(3.2,.24,.24),gldM,0,4.8,zz);
-      add(g,new THREE.CylinderGeometry(.34,.34,.45,14),hullGilt,0,9.2,zz).rotation.x=Math.PI/2;
-      for(let k=0;k<6;k++)bulb(g,-1.4+k*.56,4.95,zz+sz*.12,.09,k*2);
+    const deckM=M(0x232a36,{roughness:.75,metalness:.25,envMapIntensity:.2});
+    const trussM=M(0xb8c4d4,{roughness:.32,metalness:.78,envMapIntensity:.55});
+    const ampM=M(0x1b2028,{roughness:.85,metalness:.1,envMapIntensity:.15});
+    // 1. 露天摇滚主舞台（7.8m × 4.6m）+ 台阶 + 舞台前沿暖金灯带
+    add(g,BX(7.8,.48,4.6),deckM,0,.24,0);
+    add(g,BX(7.92,.08,4.72),gldM,0,.49,0);
+    add(g,BX(3.6,.22,.9),deckM,0,.11,2.72);
+    // 2. 两侧桁架立柱 + 顶部横梁 + 6 盏律动舞台射灯 + 背景大型摇滚灯箱屏幕
+    for(const sx of [-3.6,3.6]){
+      add(g,BX(.22,3.8,.22),trussM,sx,2.35,-1.85);
+      add(g,BX(.22,3.8,.22),trussM,sx,2.35,1.85);
+      add(g,BX(.20,.20,3.8),trussM,sx,4.22,0);
     }
-    add(g,new THREE.CylinderGeometry(.22,.22,4.4,12),hullGilt,0,9.2,0).rotation.x=Math.PI/2;
-    // 摆动部分（绕 Z 轴前后摆动）
-    const pivot=new THREE.Group();pivot.position.set(0,9.2,0);g.add(pivot);
-    pivot.userData.physObj={type:'ride',ref:{kind:'ship',label:'豪华圣诞海盗船'}};
-    amusement.ship=pivot;amusement.dyn.add(pivot);
-    // 4 根吊臂（前后各两根斜拉至船身）
-    for(const sz of [-1,1])for(const sx of [-1,1]){
-      const arm=add(pivot,new THREE.CylinderGeometry(.09,.11,6.4,8),railM,sx*1.35,-3.0,sz*1.25);
-      arm.rotation.z=sx*.40;arm.rotation.x=-sz*.10;
+    add(g,BX(7.5,.24,.24),trussM,0,4.25,1.85);
+    add(g,BX(7.5,.24,.24),trussM,0,4.25,-1.85);
+    add(g,BX(6.6,2.3,.18),ampM,0,2.2,-1.95);
+    signPanel(g,6.2,1.95,animeSignTex(512,160,'雪夜冬日摇滚音乐节','WINTER ROCK FESTIVAL · LIVE'),0,2.2,-1.83,.72);
+    const stageSpots=[];
+    const spotCols=[0xff5a88,0xffd066,0x5ce1ff,0xff5a88,0xffd066,0x5ce1ff];
+    for(let i=0;i<6;i++){
+      const sx=-2.5+i*1.0;
+      add(g,new THREE.CylinderGeometry(.10,.14,.26,10),ampM,sx,4.02,1.82).rotation.x=.55;
+      const lm=new THREE.MeshBasicMaterial({color:spotCols[i]});
+      addNS(g,new THREE.SphereGeometry(.11,8,6),lm,sx,3.92,1.92);
+      stageSpots.push({m:lm,ph:i*1.1});
     }
-    // 船体主体：龙骨 + 上翘船首/船尾 + 金边装饰
-    add(pivot,BX(6.2,.75,2.1),hullDark,0,-6.05,0);
-    add(pivot,BX(7.4,.55,2.35),hullMid,0,-5.50,0);
-    add(pivot,BX(7.6,.14,2.46),hullGilt,0,-5.18,0);
-    // 翘起的船首与船尾甲板
-    for(const sx of [-1,1]){
-      const endDeck=add(pivot,BX(1.85,.65,1.85),hullMid,sx*3.6,-4.95,0);
-      endDeck.rotation.z=sx*.36;
-      const trim=add(pivot,BX(1.95,.14,1.98),hullGilt,sx*3.65,-4.62,0);
-      trim.rotation.z=sx*.36;
-      const post=add(pivot,BX(.18,1.15,.18),hullGilt,sx*4.4,-4.25,0);
-      bulb(pivot,sx*4.4,-3.55,0,.15,sx>0?1:4);
-    }
-    // 金色船首雕像（尖角龙首 + 圣诞花环）
-    const prow=add(pivot,new THREE.ConeGeometry(.42,1.5,8),hullGilt,4.75,-4.45,0);
-    prow.rotation.z=-Math.PI/2+.35;
-    const wr=buildWreath(.45);wr.position.set(4.1,-4.8,0);wr.rotation.y=Math.PI/2;pivot.add(wr);
-    // 船尾舵轮
-    add(pivot,new THREE.TorusGeometry(.42,.06,8,16),hullGilt,-3.9,-4.35,0).rotation.y=Math.PI/2;
-    // 船舱座椅 + 8 只小熊乘客
-    const bearCols=[0xd23b32,0x2f8f6b,0xe0a33c,0x3f6ba8,0xd07a9a,0x8f3a68,0xc99456,0x7f8f76];
-    for(let i=0;i<4;i++){
-      const sx=-2.1+i*1.4;
-      add(pivot,BX(.52,.36,1.9),M(0x2c333a,{roughness:.7}),sx,-5.05,0);
-      add(pivot,BX(.14,.42,1.92),rndM,sx-.22,-4.78,0); // 靠背
-      for(let r=0;r<2;r++){
-        const bz=(r===0?-.5:.5);
-        add(pivot,new THREE.SphereGeometry(.24,8,6),M(bearCols[i*2+r],{roughness:.75}),sx,-4.65,bz);
-        add(pivot,new THREE.SphereGeometry(.19,8,6),M(0xfbe2cf,{roughness:.8}),sx,-4.32,bz);
+    // 3. 左右双层 PA 巨型音箱阵列（带低音炮振膜）
+    const woofers=[];
+    for(const sx of [-3.2,3.2]){
+      add(g,BX(1.05,1.85,.85),ampM,sx,1.42,-1.15);
+      for(const wy of [1.05,1.75]){
+        const wf=add(g,new THREE.CylinderGeometry(.32,.32,.08,16),M(0x3a4454,{roughness:.5}),sx,wy,-.71);
+        wf.rotation.x=Math.PI/2;woofers.push(wf);
       }
     }
-    // 中央桅杆 + 圣诞红白条纹主帆 + 桅顶金星
-    add(pivot,new THREE.CylinderGeometry(.10,.14,4.2,10),hullGilt,0,-3.2,0);
-    add(pivot,BX(.12,.12,2.6),hullGilt,0,-2.0,0);
-    add(pivot,BX(.08,2.1,2.3),sailM,0,-3.0,0);
-    add(pivot,BX(.10,.45,2.32),rndM,0,-2.5,0);
-    add(pivot,BX(.10,.45,2.32),rndM,0,-3.5,0);
-    add(pivot,new THREE.OctahedronGeometry(.28,0),getBulbMat(0xffe078,0),0,-1.0,0);
-    // 船舷两侧彩灯串
-    for(let i=0;i<14;i++){
-      const bx=-3.3+i*.51;
-      for(const sz of [-1,1])bulb(pivot,bx,-5.12,sz*1.25,.10,Math.abs(i+sz));
+    // 4. 爵士架子鼓组 + 4 只小熊摇滚乐手（主唱/主音吉他/贝斯手/鼓手）
+    add(g,new THREE.CylinderGeometry(.48,.48,.46,16),M(0xb8383f,{roughness:.4}),0,.98,-.65).rotation.z=Math.PI/2;
+    add(g,new THREE.CylinderGeometry(.26,.26,.18,12),M(0xf2ede4,{roughness:.6}),-.48,1.02,-.55);
+    for(const cx of [-.68,.68]){
+      add(g,new THREE.CylinderGeometry(.02,.02,.95,6),trussM,cx,.98,-.75);
+      add(g,new THREE.CylinderGeometry(.34,.34,.02,14),gldM,cx,1.46,-.75);
     }
-    pool(g,6.5,.03,.28);
-    OUTDOOR_OBS.push([-20.0,25.5,3.8]);
+    const drum=makePerson(0x3b6ba8,0xe8c49a,{scale:.84,acc:'headphone'});
+    drum.position.set(0,.52,-1.18);g.add(drum);
+    const makeRockBear=(x,z,coat,acc,guitCol)=>{
+      const b=makePerson(coat,0xe8c49a,{scale:.86,acc});
+      b.position.set(x,.52,z);
+      if(guitCol){
+        const gu=new THREE.Group();gu.position.set(.05,.52,.28);gu.rotation.z=.45;
+        add(gu,BX(.46,.24,.06),M(guitCol,{roughness:.35}),0,0,0);
+        add(gu,BX(.62,.06,.04),M(0x7c4a2a,{roughness:.7}),.42,.04,0);
+        b.add(gu);
+      }
+      g.add(b);return b;
+    };
+    const voc=makeRockBear(0,.95,0xc93b44,'beanie',0xf0c15a);
+    add(g,new THREE.CylinderGeometry(.022,.022,1.18,6),trussM,0,1.10,1.25); // 立式麦克风架
+    const gtrL=makeRockBear(-1.65,.55,0x345c8a,'cap',0xd84654);
+    const gtrR=makeRockBear(1.65,.55,0x387460,'beret',0x58a6ff);
+    // 5. 台前挥舞荧光棒欢呼的小熊观众（6 只）
+    const fans=[];
+    const fanCols=[0xb84048,0x3d7a66,0x4b6fa8,0xd8a24a,0xc87a96,0x7c4e6c];
+    for(let i=0;i<6;i++){
+      const fx=-2.4+i*.96, fz=3.45+(i%2)*.55;
+      const fn=makePerson(fanCols[i],0xe8c49a,{scale:.80,acc:i%2?'santa':'earmuff'});
+      fn.position.set(fx,0,fz);fn.rotation.y=Math.PI+(i-2.5)*.08;
+      addNS(fn.userData.armR,new THREE.CylinderGeometry(.02,.02,.28,6),getBulbMat(spotCols[i],i),0,-.28,.08);
+      g.add(fn);fans.push({b:fn,ph:i*.85});
+    }
+    g.userData.keep=true;
+    amusement.band={drum,voc,gtrL,gtrR,woofers,stageSpots,fans};
+    amusement.dyn.add(g);
+    pool(g,6.8,.03,.24,0xffa6c9);
+    OUTDOOR_OBS.push([-20.0,25.5,4.2]);
   }
 
   /* ── 皇家圣诞旋转木马：红白条纹双层顶棚 + 8 匹立体切线奔跑木马 + 上下起伏 ── */
@@ -8412,8 +8395,8 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
 
   /* ── 圣诞树林：沿围栏内侧一圈，全部复用 buildChristmasTree ── */
   {
-    const spots=[[-29,21],[-4,55],[6,55],[16,55],[26,55],[36,55],
-                 [42,24],[42,32],[42,40],[42,48],[-29.5,19.5],[-19,19.5],[-9,19.5]];
+    const spots=[[-4,55],[6,55],[16,55],[26,55],[36,55],
+                 [42,24],[42,32],[42,40],[42,48]];
     for(const [tx,tz] of spots){
       const t=buildChristmasTree({scale:R(.85,1.45),layers:5,gifts:R(.5,1)>.3});
       t.position.set(tx+R(-.5,.5),0,tz+R(-.5,.5));
@@ -10482,9 +10465,23 @@ function animate(){
       cab.rotation.z=-amusement.wheel.rotation.z+Math.sin(t*1.35+ci*.9)*sway;
     });
   }
-  if(amusement.ship){
-    const ph=Math.sin(t*.85);
-    amusement.ship.rotation.z=Math.sign(ph)*Math.pow(Math.abs(ph),.86)*.56;
+  if(amusement.band){
+    const b=amusement.band, beat=t*7.2;
+    b.drum.userData.armL.rotation.x=-1.1+Math.sin(beat*2.0)*.55;
+    b.drum.userData.armR.rotation.x=-1.1-Math.sin(beat*2.0)*.55;
+    b.voc.position.y=.52+Math.abs(Math.sin(beat))*.05;
+    b.voc.userData.armR.rotation.x=-.9+Math.sin(beat*1.5)*.32;
+    b.gtrL.rotation.z=Math.sin(beat*.5)*.08;
+    b.gtrL.userData.armR.rotation.x=-.85+Math.sin(beat*2.0)*.28;
+    b.gtrR.rotation.z=-Math.sin(beat*.5)*.08;
+    b.gtrR.userData.armR.rotation.x=-.85+Math.cos(beat*2.0)*.28;
+    const pScale=1+Math.max(0,Math.sin(beat*2))*.10;
+    for(const wf of b.woofers)wf.scale.set(pScale,1,pScale);
+    for(const fn of b.fans){
+      fn.b.position.y=Math.abs(Math.sin(beat+fn.ph))*.12;
+      fn.b.userData.armR.rotation.x=-2.2+Math.sin(beat+fn.ph)*.38;
+      fn.b.userData.armL.rotation.x=-1.8-Math.cos(beat+fn.ph)*.25;
+    }
   }
   if(amusement.carousel)amusement.carousel.rotation.y+=dt*.45;
   if(amusement.horses){for(const h of amusement.horses)h.g.position.y=h.baseY+Math.sin(t*2.8+h.ph)*.26;}
