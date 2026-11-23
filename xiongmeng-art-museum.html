@@ -2572,11 +2572,30 @@ strip.position.set(0,4.28,9.24);shop.add(strip);
     fan.rotation.y=.3;
     u.userData.fan=fan;
   }
-  // 屋顶边缘积雪边条
-  add(shop,BX(22.4,.14,.55),snowCapM,1.25,roofY+.04,7.65);
-  add(shop,BX(22.4,.14,.55),snowCapM,1.25,roofY+.04,-11.65);
-  add(shop,BX(.55,.14,19.8),snowCapM,-9.65,roofY+.04,-2.0);
-  add(shop,BX(.55,.14,19.8),snowCapM,12.15,roofY+.04,-2.0);
+  // 屋顶除中央木栈道展区（x:-8.18..9.38, z:-3.76..6.16）与楼梯洞（x:9.70..11.84, z:-5.22..0.40）外，其余区域全面铺满厚实积雪顶
+  const roofSnowM=M(0xeef5fc,{roughness:.86,metalness:.02,flatShading:false,map:noiseTex('#e8f1fa','255,255,255',900)});
+  roofSnowM.map.repeat.set(8,8);
+  for(const [sx,sz,sw,sd] of [
+    [ 1.22,  7.02, 22.24, 1.72], // 南侧前檐整片雪顶（展区前方）
+    [-9.03,  1.20,  1.70, 9.92], // 西侧整片雪顶（展区左侧）
+    [-0.09, -7.82, 19.58, 8.12], // 北侧后半部整片大雪原（展区后方设备区）
+    [11.01, -8.55,  2.62, 6.66], // 东北角雪顶（楼梯洞北侧）
+    [10.85,  3.28,  2.94, 5.76], // 东南角雪顶（楼梯口南侧）
+    [ 9.54, -1.68,  0.32, 4.16], // 展区东缘与楼梯围栏之间衔接雪条
+    [12.08, -2.41,  0.48, 5.62]  // 楼梯洞东侧外沿雪条
+  ]){
+    const sm=add(shop,BX(sw,.11,sd),roofSnowM,sx,roofY+.045,sz);
+    sm.receiveShadow=true;
+  }
+  // 屋顶四角、设备脚下与展区周边的自然起伏积雪堆（消除生硬切边，呈现真实冬夜厚雪质感）
+  for(const [dx,dz,rx,ry,rz] of [
+    [-8.8, -10.6, 1.8, .22, 1.4], [-1.8, -10.5, 2.2, .18, 1.2], [ 3.2, -10.4, 2.0, .19, 1.2],
+    [10.4, -10.5, 1.7, .22, 1.3], [-9.0,  -4.6, 1.2, .18, 1.8], [-9.0,   6.8, 1.5, .20, 1.1],
+    [10.8,   6.8, 1.6, .20, 1.1], [-7.8,   5.2, 0.7, .16, 0.7], [ 9.2,   5.2, 0.7, .16, 0.7]
+  ]){
+    const drift=add(shop,new THREE.SphereGeometry(1,14,10),snowCapM,dx,roofY+.06,dz);
+    drift.scale.set(rx,ry,rz);drift.castShadow=false;drift.receiveShadow=true;
+  }
   // 水箱靠左后角
   add(shop,new THREE.CylinderGeometry(.95,.95,1.45,18),M(0x7d6a54,{roughness:.8}),-7.6,roofY+1.48,-9.2);
   add(shop,new THREE.CylinderGeometry(.32,.95,.22,18),snowCapM,-7.6,roofY+2.34,-9.2);
@@ -2632,9 +2651,11 @@ strip.position.set(0,4.28,9.24);shop.add(strip);
       });
     }
   }
-  // 天窗（避开右侧上天台楼梯洞）
-  add(shop,BX(3.6,.16,2.2),new THREE.MeshPhysicalMaterial({color:0xbfe0f0,transparent:true,opacity:.36,roughness:.08,clearcoat:1,depthWrite:false}),5.8,roofY+.08,-5.2);
-  add(shop,BX(3.9,.12,2.5),M(0x323941,{roughness:.7}),5.8,roofY+.02,-5.2);
+  // 天窗（略高于屋面积雪层，四边带积雪围边，避开右侧上天台楼梯洞）
+  add(shop,BX(3.6,.16,2.2),new THREE.MeshPhysicalMaterial({color:0xbfe0f0,transparent:true,opacity:.38,roughness:.08,clearcoat:1,depthWrite:false}),5.8,roofY+.18,-5.2);
+  add(shop,BX(3.9,.16,2.5),M(0x323941,{roughness:.7}),5.8,roofY+.10,-5.2);
+  for(const [kx,kz,kw,kd] of [[5.8,-3.92,4.0,.22],[5.8,-6.48,4.0,.22],[3.82,-5.2,.22,2.4],[7.78,-5.2,.22,2.4]])
+    add(shop,BX(kw,.08,kd),snowCapM,kx,roofY+.16,kz);
   // 屋顶楼梯洞安全围栏（仅留 z=+0.40 入口端敞开）
   const rHoleM=M(0x9aa4ad,{roughness:.35,metalness:.8});
   add(shop,BX(.08,.92,5.6),rHoleM,9.72,roofY+.46,-2.4);
