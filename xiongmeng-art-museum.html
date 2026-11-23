@@ -506,7 +506,7 @@ function M(color,o={}){
   if(color===undefined||color===null)color=0xffffff;
   const k=color+'|'+JSON.stringify(o);
   if(matCache.has(k))return matCache.get(k);
-  const m=new THREE.MeshStandardMaterial(Object.assign({color,flatShading:false,roughness:.76,metalness:.06,envMapIntensity:.95},o));
+  const m=new THREE.MeshStandardMaterial(Object.assign({color,flatShading:false,roughness:.88,metalness:0,envMapIntensity:.24},o));
   matCache.set(k,m);return m;
 }
 function add(parent,geo,mat,x=0,y=0,z=0){
@@ -624,7 +624,7 @@ renderer.outputColorSpace=THREE.SRGBColorSpace;
 host.appendChild(renderer.domElement);
 
 const scene=new THREE.Scene();
-scene.fog=new THREE.FogExp2(0x0e1a2b,0.0082);
+scene.fog=new THREE.FogExp2(0x0c192c,0.0068);
 
 const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,700);
 camera.position.set(26,19,28);
@@ -667,17 +667,21 @@ const animeOutlineShader={
       float br=luma(texture2D(tDiffuse,vUv+vec2( tx.x,-tx.y)).rgb);
       float gx=-tl-2.0*ml-bl+tr+2.0*mr+br;
       float gy=-tl-2.0*tm-tr+bl+2.0*bm+br;
+      // 局部微对比度（轻量化 Cavity AO 质感）+ 轻柔轮廓墨线
+      float avgL=(tl+tm+tr+ml+mr+bl+bm+br)*0.125;
       float edge=smoothstep(0.32,0.68,sqrt(gx*gx+gy*gy));
       float centerL=luma(base.rgb);
-      // 仅对大轮廓做轻柔顺滑墨线，避免细杆、砖缝产生像素黑毛边
       float edgeMask=smoothstep(0.06,0.18,centerL)*(1.0-smoothstep(0.70,1.00,centerL));
       vec3 ink=vec3(0.08,0.10,0.18);
-      vec3 col=mix(base.rgb,ink,edge*edgeMask*0.18);
-      // 新海诚雪夜冷暖调色分级：暗部钴蓝通透、亮部暖琥珀、色彩纯净统一
+      vec3 col=mix(base.rgb,ink,edge*edgeMask*0.16);
+      col*=(1.0+clamp((centerL-avgL)*0.28,-0.08,0.08));
+      // 新海诚雪夜冷暖调色分级：暗部钴蓝通透、亮部暖琥珀、克制电影暗角聚焦中心
       float g=luma(col);
-      vec3 shinkaiShadow=mix(col,col*vec3(0.84,0.92,1.16),0.45*(1.0-smoothstep(0.05,0.45,g)));
+      vec3 shinkaiShadow=mix(col,col*vec3(0.84,0.92,1.16),0.42*(1.0-smoothstep(0.05,0.45,g)));
       vec3 shinkaiWarm=mix(shinkaiShadow,shinkaiShadow*vec3(1.06,1.01,0.92),smoothstep(0.45,0.95,g)*0.45);
-      col=mix(vec3(g),shinkaiWarm,1.12);
+      col=mix(vec3(g),shinkaiWarm,1.10);
+      float vig=1.0-smoothstep(0.36,0.94,length(vUv-vec2(0.5)))*0.14;
+      col*=vig;
       gl_FragColor=vec4(col,base.a);
     }
   `
@@ -691,9 +695,9 @@ composer.addPass(bloom);
 composer.addPass(new OutputPass());
 composer.setPixelRatio(renderer.getPixelRatio());
 
-/* ── 灯光（柔和天光补色，消除黑硬阴影与生硬明暗界线） ─────────── */
-const ambient=new THREE.AmbientLight(0x324966,.46); scene.add(ambient);
-const hemi=new THREE.HemisphereLight(0x5c82b0,0x162230,.62); scene.add(hemi);
+/* ── 灯光（冬夜钴蓝天光 + 地面暖雪反弹光 GroundBounce，消除死黑与生硬明暗） ─────────── */
+const ambient=new THREE.AmbientLight(0x364d6b,.44); scene.add(ambient);
+const hemi=new THREE.HemisphereLight(0x6c96cc,0x423a35,.78); scene.add(hemi);
 const key=new THREE.DirectionalLight(0xc2dbf6,.52);
 key.castShadow=true;
 key.shadow.mapSize.set(2048,2048);
@@ -9969,7 +9973,7 @@ function animate(){
     for(let i=0;i<p.length/3;i++){
       p[i*3+1]-=snowSpd[i]*dt;
       p[i*3]+=Math.sin(t*.7+i)*.48*dt+dt*.32;
-      if(p[i*3+1]<0||insideBuilding(p[i*3],p[i*3+2],p[i*3+1])){
+      if(p[i*3+1]<1.6||insideBuilding(p[i*3],p[i*3+2],p[i*3+1])){
         let dx,dz;
         do{dx=Math.random()*130-65;dz=Math.random()*80-40;}while(inBuildingXZ(dx,dz));
         p[i*3]=dx;p[i*3+1]=32+Math.random()*5;p[i*3+2]=dz;
@@ -9982,7 +9986,7 @@ function animate(){
     for(let i=0;i<p.length/3;i++){
       p[i*3+1]-=snowFarSpd[i]*dt;
       p[i*3]+=Math.cos(t*.5+i)*.32*dt+dt*.22;
-      if(p[i*3+1]<0||insideBuilding(p[i*3],p[i*3+2],p[i*3+1])){
+      if(p[i*3+1]<1.6||insideBuilding(p[i*3],p[i*3+2],p[i*3+1])){
         let dx,dz;
         do{dx=Math.random()*140-70;dz=Math.random()*90-45;}while(inBuildingXZ(dx,dz));
         p[i*3]=dx;p[i*3+1]=34+Math.random()*5;p[i*3+2]=dz;
