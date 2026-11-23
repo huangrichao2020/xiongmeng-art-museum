@@ -8856,7 +8856,21 @@ const sfx={
   bgmTracks:null,
   initBgmTracks(){
     if(this.bgmTracks)return;
-    const mk=(src)=>{const a=new Audio(src);a.loop=true;a.preload='auto';a.volume=0;return a;};
+    const c=this.ctx;
+    if(!c)return;
+    /* BGM 走 Web Audio 而不是 HTMLAudio 直出：
+       直出时 mp3 的刺耳高频（镲片、齿音）会直接怼耳朵，而且没法统一控音量。
+       这里加 高通(90Hz 去掉隆隆声) + 低通(6.8kHz 削刺耳) + 独立增益，
+       让背景音乐是"垫底"而不是"抢戏"。 */
+    const mk=(src)=>{
+      const a=new Audio(src);a.loop=true;a.preload='auto';
+      const node=c.createMediaElementSource(a);
+      const hp=c.createBiquadFilter();hp.type='highpass';hp.frequency.value=90;
+      const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=6800;lp.Q.value=.4;
+      const g=c.createGain();g.gain.value=0;
+      node.connect(hp);hp.connect(lp);lp.connect(g);g.connect(this.master);
+      return {a,g};
+    };
     this.bgmTracks={
       museum:mk('./audio/museum_piano.mp3'),
       park:mk('./audio/park_wonderland.mp3'),
@@ -8867,44 +8881,49 @@ const sfx={
   updateBgmMix(dt){
     if(!this.bgmTracks)return;
     const tr=this.bgmTracks;
+    const set=(k,v)=>{tr[k].g.gain.value=Math.max(0,Math.min(1,v));};
     if(!this.on){
-      for(const k of ['museum','park','rock']){tr.v[k]=Math.max(0,tr.v[k]-dt*1.6);tr[k].volume=tr.v[k];}
+      for(const k of ['museum','park','rock']){tr.v[k]=Math.max(0,tr.v[k]-dt*1.6);set(k,tr.v[k]);}
       return;
     }
     const cx=camera.position.x, cy=camera.position.y, cz=camera.position.z;
     const inMus=cx>-10.5&&cx<12.5&&cz>-12.0&&cz<8.5&&cy<9.5;
     const dRock=Math.hypot(cx-39.5,cz-36.5);
     const rockK=inMus?0:Math.max(0,Math.min(1,1-(dRock-9)/16));
-    const tMus=inMus?.40:0;
-    const tRock=rockK*.42;
-    const tPark=inMus?0:.36*(1-rockK*.85);
+    /* BGM 目标音量（整体压低，别让背景音乐盖过场景）
+       户外 park + rock 会重叠，峰值控制在 .34 左右 */
+    const tMus=inMus?.26:0;
+    const tRock=rockK*.28;
+    const tPark=inMus?0:.22*(1-rockK*.85);
     const k=Math.min(1,dt*2.4);
     tr.v.museum+=(tMus-tr.v.museum)*k;
     tr.v.park+=(tPark-tr.v.park)*k;
     tr.v.rock+=(tRock-tr.v.rock)*k;
-    tr.museum.volume=Math.max(0,Math.min(1,tr.v.museum));
-    tr.park.volume=Math.max(0,Math.min(1,tr.v.park));
-    tr.rock.volume=Math.max(0,Math.min(1,tr.v.rock));
+    set('museum',tr.v.museum);
+    set('park',tr.v.park);
+    set('rock',tr.v.rock);
   },
   pump(){},
   setRain(){},
   setHum(){},
   setOn(on){
     this.on=on;
-    this.initBgmTracks();
     if(on){
+      /* 顺序要紧：先 boot 出 AudioContext / master，再建 BGM 通道
+         （createMediaElementSource 必须挂在已建好的 context 上） */
       this.boot();
       if(this.ctx&&this.ctx.state==='suspended')this.ctx.resume();
-      if(this.master&&this.ctx)this.master.gain.setTargetAtTime(.92,this.ctx.currentTime,.20);
+      if(this.master&&this.ctx)this.master.gain.setTargetAtTime(.85,this.ctx.currentTime,.20);
+      this.initBgmTracks();
       if(this.bgmTracks){
         for(const k of ['museum','park','rock']){
-          this.bgmTracks[k].play().catch(()=>{});
+          this.bgmTracks[k].a.play().catch(()=>{});
         }
       }
     }else{
       if(this.master&&this.ctx)this.master.gain.setTargetAtTime(0,this.ctx.currentTime,.20);
       if(this.bgmTracks){
-        for(const k of ['museum','park','rock'])this.bgmTracks[k].pause();
+        for(const k of ['museum','park','rock'])this.bgmTracks[k].a.pause();
       }
     }
   },
