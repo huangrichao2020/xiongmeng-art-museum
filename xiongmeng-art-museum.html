@@ -481,7 +481,7 @@
     <div class="toggles">
       <button id="t-fp">沉浸</button>
       <button id="t-fpv">穿越机</button>
-      <button id="t-quality" class="on" title="新海诚高画质柔光滤镜开关">高画质</button>
+      <button id="t-quality" title="新海诚高画质柔光滤镜开关">高画质</button>
       <button id="t-sound" class="on">圣诞音</button>
       <button id="t-stars" class="on">流星雨</button>
       <button id="t-lights" class="on">圣诞灯</button>
@@ -513,13 +513,13 @@
 <button id="w-run" data-label="跳"></button>
 <div class="wtop" id="wtop">
   <button id="w-view" title="沉浸 / 沙盘" data-label="沙盘"></button>
-  <button id="w-quality-top" class="on" title="高画质光滤镜开关" data-label="高画质"></button>
+  <button id="w-quality-top" title="高画质光滤镜开关" data-label="高画质"></button>
   <button id="w-sound" class="on" title="声音" data-label="♪"></button>
 </div>
 <div class="wtools" id="wtools">
   <button id="w-mode" title="沉浸 / 沙盘" data-label="沉浸"></button>
   <button id="w-fpv" title="FPV 穿越机特技模式 (F)" data-label="穿越"></button>
-  <button id="w-quality" class="on" title="高画质光滤镜开关" data-label="高画质"></button>
+  <button id="w-quality" title="高画质光滤镜开关" data-label="高画质"></button>
   <button id="w-audio" class="on" title="声音" data-label="♪"></button>
 </div>
 <div id="fpv-osd">
@@ -9776,7 +9776,7 @@ const TIMES=[
   {k:'dusk', name:'暮',h:17.5,weather:'雪霞',sky:['#263b68','#995878','#f0a46c','rgba(255,176,105,.65)'],fog:0x9b746a,fogD:.0082},
   {k:'night',name:'夜',h:21.5,weather:'雪夜',sky:WINTER_SKY,fog:WINTER_FOG,fogD:WINTER_FOG_D}
 ];
-const state={timeKey:'night',hour:21.5,lights:true,quality:true,envDirty:true,stars:true,clean:true};
+const state={timeKey:'night',hour:21.5,lights:true,quality:false,envDirty:true,stars:true,clean:true};
 let rainLevel=0,resetPerf=true;
 const rSeason=document.getElementById('r-season'),rWeather=document.getElementById('r-weather'),
       rTime=document.getElementById('r-time'),rTemp=document.getElementById('r-temp'),
@@ -9869,13 +9869,13 @@ function applyQualityMode(on){
   const btn=document.getElementById('t-quality');
   if(btn){
     btn.classList.toggle('on',state.quality);
-    btn.textContent=state.quality?'高画质':'标准';
+    btn.textContent='高画质';
   }
   for(const id of ['w-quality','w-quality-top']){
     const wb=document.getElementById(id);
     if(wb){
       wb.classList.toggle('on',state.quality);
-      wb.dataset.label=state.quality?'高画质':'标准';
+      wb.dataset.label='高画质';
       wb.textContent='';
     }
   }
@@ -9905,7 +9905,7 @@ for(const id of ['w-quality','w-quality-top']){
     sfx.blip(state.quality?780:520,.08,.06);
   };
 }
-applyQualityMode(true);
+applyQualityMode(false);
 document.getElementById('t-lights').onclick=function(){
   state.lights=!state.lights;this.classList.toggle('on',state.lights);
 };
