@@ -610,7 +610,8 @@ function mergeStatic(root,skip){
    ════════════════════════════════════════════════════════════ */
 const host=document.getElementById('stage');
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance',stencil:false});
-const HI_DPR=Math.min(devicePixelRatio||1,1.5);
+const HI_DPR=Math.min(devicePixelRatio||1,1.85);
+const LO_DPR=Math.min(HI_DPR,1.25);
 renderer.setPixelRatio(HI_DPR);
 renderer.setSize(innerWidth,innerHeight);
 renderer.shadowMap.enabled=true;
@@ -637,8 +638,10 @@ controls.autoRotateSpeed=.55;
 
 const HOME={pos:camera.position.clone(),tgt:controls.target.clone()};
 
-/* ── 后期：日系二次元电影感三渲二管线 (Render -> Sobel细描边&新海诚调色 -> 柔和Bloom -> ACES) ── */
-const composer=new EffectComposer(renderer);
+/* ── 后期：日系二次元电影感三渲二管线 (4x MSAA Render -> 柔化细描边&新海诚调色 -> 柔和Bloom -> ACES) ── */
+const _msaaSamples=Math.min(4,renderer.capabilities.maxSamples||4);
+const _composerRT=new THREE.WebGLRenderTarget(Math.max(1,Math.round(innerWidth*HI_DPR)),Math.max(1,Math.round(innerHeight*HI_DPR)),{type:THREE.HalfFloatType,samples:_msaaSamples});
+const composer=new EffectComposer(renderer,_composerRT);
 composer.addPass(new RenderPass(scene,camera));
 const animeOutlineShader={
   uniforms:{
@@ -664,12 +667,12 @@ const animeOutlineShader={
       float br=luma(texture2D(tDiffuse,vUv+vec2( tx.x,-tx.y)).rgb);
       float gx=-tl-2.0*ml-bl+tr+2.0*mr+br;
       float gy=-tl-2.0*tm-tr+bl+2.0*bm+br;
-      float edge=smoothstep(0.22,0.50,sqrt(gx*gx+gy*gy));
+      float edge=smoothstep(0.32,0.68,sqrt(gx*gx+gy*gy));
       float centerL=luma(base.rgb);
-      // 极亮发光体与最暗夜空不压黑线，只给实体边缘加干净细锐的动漫深蓝紫墨线
-      float edgeMask=smoothstep(0.05,0.16,centerL)*(1.0-smoothstep(0.72,1.02,centerL));
-      vec3 ink=vec3(0.06,0.08,0.16);
-      vec3 col=mix(base.rgb,ink,edge*edgeMask*0.36);
+      // 仅对大轮廓做轻柔顺滑墨线，避免细杆、砖缝产生像素黑毛边
+      float edgeMask=smoothstep(0.06,0.18,centerL)*(1.0-smoothstep(0.70,1.00,centerL));
+      vec3 ink=vec3(0.08,0.10,0.18);
+      vec3 col=mix(base.rgb,ink,edge*edgeMask*0.18);
       // 新海诚雪夜冷暖调色分级：暗部钴蓝通透、亮部暖琥珀、色彩纯净统一
       float g=luma(col);
       vec3 shinkaiShadow=mix(col,col*vec3(0.84,0.92,1.16),0.45*(1.0-smoothstep(0.05,0.45,g)));
@@ -693,12 +696,12 @@ const ambient=new THREE.AmbientLight(0x324966,.46); scene.add(ambient);
 const hemi=new THREE.HemisphereLight(0x5c82b0,0x162230,.62); scene.add(hemi);
 const key=new THREE.DirectionalLight(0xc2dbf6,.52);
 key.castShadow=true;
-key.shadow.mapSize.set(1024,1024);
-key.shadow.radius=2.8;
+key.shadow.mapSize.set(2048,2048);
+key.shadow.radius=3.2;
 key.shadow.camera.left=-56;key.shadow.camera.right=56;
 key.shadow.camera.top=56;key.shadow.camera.bottom=-56;
 key.shadow.camera.near=1;key.shadow.camera.far=160;
-key.shadow.bias=-.0006;key.shadow.normalBias=.035;
+key.shadow.bias=-.0004;key.shadow.normalBias=.055;
 scene.add(key);scene.add(key.target);
 
 const moon=new THREE.DirectionalLight(0x7fa8d8,.25); scene.add(moon);
@@ -10659,8 +10662,8 @@ function animate(){
     if(!ridingFast){
       if(f<44){
         window._lowFpsStreak=(window._lowFpsStreak||0)+1;window._hiFpsStreak=0;
-        if(window._lowFpsStreak>=2&&renderer.getPixelRatio()>1.02){
-          renderer.setPixelRatio(1);composer.setPixelRatio(1);
+        if(window._lowFpsStreak>=2&&renderer.getPixelRatio()>LO_DPR+.05){
+          renderer.setPixelRatio(LO_DPR);composer.setPixelRatio(LO_DPR);
         }
       }else if(f>=54){
         window._hiFpsStreak=(window._hiFpsStreak||0)+1;window._lowFpsStreak=0;
@@ -11177,7 +11180,7 @@ function toggleRideTrain(stationHint){
       trainSys.u=stationHint.u;trainSys.atStation=stationHint;trainSys.stopTimer=3.0;trainSys.speed=0;
     }
     trainSys.riding=true;
-    renderer.setPixelRatio(1);composer.setPixelRatio(1);
+    renderer.setPixelRatio(LO_DPR);composer.setPixelRatio(LO_DPR);
     sfx.blip(880,.12,.08);
   }
 }
@@ -11199,7 +11202,7 @@ function toggleRideFacility(info){
   if(!fp.on)enterWalk();
   wheelSys.kind=info.kind;wheelSys.car=info.car||null;wheelSys.heli=info.heli||null;wheelSys.label=info.label||'游乐设施';
   wheelSys.riding=true;
-  if(info.kind==='coaster'){renderer.setPixelRatio(1);composer.setPixelRatio(1);}
+  if(info.kind==='coaster'){renderer.setPixelRatio(LO_DPR);composer.setPixelRatio(LO_DPR);}
   if(info.kind==='sleigh'){fp.yaw=flyingSleigh.rotation.y+Math.PI;fp.pitch=-.16;}
   if(info.kind==='heli'&&info.heli){fp.yaw=info.heli.g.rotation.y+Math.PI;fp.pitch=-.42;}
   sfx.blip(988,.14,.08);
