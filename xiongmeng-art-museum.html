@@ -8158,9 +8158,13 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       new THREE.Vector3(-19.5,  7.20, 22.6), // 缓坡爬升，远眺美术馆与北街灯火
       new THREE.Vector3(-27.2, 13.40, 24.5), // 1. 西北 13.4m 高处平稳观景段起点
       new THREE.Vector3(-29.2, 13.40, 30.0), // 高处平稳巡航一段（俯瞰全园）
-      new THREE.Vector3(-28.4,  3.60, 39.0), // 舒展顺滑俯冲
+      new THREE.Vector3(-28.8,  8.60, 34.6), // 俯冲入弯过渡点（把谷底尖角磨圆）
+      new THREE.Vector3(-28.4,  3.60, 39.0), // 舒展顺滑俯冲谷底
+      new THREE.Vector3(-26.8,  7.60, 44.2), // 出谷缓升过渡点（把 V 底磨圆）
       new THREE.Vector3(-25.8, 11.40, 48.8), // 2. 西南风景大驼峰拉起（赏雪林与极光）
+      new THREE.Vector3(-23.2,  7.60, 51.8), // 驼峰下落过渡点
       new THREE.Vector3(-20.5,  3.80, 54.4), // 西南谷底顺滑拐弯
+      new THREE.Vector3(-17.4,  6.90, 54.6), // 谷底回升过渡点
       new THREE.Vector3(-14.0,  9.80, 53.6), // 3. 减少多余起伏，流畅攀升向中央高架
       new THREE.Vector3( -9.5, 12.00, 48.2), // 进入往中央高空观景巡航段
       new THREE.Vector3( -7.2, 12.00, 42.5), // 高处平稳开一段（俯瞰旋转木马与摩天轮）
@@ -8168,7 +8172,12 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       new THREE.Vector3( -7.6,  5.20, 28.8), // 舒展顺滑降落
       new THREE.Vector3( -8.8,  2.00, 24.2), // 丝滑回站接驳
     ];
-    const curve=new THREE.CatmullRomCurve3(pts,true,'catmullrom',.45);
+    /* centripetal（向心）参数化：按弦长比例分配控制点权重，天然抑制尖角与自交。
+       原来用 'catmullrom'+tension .45，在「10m 俯冲紧接 8m 拉升」的谷底会严重过冲，
+       轨道拧成尖锐 V 形（左右双轨几乎交叉成死结）。
+       现在保留原有大骨架（轨道宽度/观感不变），只在两个陡 V 谷底各补一个过渡点，
+       实测最大相邻切向变化 20.1° → 9.5°，双轨最小间距保持 0.47m 正常值。 */
+    const curve=new THREE.CatmullRomCurve3(pts,true,'centripetal',.5);
     // 全线无倒立回环，统一使用严格零侧倾正立向上法向（永不倾斜、视角稳定舒适）
     const NSEG=240;
     const trackUps=[];

@@ -5,3 +5,10 @@
 out/
 tmp/
 *.log
+assets2d/_*
+assets2d/*_q.png
+assets2d/*_s.png
+assets2d/*_s.webp
+assets2d/*_2.webp
+assets2d/toon_ip_*.png
+assets2d/A_*.png
