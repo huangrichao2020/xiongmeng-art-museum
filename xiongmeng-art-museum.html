@@ -6735,18 +6735,26 @@ const skylineMats=[];
       addExtLamp(55.5+sx*3.6,24.4,0);
     }
   }
-  // 广场/墙角柔和半埋积雪堆（打破直角底座与平地面之间的生硬感）
-  const driftGeo=new THREE.SphereGeometry(1,12,8);
+  // 将原本零散丑陋的地面扁平雪堆，统一替换为俏皮可爱的冬日小雪人
+  const driftScarf=[0xdc2f2f,0x1f8a4c,0x2563eb,0xeab308,0xc026d3,0xe11d48];
+  const driftHats=['santa','beanie','top'];
   const drifts=[
-    [-58,24,2.6,.48,1.8],[-40,24,2.4,.44,1.6],[-59,36,2.8,.52,2.2],[-39,36,2.5,.45,2.0],
-    [47,24,2.4,.44,1.6],[64,24,2.6,.48,1.8],[46,36,2.2,.42,1.8],[65,36,2.8,.52,2.4],
-    [-33,20,2.5,.45,1.8],[45,20,2.5,.45,1.8],[-33,56,2.8,.50,2.0],[45,56,2.8,.50,2.0],
-    [-16,9.5,2.2,.40,1.5],[18,9.5,2.2,.40,1.5],[-22,-25,2.6,.45,1.8],[22,-25,2.6,.45,1.8]
+    [-58,24,0.86],[-40,24,0.74],[-59,36,0.90],[-39,36,0.78],
+    [47,24,0.76],[64,24,0.86],[46,36,0.74],[65,36,0.90],
+    [-33,20,0.82],[45,20,0.82],[-33,56,0.86],[45,56,0.86],
+    [-16,9.5,0.76],[18,9.5,0.76],[-22,-25,0.82],[22,-25,0.82]
   ];
-  for(const [dx,dz,sx,sy,sz] of drifts){
-    const dm=addNS(lmGroup,driftGeo,snowRoofM,dx,.02,dz);
-    dm.scale.set(sx,sy,sz);dm.rotation.y=dx*.2+dz*.1;
-  }
+  drifts.forEach(([dx,dz,sc],idx)=>{
+    const sm=buildSnowman(sc,{
+      scarf:driftScarf[idx%driftScarf.length],
+      hat:driftHats[idx%driftHats.length],
+      wave:idx%2===0,
+      tilt:idx%3===0?0.08:idx%3===1?-0.08:0
+    });
+    sm.position.set(dx,0,dz);
+    sm.rotation.y=Math.atan2(-dx,-dz)*0.45+(idx%2?0.25:-0.25);
+    lmGroup.add(sm);
+  });
   // 将教堂与大剧院静态建筑、雪堆与小熊人合批（保留 PointLight 光源，大幅削减 Draw Call）
   mergeStatic(lmGroup);
   // 环路外侧：洁净覆雪人行道（移除杂乱大发光圈孤立树，保持视野通透大气）
