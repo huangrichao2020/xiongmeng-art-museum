@@ -2105,12 +2105,12 @@ add(shop,BX(22.4,.4,19.9),M(0x3d444b,{roughness:.82}),1.25,.2,-2.0);
   add(shop,BX(2.65,.34,7.5),roofSlabM,11.025,8.78,4.15).receiveShadow=false;
 }
 
-/* 内部地板（纯净平整的现代美术馆微水泥地坪，绝无室外水渍与蜂窝斑纹） */
-const floor1Mat=M(0xffffff,{roughness:.58,metalness:0,map:floorTex,flatShading:false,envMapIntensity:.18});
+/* 内部地板（完全哑光零反光的现代美术馆微水泥地坪，绝无灯光镜面光斑） */
+const floor1Mat=M(0xffffff,{roughness:.98,metalness:0,map:floorTex,flatShading:false,envMapIntensity:0});
 const floor1=add(shop,BX(21.5,0.06,19),floor1Mat,1.25,D.f1top,-2.0);
 floor1.castShadow=false;floor1.receiveShadow=false;
 {
-  const f2m=M(0xffffff,{roughness:.62,metalness:0,map:floorTex,flatShading:false,envMapIntensity:.16});
+  const f2m=M(0xffffff,{roughness:.98,metalness:0,map:floorTex,flatShading:false,envMapIntensity:0});
   const floor2=add(shop,BX(18.95,0.06,19),f2m,-.025,D.f2top,-2.0);
   floor2.castShadow=false;floor2.receiveShadow=false;
   const f2b=add(shop,BX(2.55,0.06,11.05),f2m,10.725,D.f2top,-5.975);
