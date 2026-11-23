@@ -738,7 +738,7 @@ composer.addPass(animePass);
 const BLOOM_SCALE=IS_TOUCH_DEV?.35:.5;   // 触屏端泛光降到 0.35 倍分辨率，省一大截填充率
 const bloom=new UnrealBloomPass(new THREE.Vector2(Math.max(64,Math.round(innerWidth*BLOOM_SCALE)),Math.max(64,Math.round(innerHeight*BLOOM_SCALE))),.16,.36,.90);
 const _bloomSetSize=bloom.setSize.bind(bloom);
-bloom.setSize=(w,h)=>_bloomSetSize(Math.max(64,Math.round(w*.5)),Math.max(64,Math.round(h*.5)));
+bloom.setSize=(w,h)=>_bloomSetSize(Math.max(64,Math.round(w*BLOOM_SCALE)),Math.max(64,Math.round(h*BLOOM_SCALE)));
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 composer.setPixelRatio(renderer.getPixelRatio());
@@ -5019,9 +5019,11 @@ const lampPools=[];
     halo.rotation.x=-Math.PI/2;halo.position.set(0,.05,1.40);g.add(halo);
     halo.userData.noReflect=true;
     lampPools.push(halo);
-    const cone=new THREE.Mesh(new THREE.ConeGeometry(2.6,5.8,16,1,true),new THREE.MeshBasicMaterial({
-      color:0xffd79a,transparent:true,opacity:.055,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false}));
-    cone.position.set(0,2.9,1.40);g.add(cone);
+    /* 灯罩光锥：去掉锥体网格，改成灯罩下方的柔光小球 + 地面光池（上方已有 halo），
+       避免从下往上看灯罩时出现一条生硬的实心白带 */
+    const lampGlow=new THREE.Mesh(new THREE.SphereGeometry(.42,12,8),new THREE.MeshBasicMaterial({
+      color:0xffd79a,transparent:true,opacity:.34,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+    lampGlow.position.set(0,2.9,1.40);lampGlow.castShadow=false;g.add(lampGlow);
     if(x===-19.5||x===9.5||x===26.8){
       const pl=new THREE.PointLight(0xffd9a4,68,34,1.65);
       pl.position.set(x,5.8,12.85);scene.add(pl);shopLights.push({l:pl,base:68,street:true});
@@ -7971,11 +7973,12 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       const lm=new THREE.MeshBasicMaterial({color:spotCols[i]});
       addNS(head,new THREE.SphereGeometry(.11,8,6),lm,0,-.18,0);
       const bm=new THREE.MeshBasicMaterial({
-        color:spotCols[i],transparent:true,opacity:.14,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide
+        color:spotCols[i],transparent:true,opacity:.14,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.FrontSide
       });
-      const cone=new THREE.Mesh(new THREE.ConeGeometry(1.15,4.6,14,1,true),bm);
-      cone.position.y=-2.45;cone.raycast=()=>{};head.add(cone);
-      spotHeads.push({head,bm,ph:i*1.05});
+      /* 同理去掉锥体网格：改用灯头下方的小光点，避免从下往上看时出现实心白带 */
+      const bulb=addNS(head,new THREE.SphereGeometry(.12,10,8),bm,0,-.22,0);
+      bulb.castShadow=false;
+      spotHeads.push({head,bm,ph:i*1.05,bulb});
     }
     // 3. 左右双层 PA 巨型音箱阵列（带低音炮振膜）
     const woofers=[];
@@ -11116,8 +11119,18 @@ const trainCars=[];
     add(sg,BX(2.6,.24,6.4),M(0x6b4b32,{roughness:.85}),0,.12,0);
     add(sg,BX(2.7,.06,6.5),M(0xf2f7fc,{roughness:.9}),0,.26,0).castShadow=false;
     for(const sz of [-2.4,2.4])add(sg,BX(.14,2.8,.14),M(0x1f4034,{roughness:.5}),0,1.5,sz);
-    add(sg,BX(2.4,.14,5.6),M(0x8a2432,{roughness:.7}),0,2.9,0);
-    add(sg,BX(2.5,.10,5.7),M(0xf2f7fc,{roughness:.9}),0,3.02,0).castShadow=false;
+    /* 雨棚顶：人字坡 + 中间透空。
+       原来是一整块 2.4m 宽的平顶板（暗红顶 + 白色雪盖），玩家在站台旁 1m 处
+       平视/抬头时，它横在眼前就是一整片大平面 —— 深蓝夜空背景上会切出一条
+       锐利的斜亮带（远处看像"贴图坏了"）。改成两片斜置薄檐 + 屋脊压条，
+       中间留 0.9m 透空，任何角度看都只剩细边，不会再切视线。 */
+    for(const sx of [-1,1]){
+      const rb=add(sg,BX(1.42,.12,5.6),M(0x8a2432,{roughness:.7}),sx*.66,2.90,0);
+      rb.rotation.z=sx*.26;
+      const rs=add(sg,BX(1.50,.10,5.7),M(0xf2f7fc,{roughness:.9}),sx*.66,3.00,0);
+      rs.rotation.z=sx*.26; rs.castShadow=false;
+    }
+    add(sg,BX(.26,.15,5.7),M(0xf2f7fc,{roughness:.9}),0,3.18,0).castShadow=false;
     // 发光站牌
     const sc=cv(384,110)[0],sx=sc.getContext('2d');
     sx.fillStyle='#192836';sx.fillRect(0,0,384,110);
@@ -11800,13 +11813,22 @@ const helis=[];
     const spot=new THREE.Group();spot.position.set(0,.34,1.62);g.add(spot);
     addNS(spot,new THREE.SphereGeometry(.11,10,8),darkM,0,0,0);
     addNS(spot,new THREE.SphereGeometry(.065,8,6),new THREE.MeshBasicMaterial({color:cfg.beam}),0,-.04,.06);
-    const beamH=cfg.y-1.0;
-    const cone=new THREE.Mesh(
-      new THREE.ConeGeometry(1.35,beamH,16,1,true),
-      new THREE.MeshBasicMaterial({color:cfg.beam,transparent:true,opacity:.038,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide})
-    );
-    cone.position.y=-beamH/2;cone.raycast=()=>{};spot.add(cone);
-    const item={g,rotor,tRotor,spot,cfg};
+    /* 探照灯：不再用锥体网格做体积光。
+       锥体从下方/侧面看会变成一条生硬的实心白带（圆锥只有 16 段 → 硬折线），
+       DoubleSide + Additive 还会正反叠加出同心摩尔纹。
+       改成：机身下的小发光点 + 地面上的加性光池，光感干净且零穿帮。 */
+    const beamDot=addNS(spot,new THREE.SphereGeometry(.13,10,8),
+      new THREE.MeshBasicMaterial({color:cfg.beam,transparent:true,opacity:.9,
+        blending:THREE.AdditiveBlending,depthWrite:false}),0,-.05,.06);
+    beamDot.castShadow=false;
+    /* 地面光池（跟随机腹下方，随高度变大变淡） */
+    const poolM=new THREE.MeshBasicMaterial({color:cfg.beam,transparent:true,opacity:.30,
+      blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
+    const beamPool=new THREE.Mesh(new THREE.CircleGeometry(1,28),poolM);
+    beamPool.rotation.x=-Math.PI/2;beamPool.castShadow=false;beamPool.raycast=()=>{};
+    beamPool.position.y=.03;
+    scene.add(beamPool);
+    const item={g,rotor,tRotor,spot,cfg,beamPool,poolM};
     g.userData.physObj={type:'ride',ref:{kind:'heli',heli:item,label:cfg.name}};
     helis.push(item);
   }
@@ -11822,6 +11844,13 @@ function updateHelis(dt){
     h.g.rotation.y=Math.atan2(vx,vz);
     h.g.rotation.x=.09; // 前倾巡航姿态
     h.rotor.rotation.y+=dt*22;
+    if(h.beamPool){
+      // 光池投在机腹正下方的地面：直径随高度变大、亮度随高度衰减
+      h.beamPool.position.set(h.g.position.x,.04,h.g.position.z);
+      const rad=2.4+Math.max(0,c.y-8)*.52;
+      h.beamPool.scale.setScalar(rad);
+      h.poolM.opacity=Math.max(.06,.34-Math.max(0,c.y-8)*.010);
+    }
     h.tRotor.rotation.x+=dt*26;
     // 探照灯来回摆动扫射地面
     h.spot.rotation.z=Math.sin(t*1.6+i*2.1)*.26;
