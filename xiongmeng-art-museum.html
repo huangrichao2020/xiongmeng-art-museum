@@ -384,7 +384,6 @@
       <button id="t-sound" class="on">圣诞音</button>
       <button id="t-stars" class="on">流星雨</button>
       <button id="t-lights" class="on">圣诞灯</button>
-      <button id="t-quality" class="on">高画质</button>
       <button id="t-rotate">环绕</button>
       <button id="t-reset">复位</button>
     </div>
@@ -581,7 +580,7 @@ function mergeStatic(root,skip){
    ════════════════════════════════════════════════════════════ */
 const host=document.getElementById('stage');
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance',stencil:false});
-const HI_DPR=Math.min(devicePixelRatio||1,1.15);
+const HI_DPR=Math.min(devicePixelRatio||1,1.5);
 renderer.setPixelRatio(HI_DPR);
 renderer.setSize(innerWidth,innerHeight);
 renderer.shadowMap.enabled=true;
@@ -635,25 +634,24 @@ const animeOutlineShader={
       float br=luma(texture2D(tDiffuse,vUv+vec2( tx.x,-tx.y)).rgb);
       float gx=-tl-2.0*ml-bl+tr+2.0*mr+br;
       float gy=-tl-2.0*tm-tr+bl+2.0*bm+br;
-      float edge=smoothstep(0.16,0.42,sqrt(gx*gx+gy*gy));
+      float edge=smoothstep(0.22,0.50,sqrt(gx*gx+gy*gy));
       float centerL=luma(base.rgb);
       // 极亮发光体与最暗夜空不压黑线，只给实体边缘加干净细锐的动漫深蓝紫墨线
-      float edgeMask=smoothstep(0.04,0.14,centerL)*(1.0-smoothstep(0.75,1.05,centerL));
+      float edgeMask=smoothstep(0.05,0.16,centerL)*(1.0-smoothstep(0.72,1.02,centerL));
       vec3 ink=vec3(0.06,0.08,0.16);
-      vec3 col=mix(base.rgb,ink,edge*edgeMask*0.48);
-      // 日系二次元电影微调色：暗部轻染通透青紫，整体色彩更清澈饱满
+      vec3 col=mix(base.rgb,ink,edge*edgeMask*0.36);
+      // 清澈动漫色彩微调：不加灰雾底色，保持夜景高对比通透感
       float g=luma(col);
-      col=mix(vec3(g),col,1.12);
-      col=mix(col+vec3(0.006,0.012,0.028)*(1.0-smoothstep(0.0,0.35,g)),col,0.65);
+      col=mix(vec3(g),col,1.10);
       gl_FragColor=vec4(col,base.a);
     }
   `
 };
 const animePass=new ShaderPass(animeOutlineShader);
 composer.addPass(animePass);
-const bloom=new UnrealBloomPass(new THREE.Vector2(Math.max(64,Math.round(innerWidth*.25)),Math.max(64,Math.round(innerHeight*.25))),.34,.82,.78);
+const bloom=new UnrealBloomPass(new THREE.Vector2(Math.max(64,Math.round(innerWidth*.5)),Math.max(64,Math.round(innerHeight*.5))),.16,.36,.90);
 const _bloomSetSize=bloom.setSize.bind(bloom);
-bloom.setSize=(w,h)=>_bloomSetSize(Math.max(64,Math.round(w*.25)),Math.max(64,Math.round(h*.25)));
+bloom.setSize=(w,h)=>_bloomSetSize(Math.max(64,Math.round(w*.5)),Math.max(64,Math.round(h*.5)));
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 composer.setPixelRatio(renderer.getPixelRatio());
@@ -9160,22 +9158,6 @@ document.getElementById('t-lights').onclick=function(){
 document.getElementById('t-rotate').onclick=function(){
   controls.autoRotate=!controls.autoRotate;this.classList.toggle('on',controls.autoRotate);
 };
-document.getElementById('t-quality').onclick=function(){
-  state.quality=!state.quality;
-  adapted=false;lowStreak=0;
-  renderer.setPixelRatio(state.quality?HI_DPR:1);
-  renderer.setSize(innerWidth,innerHeight);
-  composer.setPixelRatio(renderer.getPixelRatio());
-  composer.setSize(innerWidth,innerHeight);
-  bloom.enabled=state.quality;
-  syncQuality();
-};
-function syncQuality(){
-  const b=document.getElementById('t-quality');
-  const low=!state.quality||adapted;
-  b.classList.toggle('on',!low);
-  b.textContent=low?'性能模式':'高画质';
-}
 document.getElementById('t-stars').onclick=function(){
   state.stars=!state.stars;this.classList.toggle('on',state.stars);
 };
@@ -10425,19 +10407,6 @@ function animate(){
     const f=Math.round(fpsFrames*1000/(nowMs-fpsT0));
     fpsEl.textContent=f+' FPS';
     fpsFrames=0;fpsT0=nowMs;
-    if(resetPerf){resetPerf=false;lowStreak=0;hiStreak=0;}
-    if(f<18&&!adapted&&state.quality&&t>25){lowStreak++;hiStreak=0;if(lowStreak>14){adapted=true;lowStreak=0;
-      renderer.setPixelRatio(1);renderer.setSize(innerWidth,innerHeight);
-      composer.setPixelRatio(1);composer.setSize(innerWidth,innerHeight);
-      bloom.enabled=false;
-      syncQuality();
-    }}else lowStreak=0;
-    if(adapted&&f>50){hiStreak++;lowStreak=0;if(hiStreak>8){adapted=false;hiStreak=0;
-      renderer.setPixelRatio(HI_DPR);renderer.setSize(innerWidth,innerHeight);
-      composer.setPixelRatio(renderer.getPixelRatio());composer.setSize(innerWidth,innerHeight);
-      bloom.enabled=state.quality;
-      syncQuality();
-    }}else hiStreak=0;
   }
 }
 function baseKeyIntensity(){
@@ -11338,8 +11307,8 @@ function updateTrain(dt){
           vec3 _styled=mix(_celCol,_shadowCold,_darkMask*0.48);
           // 强烈日系二次元边缘轮廓光 (Anime Rim Light，使用 Three.js 标准视图空间法线 normal)
           float _rim=pow(1.0-clamp(abs(dot(normalize(normal),normalize(vViewPosition))),0.0,1.0),3.2);
-          _styled+=vec3(0.56,0.80,1.0)*_rim*0.26*(1.0-smoothstep(0.45,0.95,_lum));
-          gl_FragColor.rgb=mix(gl_FragColor.rgb,_styled,0.68);
+          _styled+=vec3(0.56,0.80,1.0)*_rim*0.20*(1.0-smoothstep(0.42,0.92,_lum));
+          gl_FragColor.rgb=mix(gl_FragColor.rgb,_styled,0.52);
         }
         #include <dithering_fragment>
         `
