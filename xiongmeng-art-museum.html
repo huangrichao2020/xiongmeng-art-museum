@@ -7950,9 +7950,9 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     OUTDOOR_OBS.push([27,36,4.6]);
   }
 
-  /* ── 冬夜音乐节 · 露天摇滚乐表演舞台（背对教堂朝向游乐园中央，配活动光束射灯与热力乐队） ── */
+  /* ── 冬夜音乐节 · 露天摇滚乐表演舞台（挪至东侧大剧院旁，背对剧院面向游乐园） ── */
   {
-    const g=new THREE.Group();g.position.set(-20.0,0,25.5);g.rotation.y=Math.PI*.44;fair.add(g);
+    const g=new THREE.Group();g.position.set(39.5,0,36.5);g.rotation.y=-Math.PI/2;fair.add(g);
     const deckM=M(0x232a36,{roughness:.75,metalness:.25,envMapIntensity:.2});
     const trussM=M(0xb8c4d4,{roughness:.32,metalness:.78,envMapIntensity:.55});
     const ampM=M(0x1b2028,{roughness:.85,metalness:.1,envMapIntensity:.15});
@@ -8035,12 +8035,12 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     amusement.band={drum,voc,gtrL,gtrR,woofers,spotHeads,cymbals,fans};
     // 不加入 amusement.dyn，避免被 mergeStatic(d) 拆成静态雕塑而冻结动画
     pool(g,6.8,.03,.24,0xffa6c9);
-    OUTDOOR_OBS.push([-20.0,25.5,4.2]);
+    OUTDOOR_OBS.push([39.5,36.5,4.2]);
   }
 
-  /* ── 皇家圣诞旋转木马：红白条纹双层顶棚 + 8 匹立体切线奔跑木马 + 上下起伏 ── */
+  /* ── 皇家圣诞旋转木马（移至游乐园正中央迎宾广场，红白条纹双层顶棚 + 8 匹立体切线奔跑木马） ── */
   {
-    const g=new THREE.Group();g.position.set(-4,0,32);fair.add(g);
+    const g=new THREE.Group();g.position.set(4.0,0,30.0);fair.add(g);
     const giltM=M(0xe8b653,{roughness:.28,metalness:.85});
     const creamM=M(0xfaf4e8,{roughness:.55});
     const woodStepM=M(0x6b4226,{roughness:.78});
@@ -8130,7 +8130,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       amusement.horses.push({g:hg,ph:i*1.57,baseY:1.08});
     }
     pool(g,5.5,.03,.26);
-    OUTDOOR_OBS.push([-4,32,4.6]);
+    OUTDOOR_OBS.push([4.0,30.0,4.6]);
   }
 
   /* ── 游乐园西南区：星夜极光云霄飞车（已清空原雪地飞索与充气城堡及地面杂树） ── */
@@ -8209,69 +8209,94 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     pool(g,14,.03,.18,0x9fe8ff);
   }
 
-  /* ── 星夜极光云霄飞车（重点打造：独占整个西侧南北区，12.2m 大爬坡 + 360° 立体螺旋 + S 弯高速俯冲） ── */
+  /* ── 世界一流星夜极光双环云霄飞车（独占整个西半区 26m×35m：14.5m 大爬坡 + 360° 垂直大回环 + 立体双螺旋） ── */
   {
     const cg=new THREE.Group();fair.add(cg);
     const pts=[
-      new THREE.Vector3(-12.5, 1.45, 35.8), // 站台出发（朝西爬坡）
-      new THREE.Vector3(-20.2, 5.40, 34.8), // 长链条牵引攀升
-      new THREE.Vector3(-28.4,12.20, 37.2), // 西北 12.2m 最高峰（俯瞰全园）
-      new THREE.Vector3(-29.5, 6.20, 44.2), // 极速俯冲下坠
-      new THREE.Vector3(-26.8, 2.25, 51.4), // 贴地谷底高速冲刺
-      new THREE.Vector3(-21.2, 7.80, 54.6), // 拉起进入立体大螺旋
-      new THREE.Vector3(-17.0, 9.40, 48.6), // 螺旋上缘高空压弯
-      new THREE.Vector3(-21.4, 5.20, 44.0), // 螺旋内切交叉下穿
-      new THREE.Vector3(-26.0, 3.00, 48.0), // 旋出谷底再加速
-      new THREE.Vector3(-19.2, 2.20, 54.8), // 南侧 S 弯贴地飞驰
-      new THREE.Vector3(-10.8, 8.80, 53.6), // 东南高空驼峰大回转
-      new THREE.Vector3( -7.4, 4.40, 47.2), // 东侧俯冲压弯
-      new THREE.Vector3( -8.2, 1.85, 39.2), // 进站减速直道
+      new THREE.Vector3( -7.5,  1.60, 22.8), // 北侧发车直道（朝西高速加速）
+      new THREE.Vector3(-17.5,  6.80, 21.8), // 长链条爬升段
+      new THREE.Vector3(-28.8, 14.50, 23.2), // 西北 14.5m 超级最高峰（俯瞰全城）
+      new THREE.Vector3(-30.0,  7.20, 29.8), // 极速俯冲直道
+      new THREE.Vector3(-29.2,  2.10, 36.2), // 谷底拉起准备入环
+      // ★ 360° 垂直大回环 (Clothoid Vertical Loop along +Z at x ≈ -28.4)
+      new THREE.Vector3(-28.4,  6.20, 39.2),
+      new THREE.Vector3(-27.8, 12.60, 37.8), // 回环最高点（完全倒立！）
+      new THREE.Vector3(-27.2,  6.20, 35.4),
+      new THREE.Vector3(-26.8,  2.20, 39.8), // 出环贴地冲刺
+      // ★ 立体双螺旋 + 飞跃驼峰
+      new THREE.Vector3(-25.8,  2.40, 52.8), // 西南高速大弯
+      new THREE.Vector3(-17.5,  9.20, 54.4), // 拉起上螺旋峰
+      new THREE.Vector3(-13.8,  6.80, 47.2), // 螺旋内切俯冲
+      new THREE.Vector3(-19.5,  3.20, 43.4), // 交叉下穿高架
+      new THREE.Vector3(-21.8,  4.80, 49.8), // 二次旋出
+      new THREE.Vector3(-12.2,  2.30, 54.6), // 南侧 S 弯贴地飞驰
+      new THREE.Vector3( -6.2,  9.60, 52.2), // 东南高空驼峰
+      new THREE.Vector3( -5.2,  4.60, 43.2), // 东侧高速回转
+      new THREE.Vector3( -6.0,  2.20, 31.5), // 返程直道
     ];
-    const curve=new THREE.CatmullRomCurve3(pts,true,'catmullrom',.42);
-    const spineM=M(0x2a394a,{roughness:.40,metalness:.75});
+    const curve=new THREE.CatmullRomCurve3(pts,true,'catmullrom',.40);
+    // 预计算无万向锁的连续平行传输法向 (trackUps)，确保经过 360° 垂直大回环倒立时车厢与镜头丝滑零翻转
+    const NSEG=240;
+    const trackUps=[];
+    let prevUp=new THREE.Vector3(0,1,0);
+    const _t0=new THREE.Vector3(), _n0=new THREE.Vector3();
+    for(let i=0;i<NSEG;i++){
+      curve.getTangentAt(i/NSEG,_t0);
+      const proj=prevUp.clone().addScaledVector(_t0,-prevUp.dot(_t0));
+      if(proj.lengthSq()<1e-5)proj.set(0,1,0);
+      proj.normalize();
+      // 非回环段柔和向世界 +Y 回正，防止扭转累积
+      if(Math.abs(_t0.y)<0.55&&proj.y>0.2)proj.lerp(_n0.set(0,1,0),0.12).normalize();
+      trackUps.push(proj);
+      prevUp=proj;
+    }
+    const sampleTrackUp=(u,out)=>{
+      const f=((u%1)+1)%1*NSEG, i0=Math.floor(f)%NSEG, i1=(i0+1)%NSEG;
+      return out.copy(trackUps[i0]).lerp(trackUps[i1],f-Math.floor(f)).normalize();
+    };
+    const spineM=M(0x28384c,{roughness:.38,metalness:.75});
     const railSilverM=M(0xe4edf7,{roughness:.22,metalness:.90});
     const pierFootM=M(0xd9e2ec,{roughness:.85});
     // 中央主脊梁
-    const spineMesh=new THREE.Mesh(new THREE.TubeGeometry(curve,150,.17,7,true),spineM);
+    const spineMesh=new THREE.Mesh(new THREE.TubeGeometry(curve,220,.18,7,true),spineM);
     spineMesh.castShadow=true;spineMesh.receiveShadow=true;cg.add(spineMesh);
-    // 左右双轨：沿水平法向偏移 ±0.40m（细轨不投射阴影，大幅减负）
-    const upV=new THREE.Vector3(0,1,0);
+    // 左右双轨：沿真实轨道法向偏移 ±0.42m（不投射阴影保流畅）
+    const _upTmp=new THREE.Vector3();
     for(const side of [-1,1]){
       const rPts=[];
-      for(let i=0;i<110;i++){
-        const u=i/110;
+      for(let i=0;i<160;i++){
+        const u=i/160;
         const p=curve.getPointAt(u), tan=curve.getTangentAt(u);
-        const bin=new THREE.Vector3().crossVectors(tan,upV).normalize();
-        if(bin.lengthSq()<.01)bin.set(1,0,0);
-        rPts.push(p.clone().addScaledVector(bin,side*.40).add(new THREE.Vector3(0,.16,0)));
+        sampleTrackUp(u,_upTmp);
+        const bin=new THREE.Vector3().crossVectors(tan,_upTmp).normalize();
+        rPts.push(p.clone().addScaledVector(bin,side*.42).addScaledVector(_upTmp,.16));
       }
       const rCurve=new THREE.CatmullRomCurve3(rPts,true);
-      const rMesh=new THREE.Mesh(new THREE.TubeGeometry(rCurve,150,.06,5,true),railSilverM);
+      const rMesh=new THREE.Mesh(new THREE.TubeGeometry(rCurve,220,.062,5,true),railSilverM);
       rMesh.castShadow=false;cg.add(rMesh);
     }
-    // 枕木、灯珠与立体 A 字高塔立柱（46 组精细支撑）
-    const pN=46;
+    // 72 组枕木、沿轨彩灯与 A 字钢塔立柱
+    const pN=72;
     for(let i=0;i<pN;i++){
       const u=i/pN;
       const p=curve.getPointAt(u), tan=curve.getTangentAt(u);
-      const tie=addNS(cg,BX(.98,.065,.15),spineM,p.x,p.y+.08,p.z);
+      const tie=addNS(cg,BX(1.04,.065,.15),spineM,p.x,p.y+.08,p.z);
       tie.rotation.y=Math.atan2(tan.x,tan.z);
-      if(i%2===0&&p.y>1.3){
+      if(i%3===0&&p.y>1.4){
         const ph=p.y-.04;
-        add(cg,new THREE.CylinderGeometry(.12,.18,ph,8),spineM,p.x,ph/2,p.z);
-        add(cg,new THREE.CylinderGeometry(.30,.36,.26,8),pierFootM,p.x,.13,p.z);
-        // 高峰塔架加装金色横撑环，更有真实过山车工程结构感
-        if(ph>5.5){
-          add(cg,new THREE.TorusGeometry(.22,.035,6,12),gldM,p.x,ph*.55,p.z).rotation.x=Math.PI/2;
+        add(cg,new THREE.CylinderGeometry(.13,.19,ph,8),spineM,p.x,ph/2,p.z);
+        add(cg,new THREE.CylinderGeometry(.32,.38,.28,8),pierFootM,p.x,.14,p.z);
+        if(ph>6.5){
+          add(cg,new THREE.TorusGeometry(.24,.038,6,12),gldM,p.x,ph*.52,p.z).rotation.x=Math.PI/2;
+          add(cg,new THREE.TorusGeometry(.22,.034,6,12),gldM,p.x,ph*.78,p.z).rotation.x=Math.PI/2;
         }
       }
       if(i%2===1)bulb(cg,p.x,p.y+.24,p.z,.085,i);
     }
-    // 已去掉地面站台，保留通透立体轨道与可点击乘车列车
-    // 4 节低矮流线型全景列车（第 1 节做小巧尖头且留空前排视野，绝不挡玩家视角）
+    // 4 节低矮流线型全景列车（无站台，第 1 节做低矮小尖头不挡视线）
     const cars=[];
     const carCols=[0xd23b32,0xe8a838,0x2f8f6b,0x3f6ba8];
-    const coasterRef={kind:'coaster',label:'星夜极光云霄飞车'};
+    const coasterRef={kind:'coaster',label:'星夜极光双环云霄飞车'};
     for(let c=0;c<4;c++){
       const car=new THREE.Group();
       const bodyM=M(carCols[c],{roughness:.42,metalness:.25});
@@ -8285,14 +8310,14 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       add(car,BX(.68,.26,.10),M(0x1f2937,{roughness:.6}),0,.52,-.46);
       add(car,BX(.64,.045,.045),M(0x94a3b8,{roughness:.3,metalness:.8}),0,.56,.20);
       if(c>0){
-        const rider=makePerson(carCols[(c+1)%4],0xfbe2cf,{scale:.50,acc:c%2?'santa':'beanie'});
+        const rider=makePerson(carCols[(c+1)%4],0xe8c49a,{scale:.50,acc:c%2?'santa':'beanie'});
         rider.position.set(0,.34,-.18);car.add(rider);
       }
       car.userData.keep=true;
       car.userData.physObj={type:'ride',ref:coasterRef};
       cg.add(car);cars.push(car);
     }
-    amusement.coaster={curve,cars,t:0};
+    amusement.coaster={curve,cars,t:0,sampleTrackUp};
   }
 
   /* ── 巨型圣诞老人地标雕塑（带大理石鎏金底座、礼物袋与挥手致意） ── */
@@ -8414,8 +8439,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
 
   /* ── 圣诞树林：沿围栏内侧一圈，全部复用 buildChristmasTree ── */
   {
-    const spots=[[-4,55],[6,55],[16,55],[26,55],[36,55],
-                 [42,24],[42,32],[42,40],[42,48]];
+    const spots=[[-4,55],[6,55],[16,55]];
     for(const [tx,tz] of spots){
       const t=buildChristmasTree({scale:R(.85,1.45),layers:5,gifts:R(.5,1)>.3});
       t.position.set(tx+R(-.5,.5),0,tz+R(-.5,.5));
@@ -10541,14 +10565,16 @@ function animate(){
   if(amusement.horses){for(const h of amusement.horses)h.g.position.y=h.baseY+Math.sin(t*2.8+h.ph)*.26;}
   if(amusement.coaster){
     const co=amusement.coaster;
-    if(!co._vP){co._vP=new THREE.Vector3();co._vT=new THREE.Vector3();co._vL=new THREE.Vector3();}
+    if(!co._vP){co._vP=new THREE.Vector3();co._vT=new THREE.Vector3();co._vL=new THREE.Vector3();co._vU=new THREE.Vector3();}
     co.curve.getPointAt(co.t%1,co._vP);
-    const spd=Math.max(.024,.056+(5.8-co._vP.y)*.0055);
+    const spd=Math.max(.022,.048+(6.5-co._vP.y)*.0045);
     co.t=(co.t+spd*dt)%1;
     for(let ci=0;ci<co.cars.length;ci++){
-      const u=(co.t-ci*.024+1)%1;
+      const u=(co.t-ci*.019+1)%1;
       co.curve.getPointAt(u,co._vP);
       co.curve.getTangentAt(u,co._vT);
+      co.sampleTrackUp(u,co._vU);
+      co.cars[ci].up.copy(co._vU);
       co.cars[ci].position.copy(co._vP);
       co.cars[ci].lookAt(co._vL.copy(co._vP).add(co._vT));
     }
@@ -11147,11 +11173,11 @@ function toggleRideTrain(stationHint){
 }
 const wheelSys={riding:false,cab:null,kind:null,car:null,label:''};
 const RIDE_EXITS={
-  wheel:[27,41.2],carousel:[-4,37.5],ship:[-20.0,30.8],coaster:[-12.5,33.2],bumper:[-6.5,45.0],sleigh:[0,10.2],heli:[0,10.2]
+  wheel:[27,41.2],carousel:[4.0,35.5],ship:[39.5,36.5],coaster:[-7.5,20.5],bumper:[-6.5,45.0],sleigh:[0,10.2],heli:[0,10.2]
 };
 function stopFacilityRide(){
   if(wheelSys.cab&&wheelSys.cab.userData.rods)wheelSys.cab.userData.rods.forEach(r=>r.visible=true);
-  if(wheelSys.kind==='coaster'){renderer.setPixelRatio(HI_DPR);composer.setPixelRatio(HI_DPR);}
+  if(wheelSys.kind==='coaster'){camera.up.set(0,1,0);renderer.setPixelRatio(HI_DPR);composer.setPixelRatio(HI_DPR);}
   const ex=RIDE_EXITS[wheelSys.kind]||[4,24];
   wheelSys.riding=false;wheelSys.cab=null;wheelSys.kind=null;wheelSys.car=null;
   fp.x=ex[0];fp.z=ex[1];fp.y=0;fp.vx=fp.vz=0;
@@ -11327,12 +11353,13 @@ function updateWheelRide(dt){
       wp.set(2.1,-3.65,0).applyMatrix4(amusement.ship.matrixWorld);
     }else if(wheelSys.kind==='coaster'&&amusement.coaster){
       const co=amusement.coaster, car0=co.cars[0];
-      if(!co._camL)co._camL=new THREE.Vector3();
+      if(!co._camL){co._camL=new THREE.Vector3();co._camU=new THREE.Vector3();}
       wp.set(0,.70,.24).applyMatrix4(car0.matrixWorld);
       fp.x=wp.x;fp.z=wp.z;fp.y=wp.y-FP_EYE;
       camera.position.copy(wp);
       co._camL.set(0,.56,8.0).applyMatrix4(car0.matrixWorld);
-      camera.up.set(0,1,0);
+      co.sampleTrackUp(co.t%1,co._camU);
+      camera.up.copy(co._camU);
       camera.lookAt(co._camL);
       trainHud.classList.add('show');
       trainMsgEl.textContent='正在乘坐 '+wheelSys.label+'（车头锁定第一视角 · 高度 '+wp.y.toFixed(1)+'m）';
