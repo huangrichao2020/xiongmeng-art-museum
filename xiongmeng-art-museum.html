@@ -808,18 +808,23 @@ const animeOutlineShader={
       vec3 ink=vec3(0.08,0.10,0.18);
       vec3 col=mix(base.rgb,ink,edge*edgeMask*0.16);
       col*=(1.0+clamp((centerL-avgL)*0.28,-0.08,0.08));
-      // 新海诚雪夜高通透冷暖分级：绝不抬高灰雾底色，压实暗部通透感，仅让纯发光体与暖光绽放
+      // UE5 电影级高光柔化肩部曲线 (Filmic Highlight Shoulder) + 新海诚/光遇冷暖分级：
+      // 自动压住强光区域的地面过曝，保留暗部深邃蔚蓝层次，前中后景与视觉中心对比鲜明
       float g=luma(col);
-      vec3 shinkaiShadow=mix(col,col*vec3(0.82,0.91,1.18),(0.36+0.12*uHQ)*(1.0-smoothstep(0.04,0.42,g)));
-      vec3 shinkaiWarm=mix(shinkaiShadow,shinkaiShadow*vec3(1.07,1.02,0.92),smoothstep(0.48,0.96,g)*(0.38+0.14*uHQ));
-      col=mix(vec3(g),shinkaiWarm,1.10+0.06*uHQ);
+      vec3 hiShoulder=col/(vec3(1.0)+max(col-vec3(0.66),vec3(0.0))*0.56);
+      col=mix(col,hiShoulder,smoothstep(0.58,0.96,g));
+      g=luma(col);
+      vec3 shinkaiShadow=mix(col,col*vec3(0.80,0.90,1.20),(0.38+0.12*uHQ)*(1.0-smoothstep(0.04,0.44,g)));
+      vec3 shinkaiWarm=mix(shinkaiShadow,shinkaiShadow*vec3(1.08,1.02,0.91),smoothstep(0.46,0.95,g)*(0.40+0.14*uHQ));
+      col=mix(vec3(g),shinkaiWarm,1.12+0.06*uHQ);
       if(uHQ>0.5){
-        // 高画质通透对比滤镜：压清暗部薄雾感 + 仅对 >0.84 的真光源做纯净星芒增艳
-        col=max(vec3(0.0),(col-0.012)*1.035);
-        float pureLight=smoothstep(0.84,1.0,centerL);
-        col+=max(avgCol-vec3(0.78),vec3(0.0))*vec3(1.12,0.96,0.78)*pureLight*0.22;
+        // 高画质抗闪烁柔光滤镜：采用 9 邻域预滤波均值稳定提取高光，彻底消除移动时细小路灯亚像素闪烁
+        col=max(vec3(0.0),(col-0.010)*1.032);
+        float filteredL=mix(centerL,avgL,0.68);
+        float pureLight=smoothstep(0.82,0.98,filteredL);
+        col+=max(avgCol-vec3(0.74),vec3(0.0))*vec3(1.12,0.96,0.78)*pureLight*0.20;
       }
-      float vig=1.0-smoothstep(0.40,0.96,length(vUv-vec2(0.5)))*(0.10+0.03*uHQ);
+      float vig=1.0-smoothstep(0.38,0.95,length(vUv-vec2(0.5)))*(0.12+0.03*uHQ);
       col*=vig;
       gl_FragColor=vec4(col,base.a);
     }
@@ -827,11 +832,10 @@ const animeOutlineShader={
 };
 const animePass=new ShaderPass(animeOutlineShader);
 composer.addPass(animePass);
-/* ── 还原并优化 GitHub 初版高画质纯净光滤镜：
-   0.25x 四分之一分辨率泛光，阈值提高到 0.86（高于雪地亮度，确保白雪与建筑绝不发雾泛白），
-   仅对花窗、圣诞树星芒、彩灯、暖窗与烟花产生纯净通透的新海诚光晕！ ── */
-const BLOOM_SCALE=0.25;
-const bloom=new UnrealBloomPass(new THREE.Vector2(Math.max(64,Math.round(innerWidth*BLOOM_SCALE)),Math.max(64,Math.round(innerHeight*BLOOM_SCALE))),.28,.72,.86);
+/* ── 半分辨率 (0.5x) 抗闪烁光遇柔光泛光管线：
+   相比 0.25x 采样精度提升 4 倍，彻底解决移动视角时远处路灯跨越低清纹素引起的闪烁 ── */
+const BLOOM_SCALE=0.5;
+const bloom=new UnrealBloomPass(new THREE.Vector2(Math.max(64,Math.round(innerWidth*BLOOM_SCALE)),Math.max(64,Math.round(innerHeight*BLOOM_SCALE))),.26,.68,.84);
 const _bloomSetSize=bloom.setSize.bind(bloom);
 bloom.setSize=(w,h)=>_bloomSetSize(Math.max(64,Math.round(w*BLOOM_SCALE)),Math.max(64,Math.round(h*BLOOM_SCALE)));
 composer.addPass(bloom);
@@ -2000,14 +2004,29 @@ function buildWreath(r=.42){
    同一批装饰会反复用（30 棵树 × 90 个零件），材质如果每次 new，
    一是内存和着色器编译爆炸，二是材质不共享就没法静态合批。
    这些材质全程只读（场景里只有 ground/road/信号灯 的材质会被动态改色），可以放心共享。 */
+/* ── 真实松柏针叶程序化纹理（深林墨绿+翠绿针叶簇层次肌理，告别纯色塑料与白模感） ── */
+const cypressTex=(()=>{
+  const [c,g]=cv(256,256);
+  const bg=g.createLinearGradient(0,0,0,256);
+  bg.addColorStop(0,'#245c36');bg.addColorStop(.55,'#194728');bg.addColorStop(1,'#0f301a');
+  g.fillStyle=bg;g.fillRect(0,0,256,256);
+  for(let i=0;i<1400;i++){
+    const x=R(0,256),y=R(0,256),len=R(5,13),ang=R(1.15,1.99);
+    g.strokeStyle=i%3===0?'rgba(56,126,74,.52)':(i%3===1?'rgba(14,42,22,.58)':'rgba(36,94,52,.48)');
+    g.lineWidth=R(1.2,2.4);
+    g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.cos(ang)*len,y+Math.sin(ang)*len);g.stroke();
+  }
+  const t=ctex(c,[3,2]);
+  return t;
+})();
 const XMAS_MATS={
   treeTrunk:M(0x4b3322,{roughness:.92,flatShading:false}),
-  treeSnow:M(0xf2f7fc,{roughness:.88,flatShading:true}),
+  treeSnow:M(0xe8f1fa,{roughness:.88,flatShading:false}),
   treeBase:M(0xc42525,{roughness:.75}),
   treeRing:M(0xf4c56a,{roughness:.3,metalness:.5}),
-  treePine:[M(0x185430,{roughness:.84,flatShading:true}),
-            M(0x1d6138,{roughness:.84,flatShading:true}),
-            M(0x144929,{roughness:.84,flatShading:true})],
+  treePine:[M(0xd8f0df,{map:cypressTex,roughness:.80,flatShading:false}),
+            M(0xe6f7ea,{map:cypressTex,roughness:.78,flatShading:false}),
+            M(0xc4e2cd,{map:cypressTex,roughness:.82,flatShading:false})],
   treeOrnR:M(0xe62e2e,{roughness:.22,metalness:.55,flatShading:false}),
   treeOrnG:M(0xf7c948,{roughness:.18,metalness:.75,flatShading:false}),
   smSnow:M(0xeef4fa,{roughness:.88,flatShading:false}),
@@ -2095,9 +2114,9 @@ function buildChristmasTree(opts={}){
     const u=i/(layers-1);
     const r=1.55*(1-u*.66), h=1.28-u*.34, y=.95+i*.68;
     const leafM=XMAS_MATS.treePine[i%3];
-    const cone=add(g,new THREE.ConeGeometry(r,h,14),leafM,0,y,0);
+    const cone=add(g,new THREE.ConeGeometry(r,h,16),leafM,0,y,0);
     cone.rotation.set(((i%3)-1)*.032, i*.52, (((i+1)%3)-1)*.028);
-    const sCone=addNS(g,new THREE.ConeGeometry(r*.94,h*.42,14),snowM,0,y+h*.28,0);
+    const sCone=addNS(g,new THREE.ConeGeometry(r*.52,h*.24,16),snowM,0,y+h*.36,0);
     sCone.rotation.copy(cone.rotation);
   }
   const starY=.95+(layers-1)*.68+.62;
@@ -5031,12 +5050,12 @@ const animePark=new THREE.Group();animePark.userData.tag='park';scene.add(animeP
   }
   // 东侧动漫园地面矮灯柱与高柱天幕彩球已全部清除，保留中央广角主灯保持画面干净通透
 
-  // 6. 合并为 1 盏广角中心主灯（砍掉 3 盏零散 PointLight，大幅加速全场 PBR 片元着色）
+  // 6. 东园视觉中心物理衰减主灯（UE 平方反比柔和衰减，聚焦中心雕塑群，四周自然过渡不泛白）
   const parkLights=[
-    [PX,     7.5, PZ,     0xffe4b0, 155, 38]
+    [PX,     8.5, PZ,     0xffe0a6, 86, 32]
   ];
   for(const [lx,ly,lz,col,base,dist] of parkLights){
-    const pl=new THREE.PointLight(col,base,dist,1.5);
+    const pl=new THREE.PointLight(col,base,dist,1.75);
     pl.position.set(lx,ly,lz);scene.add(pl);
     shopLights.push({l:pl,base,street:false,delay:1.5});
   }
@@ -5055,10 +5074,10 @@ const treeX=[-24,-17.8,-6,5.5,14.5,21.5,32.5,39.5];
   const pitM=M(0x525b64,{roughness:.85});
   const soilM=M(0xe6eef6,{roughness:.94});
   const trunk=new THREE.InstancedMesh(new THREE.CylinderGeometry(.045,.135,5.0,10),bark,treeX.length);
-  const treeLeafMat=M(0xffffff,{roughness:.86,flatShading:true});
+  const treeLeafMat=M(0xffffff,{map:cypressTex,roughness:.80,flatShading:false});
   const TIERS=6;
-  const leaf=new THREE.InstancedMesh(new THREE.ConeGeometry(1,1.35,9),treeLeafMat,treeX.length*TIERS);
-  const sCap=new THREE.InstancedMesh(new THREE.ConeGeometry(.95,.55,9),snowCapM,treeX.length*TIERS);
+  const leaf=new THREE.InstancedMesh(new THREE.ConeGeometry(1,1.35,14),treeLeafMat,treeX.length*TIERS);
+  const sCap=new THREE.InstancedMesh(new THREE.ConeGeometry(.95,.55,14),snowCapM,treeX.length*TIERS);
   const m4=new THREE.Matrix4(),col=new THREE.Color(),q=new THREE.Quaternion(),e3=new THREE.Euler();
   const tierY=[2.65,3.45,4.25,5.00,5.72,6.40];
   const tierR=[.82,.72,.61,.49,.37,.24];
@@ -5076,10 +5095,11 @@ const treeX=[-24,-17.8,-6,5.5,14.5,21.5,32.5,39.5];
       e3.set(R(-.03,.03),c*.75+R(0,.6),R(-.03,.03));q.setFromEuler(e3);
       m4.compose(new THREE.Vector3(x,tierY[c]*hVar,TZ),q,new THREE.Vector3(rr,hh,rr));
       leaf.setMatrixAt(i*TIERS+c,m4);
-      m4.compose(new THREE.Vector3(x,(tierY[c]+hh*.26)*hVar,TZ),q,new THREE.Vector3(rr*.94,hh,rr*.94));
+      // 薄雪仅覆在树冠顶端小帽，露出 80% 真实苍翠柏树针叶肌理
+      m4.compose(new THREE.Vector3(x,(tierY[c]+hh*.35)*hVar,TZ),q,new THREE.Vector3(rr*.52,hh*.26,rr*.52));
       sCap.setMatrixAt(i*TIERS+c,m4);
-      const shade=.68+c*.055+R(-.04,.04);
-      col.setRGB(shade*.72,shade*1.04,shade*.80);leaf.setColorAt(i*TIERS+c,col);
+      const shade=.78+c*.045+R(-.04,.04);
+      col.setRGB(shade*.82,shade*1.02,shade*.86);leaf.setColorAt(i*TIERS+c,col);
     }
     const stTop=addNS(street,new THREE.OctahedronGeometry(.14,0),getBulbMat(0xffe27a,0),x,7.05*hVar,TZ);
     xmasStars.push(stTop);
@@ -5128,10 +5148,10 @@ const lampPools=[];
     add(g,new THREE.CylinderGeometry(.16,.22,.36,14),M(0x1e242a,{roughness:.75}),0,.2,0);
     add(g,BX(.42,.15,.72),M(0x333b43,{roughness:.45,metalness:.65}),0,5.93,1.38);
     add(g,BX(.46,.09,.76),snowCapM,0,6.04,1.38);
-    // 路灯柱挂圣诞花环
+    // 路灯柱挂圣诞花环 + 立体厚壁柔光灯罩（替代原先 2D 薄片，彻底消除掠射角亚像素与深度冲突闪烁）
     const lWr=buildWreath(.26);lWr.position.set(0,3.8,.12);g.add(lWr);
-    const bulb=new THREE.Mesh(new THREE.PlaneGeometry(.32,.56),new THREE.MeshBasicMaterial({color:0xffe2b0}));
-    bulb.rotation.x=Math.PI/2;bulb.position.set(0,5.84,1.40);g.add(bulb);
+    const bulb=new THREE.Mesh(BX(.30,.11,.52),new THREE.MeshBasicMaterial({color:0xffdfa8}));
+    bulb.position.set(0,5.79,1.38);g.add(bulb);
     const halo=new THREE.Mesh(new THREE.PlaneGeometry(3.6,3.6),new THREE.MeshBasicMaterial({
       map:glowTex,color:0xffd79a,transparent:true,opacity:.32,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
     halo.rotation.x=-Math.PI/2;halo.position.set(0,.05,1.40);g.add(halo);
@@ -5184,22 +5204,11 @@ const lampPools=[];
   pBack.position.set(0,2.62,-.026);pBack.rotation.y=Math.PI;g.add(pBack);
 }
 
-/* 垃圾桶 / 长椅 / 消防栓 */
+/* 垃圾桶 / 消防栓（已移除条板木长椅） */
 {
   for(const x of [-8.4,4.5]){
     add(street,new THREE.CylinderGeometry(.28,.24,.9,10),M(0x2f4a3a,{roughness:.7,metalness:.3}),x,.45,9.5);
     add(street,new THREE.TorusGeometry(.29,.035,4,12),M(0x1d2a22,{roughness:.7}),x,.82,9.5).rotation.x=Math.PI/2;
-  }
-  // 条板木长椅（避开停车场通道）
-  const woodM=M(0x74553a,{roughness:.82});
-  const legM=M(0x2c333a,{roughness:.5,metalness:.6});
-  for(const x of [-21.5,21.5]){
-    for(let i=0;i<3;i++) add(street,BX(2.4,.045,.14),woodM,x,.48,9.44+i*.16);
-    for(let i=0;i<2;i++) add(street,BX(2.4,.18,.045),woodM,x,.68+i*.22,9.86);
-    for(const s of [-.95,.95]){
-      add(street,BX(.08,.48,.48),legM,x+s,.24,9.60);
-      add(street,BX(.07,.54,.07),legM,x+s,.75,9.86);
-    }
   }
   // 精细消防栓（顶盖螺母 + 两侧出水口法兰）
   const hydM=M(0xc0392b,{roughness:.45,metalness:.35,flatShading:false});
@@ -5325,18 +5334,18 @@ let fireflyMat=null;
   // 3. 花坛四角 4 棵覆雪圣诞松柏（挂圣诞彩球灯串）
   const barkM=M(0x4a3525,{roughness:.9,flatShading:false});
   const treeSpecs=[
-    [GX-3.4, GZ-4.6, 0x225a48, 1.05],
-    [GX+3.4, GZ-4.6, 0x1c5938, 1.15],
-    [GX-3.4, GZ+4.6, 0x266144, 1.02],
-    [GX+3.4, GZ+4.6, 0x185239, 1.10]
+    [GX-3.4, GZ-4.6, 0xd4ede0, 1.05],
+    [GX+3.4, GZ-4.6, 0xc8e6d4, 1.15],
+    [GX-3.4, GZ+4.6, 0xdcf2e4, 1.02],
+    [GX+3.4, GZ+4.6, 0xc2e0ce, 1.10]
   ];
   for(const [tx,tz,tCol,sc] of treeSpecs){
     add(westGarden,new THREE.CylinderGeometry(.045,.12,3.6*sc,10),barkM,tx,.55+1.8*sc,tz);
-    const leafM=M(tCol,{roughness:.84,flatShading:true});
+    const leafM=M(tCol,{map:cypressTex,roughness:.80,flatShading:false});
     for(const [ty,tr,th,rot] of [[1.65,.68,.95,0],[2.35,.58,.92,.6],[3.00,.46,.88,1.2],[3.60,.34,.85,1.8],[4.15,.22,.82,2.4]]){
-      const cone=add(westGarden,new THREE.ConeGeometry(tr*sc,th*sc,9),leafM,tx,.55+ty*sc,tz);
+      const cone=add(westGarden,new THREE.ConeGeometry(tr*sc,th*sc,14),leafM,tx,.55+ty*sc,tz);
       cone.rotation.y=rot;
-      const scCone=add(westGarden,new THREE.ConeGeometry(tr*sc*.94,th*sc*.42,9),snowCapM,tx,.55+(ty+th*.28)*sc,tz);
+      const scCone=add(westGarden,new THREE.ConeGeometry(tr*sc*.52,th*sc*.24,14),snowCapM,tx,.55+(ty+th*.35)*sc,tz);
       scCone.rotation.y=rot;
     }
     for(let bi=0;bi<4;bi++){
@@ -5360,9 +5369,9 @@ let fireflyMat=null;
 
     // 2. 9 层高画质 32 段丰满常青松冠 + 放射状层次侧枝 + 柔润厚雪裙边
     const pineMats=[
-      M(0x16522e,{roughness:.78,flatShading:false}),
-      M(0x1d6338,{roughness:.76,flatShading:false}),
-      M(0x134727,{roughness:.80,flatShading:false})
+      M(0xd4ede0,{map:cypressTex,roughness:.78,flatShading:false}),
+      M(0xe2f5ea,{map:cypressTex,roughness:.76,flatShading:false}),
+      M(0xc4e2d0,{map:cypressTex,roughness:.80,flatShading:false})
     ];
     const snowSmoothM=M(0xf4f9ff,{roughness:.85,flatShading:false});
     const goldOrnM=M(0xf7c948,{roughness:.16,metalness:.88,flatShading:false});
@@ -5494,9 +5503,9 @@ let fireflyMat=null;
     const d2=buildReindeer({rudolph:false,fur:0xb57b4e});d2.scale.setScalar(1.05);
     d2.position.set(SX+2.4,.16,SZ+3.4);d2.rotation.y=-.48;westGarden.add(d2);
     const wSm=buildSnowman(1.08);wSm.position.set(SX+3.9,.16,SZ+.5);wSm.rotation.y=-.35;westGarden.add(wSm);
-    // 巨树专享暖金补光
-    const mtPl=new THREE.PointLight(0xffcf80,95,28,1.45);mtPl.position.set(SX,6.8,SZ+1.2);
-    scene.add(mtPl);shopLights.push({l:mtPl,base:95,street:false,delay:1.6});
+    // 巨树视觉中心暖金物理衰减补光
+    const mtPl=new THREE.PointLight(0xffcf80,68,26,1.75);mtPl.position.set(SX,7.4,SZ+1.2);
+    scene.add(mtPl);shopLights.push({l:mtPl,base:68,street:false,delay:1.6});
   }
 
   // 4. 冬日覆雪灌木 + 冰川景石 + 260 簇圣诞红白金一品红花海
@@ -5588,11 +5597,11 @@ let fireflyMat=null;
   fireflies.userData.noReflect=true;fireflies.frustumCulled=false;
   westGarden.add(fireflies);
 
-  // 6. 西侧雪园地灯柱已移除，仅保留中心主灯照亮雪园
+  // 6. 西侧雪园地灯柱已移除，仅保留中心主灯照亮雪园（UE 物理衰减聚焦喷泉中心）
   for(const [lx,ly,lz,col,inten] of [
-    [GX, 3.8, GZ, 0xffe09a, 82]
+    [GX, 4.8, GZ, 0xffe09a, 58]
   ]){
-    const pl=new THREE.PointLight(col,inten,24,1.45);
+    const pl=new THREE.PointLight(col,inten,24,1.75);
     pl.position.set(lx,ly,lz);
     scene.add(pl);shopLights.push({l:pl,base:inten,street:false,delay:1.5});
   }
@@ -6322,14 +6331,14 @@ const skylineMats=[];
     }
   };
   const treeBarkM=M(0x4a3525,{roughness:.92});
-  const treeLeafM=M(0x234a35,{roughness:.88});
+  const treeLeafM=M(0xd4ede0,{map:cypressTex,roughness:.82,flatShading:false});
   const addExtTree=(x,z)=>{
     add(skyline,BX(1.5,.18,1.5),curbM,x,.11,z).castShadow=false;
     add(skyline,new THREE.CylinderGeometry(.11,.16,1.5,7),treeBarkM,x,.85,z).castShadow=false;
     for(let l=0;l<3;l++){
       const r=1.15-l*.28, y=1.8+l*.95;
-      add(skyline,new THREE.ConeGeometry(r,1.4,8),treeLeafM,x,y,z).castShadow=false;
-      add(skyline,new THREE.ConeGeometry(r*.94,.55,8),M(0xedf4fa,{roughness:.92}),x,y+.45,z).castShadow=false;
+      add(skyline,new THREE.ConeGeometry(r,1.4,12),treeLeafM,x,y,z).castShadow=false;
+      add(skyline,new THREE.ConeGeometry(r*.52,.32,12),M(0xedf4fa,{roughness:.92}),x,y+.54,z).castShadow=false;
     }
   };
   for(let x=-112;x<=112;x+=28){
@@ -7124,7 +7133,7 @@ const clouds=[];
    10. 圣诞飘雪天气与冬夜星空系统（全天候下雪 + 24h 昼夜变化）
    ════════════════════════════════════════════════════════════ */
 const WINTER_SKY=['#071226','#12294e','#264b7c','rgba(135,175,240,.22)'];
-const WINTER_FOG=0x0e1c34, WINTER_FOG_D=.0022;
+const WINTER_FOG=0x0d1c34, WINTER_FOG_D=.0036;
 
 /* 建筑占地（随馆体适当扩展 x:-9.6..12.1, z:-11.6..7.6 + 门廊雨棚），雪花不能落进室内 */
 function inBuildingXZ(x,z){
@@ -7560,7 +7569,6 @@ const OUTDOOR_OBS=(()=>{
   for(const lx of [-19.5,-10.5,9.5,18.0,26.8,36.0])list.push([lx,11.45,.68]);
   for(const bx of [-8.4,4.5])list.push([bx,9.5,.55]);
   list.push([-7.2,9.3,.45],[9.6,10.6,.48],[-10.75,11.2,.48],[19.6,10.7,.58],[3.25,8.75,.72],[-10.9,9.55,.95]);
-  for(const bx of [-21.5,21.5])list.push([bx,9.65,1.42]);
   for(const s of [-1,1])list.push([s*8.3,8.55,1.05],[s*4.9,8.55,.72],[s*3.9,8.20,.5]);
   // 2. 东侧动漫雪园内部全障碍：中央与两圈雕塑底座 + 门柱 + 角树 + 雪人 + 灌木 + 草坪灯 + 高灯杆
   const PX=26.5,PZ=-2.0;
@@ -7918,13 +7926,9 @@ for(const sp of SHOPS){
   for(let i=0;i<5;i++){
     const b=add(g,new THREE.SphereGeometry(.075,8,6),stallBulbM,-1.2+i*.6,2.18,2.08);b.castShadow=false;
   }
-  /* 台阶 + 门前人行道 + 长椅 */
+  /* 台阶 + 门前人行道（已移除店前木条长椅） */
   add(g,BX(4.2,.12,1.0),M(0xdfe6ec,{roughness:.9}),0,.06,2.55).castShadow=false;
   add(g,BX(3.6,.2,.8),M(0xcfd7dd,{roughness:.9}),0,.1,3.3).castShadow=false;
-  const benchM=M(0x74553a,{roughness:.82}),legM=M(0x2c333a,{roughness:.5,metalness:.6});
-  for(let i=0;i<3;i++)add(g,BX(2.0,.045,.13),benchM,-.9,.48,3.9+i*.15);
-  for(let i=0;i<2;i++)add(g,BX(2.0,.17,.045),benchM,-.9,.67+i*.21,4.1);
-  for(const sg of [-.85,.85])add(g,BX(.08,.46,.46),legM,-.9+sg,.23,3.95);
   OUTDOOR_OBS.push([sp.x,sp.z,2.5]);
 }
 /* ══ 艺术馆正门对面 · 圣诞游乐园（76m × 38m） ══
@@ -8805,14 +8809,15 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     });
   }
 
-  /* ── 游乐园广域主照明（已去掉黑高灯柱，保持园内通透） ── */
+  /* ── 游乐园 UE 级视觉中心主照明（旋转木马暖金中心 + 摩天轮暖珀中心 + 皇家溜冰场光遇冰蓝冷暖对比，平方反比自然衰减） ── */
   {
     const fairAreaLights=[
-      [-8,8.5,34,0xffd68a,145,44],
-      [18,9.0,42,0xffe0a0,150,46]
+      [4.0, 9.5, 31.0, 0xffcf82, 86, 34],
+      [22.0, 10.5, 41.0, 0xffd896, 92, 36],
+      [-18.0, 8.0, 38.6, 0x82ccff, 44, 28]
     ];
     for(const [lx,ly,lz,col,inten,dist] of fairAreaLights){
-      const fl=new THREE.PointLight(col,inten,dist,1.45);
+      const fl=new THREE.PointLight(col,inten,dist,1.80);
       fl.position.set(lx,ly,lz);
       scene.add(fl);
       shopLights.push({l:fl,base:inten,street:true});
@@ -10526,23 +10531,26 @@ const aerialHaze=(()=>{
   mx.fillStyle=mg;mx.fillRect(0,0,256,256);
   const mistTex=new THREE.CanvasTexture(mistCanvas);mistTex.colorSpace=THREE.SRGBColorSpace;
 
-  // 布置 12 层精准低空空气透视薄雾带（减少透明 Overdraw 提升帧率，同时保持前中后景分明）
+  // 布置 8 处《光遇》风格视觉中心体积光雾（AdditiveBlending 自发光柔光团，聚焦地标视觉中心，绝不产生灰霾）
   const mists=[];
   const mistRing=[
-    [-49,3.5,24,24,0xffd699,.08],[55.5,3.5,24,24,0xffd699,.08],
-    [0,3.4,42,26,0xffd8a0,.07],[-35,3.8,-10,24,0x8cb4e8,.07],[35,3.8,-10,24,0x8cb4e8,.07],
-    [-75,5.5,-35,38,0x6e98cf,.11],[0,5.5,-54,42,0x6e98cf,.11],[75,5.5,-35,38,0x6e98cf,.11],
-    [-86,6.0,15,40,0x6a94cc,.11],[86,6.0,15,40,0x6a94cc,.11],
-    [0,6.2,78,44,0x6a94cc,.11],[0,7.5,-96,52,0x5a84bd,.13]
+    [-41.8, 5.2,  1.4, 15, 0xffca68, .12], // 1. 西广场巨型圣诞树暖金光雾中心
+    [-24.4, 3.2,  0.2, 12, 0x78c8ff, .08], // 2. 西侧许愿喷泉星光蓝光雾
+    [-49.0, 9.2, 34.0, 22, 0xffbe64, .11], // 3. 哥特婚礼大教堂玫瑰窗神圣金光雾中心
+    [  4.0, 4.5, 30.0, 17, 0xffc870, .11], // 4. 游乐园中心旋转木马暖金光雾中心
+    [-18.0, 3.8, 38.6, 19, 0x6ac4ff, .09], // 5. 星夜皇家花样溜冰场光遇冰蓝光雾中心
+    [ 27.0, 9.5, 36.0, 22, 0xffba66, .11], // 6. 摩天轮与高空跳伞塔暖琥珀光雾中心
+    [ 26.5, 4.8, -2.0, 18, 0xffcf7a, .10], // 7. 东侧动漫雪园核心雕塑群暖金光雾
+    [ 55.5, 7.5, 36.0, 20, 0xffaa58, .10]  // 8. 百老汇大剧院穹顶暖金光雾
   ];
   for(const [x,y,z,sz,col,baseOp] of mistRing){
     const mat=new THREE.SpriteMaterial({
       map:mistTex,color:col,transparent:true,opacity:baseOp,
-      depthWrite:false,blending:THREE.NormalBlending,fog:false
+      depthWrite:false,blending:THREE.AdditiveBlending,fog:false
     });
     const sp=new THREE.Sprite(mat);
     sp.position.set(x,y,z);
-    sp.scale.set(sz*1.6,sz*.52,1);
+    sp.scale.set(sz*1.45,sz*.75,1);
     grp.add(sp);
     mists.push({sp,mat,x,y,z,baseOp,phase:x*.13+z*.07});
   }
@@ -10674,20 +10682,28 @@ function updateOuterCrowd(dt,t){
 
 function updateAerialHaze(dt,t){
   const cx=camera.position.x, cy=camera.position.y, cz=camera.position.z;
-  // A. 超清通透远景：大幅降低指数雾浓度，消除画面灰白雾感
-  const baseD=scene.userData.baseFogD!==undefined?scene.userData.baseFogD:0.0022;
-  const heightFactor=THREE.MathUtils.clamp(1.0-(cy-6.0)/34.0, 0.45, 0.85);
+  // A. UE5 级前中后景空气透视纵深：近景清澈锐利，中景视觉中心光雾聚焦，远景柔和融入深蓝夜幕
+  const baseD=scene.userData.baseFogD!==undefined?scene.userData.baseFogD:0.0036;
+  const heightFactor=THREE.MathUtils.clamp(1.0-(cy-6.0)/38.0, 0.50, 0.96);
   scene.fog.density=baseD*heightFactor;
 
-  // B. 玩家前景随行轮廓暖光：在低空漫步时紧贴玩家前方 4m 柔和照亮前景，拉高视角时平滑淡出
+  // B. 玩家前景微柔轮廓补光（仅在室外低空漫步时轻柔勾勒前景立体感，靠近艺术馆门口自动淡出）
   camera.getWorldDirection(aerialHaze._fwd);
-  aerialHaze.playerFill.position.set(cx+aerialHaze._fwd.x*4.2, Math.max(1.8,cy+.3), cz+aerialHaze._fwd.z*4.2);
+  aerialHaze.playerFill.position.set(cx+aerialHaze._fwd.x*3.6, Math.max(1.8,cy+.3), cz+aerialHaze._fwd.z*3.6);
   const nearGround=THREE.MathUtils.clamp(1.0-(cy-4.0)/16.0, 0, 1);
-  aerialHaze.playerFill.intensity=0.52*nearGround;
+  const nearMuseum=THREE.MathUtils.smoothstep(Math.hypot(cx-1.0,cz-2.0), 11.0, 18.0);
+  aerialHaze.playerFill.intensity=0.28*nearGround*nearMuseum;
 
-  // C. 停用遮挡视线的巨型半透明薄雾贴片，确保全图通透清澈
+  // C. 《光遇》风格视觉中心体积光雾：前景 (<14m) 完全退散保持极致清晰，中远景在地标中心绽放柔和呼吸光晕
+  const mistHeightAtten=THREE.MathUtils.clamp(1.10-(cy-6.0)/48.0, .42, 1.0);
   for(const m of aerialHaze.mists){
-    m.sp.visible=false;
+    const d=Math.hypot(m.x-cx, m.z-cz);
+    const fgClear=THREE.MathUtils.smoothstep(d,12,28);
+    const farFade=1.0-THREE.MathUtils.smoothstep(d,135,220);
+    const pulse=0.92+0.08*Math.sin(t*1.1+m.phase);
+    m.sp.position.y=m.y+Math.sin(t*.45+m.phase)*.22;
+    m.mat.opacity=m.baseOp*fgClear*farFade*mistHeightAtten*pulse;
+    m.sp.visible=m.mat.opacity>.004;
   }
 }
 
@@ -11460,16 +11476,11 @@ function animate(){
   if(nowMs-fpsT0>500){
     const f=Math.round(fpsFrames*1000/(nowMs-fpsT0));
     fpsEl.textContent=f+' FPS';
-    if(!ridingFast){
-      if(f<44){
+    if(!ridingFast&&!state.quality){
+      if(f<36){
         window._lowFpsStreak=(window._lowFpsStreak||0)+1;window._hiFpsStreak=0;
-        if(window._lowFpsStreak>=2&&renderer.getPixelRatio()>LO_DPR+.05){
+        if(window._lowFpsStreak>=3&&renderer.getPixelRatio()>LO_DPR+.05){
           renderer.setPixelRatio(LO_DPR);composer.setPixelRatio(LO_DPR);
-        }
-      }else if(f>=54&&state.quality){
-        window._hiFpsStreak=(window._hiFpsStreak||0)+1;window._lowFpsStreak=0;
-        if(window._hiFpsStreak>=3&&renderer.getPixelRatio()<HI_DPR-.05){
-          renderer.setPixelRatio(HI_DPR);composer.setPixelRatio(HI_DPR);
         }
       }
     }
