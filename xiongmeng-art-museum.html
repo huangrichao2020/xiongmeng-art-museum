@@ -8874,14 +8874,12 @@ const sfx={
   },
   blip(f,dur,vol){
     if(!this.ctx||!this.on)return;
-    const c=this.ctx,t=c.currentTime,d=dur||.14,v=vol||.085,freq=f||740;
+    const c=this.ctx,t=c.currentTime,d=dur||.12,v=(vol||.085)*.55,freq=f||740;
     const o1=c.createOscillator();o1.type='sine';o1.frequency.setValueAtTime(freq,t);
-    const o2=c.createOscillator();o2.type='sine';o2.frequency.setValueAtTime(freq*2,t);
-    const g1=c.createGain(),g2=c.createGain();
-    g1.gain.setValueAtTime(0,t);g1.gain.linearRampToValueAtTime(v,t+.006);g1.gain.exponentialRampToValueAtTime(.0001,t+d);
-    g2.gain.setValueAtTime(0,t);g2.gain.linearRampToValueAtTime(v*.25,t+.004);g2.gain.exponentialRampToValueAtTime(.0001,t+d*.6);
-    o1.connect(g1);o2.connect(g2);g1.connect(this.master);g2.connect(this.master);
-    o1.start(t);o2.start(t);o1.stop(t+d+.04);o2.stop(t+d+.04);
+    const g1=c.createGain();
+    g1.gain.setValueAtTime(0,t);g1.gain.linearRampToValueAtTime(v,t+.012);g1.gain.exponentialRampToValueAtTime(.0001,t+d);
+    o1.connect(g1);g1.connect(this.master);
+    o1.start(t);o1.stop(t+d+.04);
   },
   carPass(){
     if(!this.ctx||!this.on||!this.noiseBuf)return;
@@ -10019,7 +10017,7 @@ function animate(){
       const ahead=fx*fwdX+fz*fwdZ, lat=Math.abs(fx*fwdZ-fz*fwdX);
       if(ahead>-1.0&&ahead<9.8&&lat<2.3){
         tgtSpd=Math.min(tgtSpd,Math.max(0,(ahead-3.6)*.85));
-        if(ahead>1.0&&ahead<7.5&&tr.honkCd<=0&&tr.curSpd>1.6){sfx.horn();tr.honkCd=4.2;}
+        if(ahead>1.0&&ahead<7.5&&tr.honkCd<=0&&tr.curSpd>1.6){tr.honkCd=4.2;}
       }
     }
     // 3. 室外萌宠 / 小熊靠近路面时减速避让
@@ -10289,10 +10287,7 @@ function animate(){
   updateSaltlinePhysics(dt);
 
   /* 远方驶过车辆环境音效调度 */
-  if(sfx.on){
-    sfx.nextCar-=dt;
-    if(sfx.nextCar<=0){sfx.nextCar=R(5,12);sfx.carPass();}
-  }
+  // 已移除随机 carPass 白噪音扫频，避免干扰背景音乐
   /* 云漂移 */
   clouds.forEach((c,i)=>{c.position.x+=dt*(.35+i*.08);if(c.position.x>130)c.position.x=-130;});
 
@@ -11833,7 +11828,7 @@ const fwSys=(()=>{
         isWillow?6.0:4.6
       );
     }
-    if(sfx.on)sfx.blip(R(130,220),.14,.018);
+    // 烟花保持静默视觉绽放，不再每发触发短促电子数字音干扰 BGM
   }
   window._triggerFwSalvo=()=>{nextWave=0;};
   return function updateFireworks(dt){
