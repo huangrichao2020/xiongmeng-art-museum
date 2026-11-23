@@ -1827,12 +1827,7 @@ function buildWreath(r=.42){
   const g=new THREE.Group();
   const pineM=M(0x1f5c34,{roughness:.82,flatShading:true});
   const redM=M(0xe02828,{roughness:.3,metalness:.18,flatShading:false});
-  const goldM=getBulbMat(0xffe07a,0);
   addNS(g,new THREE.TorusGeometry(r,r*.24,8,20),pineM,0,0,0);
-  for(let i=0;i<8;i++){
-    const a=i/8*Math.PI*2;
-    addNS(g,new THREE.SphereGeometry(r*.13,6,5),i%2===0?redM:goldM,Math.cos(a)*r,Math.sin(a)*r,r*.22);
-  }
   for(const s of [-1,1]){
     const b=addNS(g,new THREE.SphereGeometry(r*.24,8,6),redM,s*r*.24,r*.96,r*.24);
     b.scale.set(1.25,.72,.5);b.rotation.z=s*.35;
@@ -1884,21 +1879,8 @@ function buildGiftBox(w=.46,h=.40,d=.46,boxCol=0xd92e2e,ribCol=0xf7d05c){
   return g;
 }
 function buildCandyCane(h=1.35){
-  const g=new THREE.Group();
-  const pts=[];
-  for(let i=0;i<=8;i++)pts.push(new THREE.Vector3(0,i/8*(h*.74),0));
-  for(let i=1;i<=8;i++){
-    const a=i/8*Math.PI;
-    pts.push(new THREE.Vector3((1-Math.cos(a))*h*.16,h*.74+Math.sin(a)*h*.18,0));
-  }
-  const curve=new THREE.CatmullRomCurve3(pts);
-  const tube=new THREE.TubeGeometry(curve,18,h*.065,8,false);
-  add(g,tube,M(0xf8fafc,{roughness:.35,flatShading:false}),0,0,0);
-  const redRingM=M(0xd92525,{roughness:.32,flatShading:false});
-  for(let i=1;i<7;i++){
-    addNS(g,new THREE.CylinderGeometry(h*.069,h*.069,h*.055,8),redRingM,0,i/7*(h*.70),0).rotation.z=.22;
-  }
-  return g;
+  // 已去掉拐杖糖装饰，返回空组以保持画面简洁
+  return new THREE.Group();
 }
 function buildSnowman(sc=1,opts={}){
   const g=new THREE.Group();
@@ -1950,12 +1932,6 @@ function buildChristmasTree(opts={}){
   addNS(g,new THREE.TorusGeometry(.96,.045,6,18),XMAS_MATS.treeRing,0,.10,0).rotation.x=Math.PI/2;
   add(g,new THREE.CylinderGeometry(.16,.24,1.2,10),trunkM,0,.62,0);
 
-  const bulbCols=[0xff4d4d,0xffd859,0x48e59b,0x6bd4ff,0xff94d2];
-  const bulbGeo=XMAS_GEO.treeBulb;
-  const ornGeo=XMAS_GEO.treeOrn;
-  const redOrnM=XMAS_MATS.treeOrnR;
-  const goldOrnM=XMAS_MATS.treeOrnG;
-
   for(let i=0;i<layers;i++){
     const u=i/(layers-1);
     const r=1.55*(1-u*.66), h=1.28-u*.34, y=.95+i*.68;
@@ -1964,17 +1940,6 @@ function buildChristmasTree(opts={}){
     cone.rotation.set(((i%3)-1)*.032, i*.52, (((i+1)%3)-1)*.028);
     const sCone=addNS(g,new THREE.ConeGeometry(r*.94,h*.42,14),snowM,0,y+h*.28,0);
     sCone.rotation.copy(cone.rotation);
-    const nBulbs=Math.max(4,Math.round(9*(1-u*.58)));
-    for(let b=0;b<nBulbs;b++){
-      const ang=(b/nBulbs)*Math.PI*2+i*.4;
-      const br=r*.86, by=y-h*.30;
-      const bCol=bulbCols[(i*5+b)%bulbCols.length];
-      addNS(g,bulbGeo,getBulbMat(bCol,b+i),Math.cos(ang)*br,by,Math.sin(ang)*br);
-      if(b%2===0&&i<layers-1){
-        const oAng=ang+.24;
-        addNS(g,ornGeo,(b+i)%4===0?goldOrnM:redOrnM,Math.cos(oAng)*br*.94,by-.05,Math.sin(oAng)*br*.94);
-      }
-    }
   }
   const starY=.95+(layers-1)*.68+.62;
   const starSh=new THREE.Shape();
@@ -2364,20 +2329,7 @@ for(const x of [-3.2,-1.1,1.1,3.2]){
   const dl=new THREE.Mesh(new THREE.CylinderGeometry(.11,.11,.03,12),new THREE.MeshBasicMaterial({color:0xffdfaa}));
   dl.position.set(x,4.28,8.35);shop.add(dl);
 }
-/* 雨棚前缘垂挂圣诞彩灯与红绿金铃球 */
-{
-  const icCols=[0xffe28a,0xff5252,0x4ce08a,0xfff2cc];
-  const gM=M(0x1e5c35,{roughness:.82,flatShading:true});
-  addNS(shop,BX(9.5,.16,.16),gM,0,4.24,9.25);
-  for(let i=0;i<=18;i++){
-    const x=-4.5+i*.5;
-    const c=icCols[i%icCols.length];
-    const m=getBulbMat(c,i);
-    const dropH=.22+(i%3)*.12;
-    addNS(shop,new THREE.CylinderGeometry(.02,.02,dropH,6),m,x,4.16-dropH/2,9.26);
-    addNS(shop,new THREE.SphereGeometry(.075,6,5),m,x,4.16-dropH,9.26);
-  }
-}
+/* 雨棚前缘垂挂彩球已移除，保持门头干净通透 */
 /* 入口迎宾台阶 + 门前圣诞双树 & 雪人 & 导视立牌 */
 {
   const stepM=M(0x373f47,{roughness:.72});
@@ -2480,12 +2432,7 @@ strip.position.set(0,4.28,9.24);shop.add(strip);
     for(let z=-8.2;z<=4.2;z+=3.1) add(shop,new THREE.CylinderGeometry(.045,.045,.92,8),railM,x,roofY+.46,z);
     for(const ry of [.46,.88]) add(shop,BX(.045,.045,18.4),railM,x,roofY+ry,-2.0);
   }
-  // 前护栏圣诞彩球花环串
-  const rCols=[0xff4f4f,0xffe078,0x45d67e];
-  for(let i=0;i<18;i++){
-    const bx=-8.6+i*1.16, bc=rCols[i%rCols.length];
-    addNS(shop,new THREE.SphereGeometry(.075,6,5),getBulbMat(bc,i),bx,roofY+.88,7.26);
-  }
+  // 门前护栏彩球已移除，保持屋顶轮廓干净
 }
 
 /* 招牌（顶部松枝雪盖 + 两端圣诞花环 + 暖金节庆泛光） */
@@ -2499,10 +2446,6 @@ const signBoard=add(shop,BX(10.6,1.72,.42),M(0x161c22,{roughness:.6,metalness:.3
   addNS(shop,BX(10.5,.22,.22),M(0x1c5933,{roughness:.85}),0,9.86,8.06);
   for(const s of [-1,1]){
     const sw=buildWreath(.48);sw.position.set(s*5.35,9.05,8.10);shop.add(sw);
-  }
-  for(let i=-4;i<=4;i++){
-    const bc=i%2===0?0xff5454:0xffdf76;
-    addNS(shop,new THREE.SphereGeometry(.085,6,5),getBulbMat(bc,i),i*1.15,9.86,8.18);
   }
   // 招牌暖金节庆泛光
   const halo=new THREE.Mesh(new THREE.PlaneGeometry(13.5,4.8),new THREE.MeshBasicMaterial({
@@ -4932,36 +4875,7 @@ const animePark=new THREE.Group();animePark.userData.tag='park';scene.add(animeP
     add(animePark,new THREE.SphereGeometry(.56,12,8,0,Math.PI*2,0,Math.PI*.48),snowCapM,bx,.58,bz).scale.set(1.16,.78,1.06);
     for(let bi=0;bi<4;bi++)add(animePark,new THREE.SphereGeometry(.07,6,5),berryM,bx+Math.cos(bi*1.5)*.48,.58,bz+Math.sin(bi*1.5)*.45);
   }
-  for(const [lx,lz] of [
-    [PX-2.4,PZ+8.2],[PX+2.4,PZ+8.2],[PX-2.4,PZ+4.4],[PX+2.4,PZ+4.4],
-    [PX-2.4,PZ-4.4],[PX+2.4,PZ-4.4],[PX-2.4,PZ-8.2],[PX+2.4,PZ-8.2],
-    [PX-7.8,PZ+2.0],[PX+7.8,PZ+2.0],[PX-7.8,PZ-2.0],[PX+7.8,PZ-2.0],
-    [PX-12.4,PZ+3.2],[PX+12.4,PZ+3.2]
-  ]){
-    add(animePark,new THREE.CylinderGeometry(.075,.085,.62,8),bollardM,lx,.45,lz);
-    add(animePark,new THREE.CylinderGeometry(.08,.08,.16,8),bollardGlow,lx,.76,lz);
-  }
-
-  // 5. 跨公园红绿金圣诞天幕彩灯矩阵（8 根高灯柱 + 9 条交叉灯串）
-  const pPosts=[
-    [PX-12.8,PZ-9.6],[PX+12.8,PZ-9.6],[PX+12.8,PZ+9.6],[PX-12.8,PZ+9.6],
-    [PX-12.8,PZ],[PX+12.8,PZ],[PX,PZ-9.6],[PX,PZ+9.6]
-  ];
-  for(const [px,pz] of pPosts){
-    add(animePark,new THREE.CylinderGeometry(.075,.095,5.8,10),gatePostM,px,2.9,pz);
-  }
-  const pBulbGeo=new THREE.SphereGeometry(.10,8,6);
-  const pBulbCols=[0xff4d4d,0xffe078,0x48e58b,0xfff2cc];
-  const pLinks=[[0,1],[1,2],[2,3],[3,0],[4,5],[6,7],[0,5],[4,1],[3,5]];
-  pLinks.forEach(([ia,ib],li)=>{
-    const A=pPosts[ia], B=pPosts[ib], N=12;
-    for(let i=1;i<N;i++){
-      const u=i/N, sag=Math.sin(u*Math.PI)*.72;
-      const bx=A[0]+(B[0]-A[0])*u, by=5.75-sag, bz=A[1]+(B[1]-A[1])*u;
-      const bc=pBulbCols[(li+i)%pBulbCols.length];
-      addNS(animePark,pBulbGeo,getBulbMat(bc,li+i),bx,by,bz);
-    }
-  });
+  // 东侧动漫园地面矮灯柱与高柱天幕彩球已全部清除，保留中央广角主灯保持画面干净通透
 
   // 6. 合并为 1 盏广角中心主灯（砍掉 3 盏零散 PointLight，大幅加速全场 PBR 片元着色）
   const parkLights=[
@@ -5012,15 +4926,6 @@ const treeX=[-24,-17.8,-6,5.5,14.5,21.5,32.5,39.5];
       sCap.setMatrixAt(i*TIERS+c,m4);
       const shade=.68+c*.055+R(-.04,.04);
       col.setRGB(shade*.72,shade*1.04,shade*.80);leaf.setColorAt(i*TIERS+c,col);
-      // 树冠绕挂圣诞彩灯珠
-      if(c<5){
-        for(let b=0;b<3;b++){
-          const a=(b/3)*Math.PI*2+c*.9+i;
-          const bc=stBulbCols[(i+c+b)%stBulbCols.length];
-          addNS(street,stBulbGeo,getBulbMat(bc,i+c+b),
-            x+Math.cos(a)*rr*.82,(tierY[c]-hh*.28)*hVar,TZ+Math.sin(a)*rr*.82);
-        }
-      }
     }
     const stTop=addNS(street,new THREE.OctahedronGeometry(.14,0),getBulbMat(0xffe27a,0),x,7.05*hVar,TZ);
     xmasStars.push(stTop);
@@ -5370,16 +5275,7 @@ let fireflyMat=null;
   fireflies.userData.noReflect=true;fireflies.frustumCulled=false;
   westGarden.add(fireflies);
 
-  // 6. 花坛 8 盏庭院地灯 + 3 组圣诞暖红金补光（接入 shopLights）
-  const postM=M(0x252c34,{roughness:.5,metalness:.6});
-  const warmGlow=new THREE.MeshBasicMaterial({color:0xffe49e});
-  for(const [lx,lz] of [
-    [GX-5.1,GZ-6.4],[GX+5.1,GZ-6.4],[GX-5.1,GZ+6.4],[GX+5.1,GZ+6.4],
-    [GX-5.1,GZ],[GX+5.1,GZ],[GX,GZ-6.4],[GX,GZ+6.4]
-  ]){
-    add(westGarden,new THREE.CylinderGeometry(.07,.09,.72,8),postM,lx,.42,lz);
-    add(westGarden,new THREE.SphereGeometry(.10,10,8),warmGlow,lx,.84,lz);
-  }
+  // 6. 西侧雪园地灯柱已移除，仅保留中心主灯照亮雪园
   for(const [lx,ly,lz,col,inten] of [
     [GX, 3.8, GZ, 0xffe09a, 82]
   ]){
@@ -7559,25 +7455,12 @@ for(const st of STALLS){
   signPanel(g,4.3,.8,tex,0,4.1,.24,.95);
   OUTDOOR_OBS.push([-19.4,-12.4,1.5]);
 }
-/* 市集步行街：摊位与花坛之间铺一条宽雪道，两侧排矮灯柱 */
+/* 市集步行街：摊位与花坛之间铺一条宽雪道（已移除两侧矮灯柱保持路面整洁） */
 {
   const paveM=M(0xe6ecf1,{roughness:.92});
   add(market,BX(3.9,.06,20.4),paveM,-32.6,.04,-1.4).castShadow=false;
   add(market,BX(11.6,.06,3.9),paveM,-27.0,.04,-9.9).castShadow=false;
   add(market,BX(4.6,.06,4.6),paveM,-32.9,.04,-10.6).castShadow=false;
-  const lampM=M(0x3c444c,{roughness:.5,metalness:.6});
-  for(let i=0;i<7;i++){
-    const lz=7.2-i*2.9;
-    const lp=add(market,new THREE.CylinderGeometry(.07,.09,.95,8),lampM,-31.0,.475,lz);
-    const bulb=add(market,new THREE.SphereGeometry(.11,8,6),stallBulbM,-31.0,1.03,lz);
-    bulb.castShadow=false;lp.castShadow=false;
-  }
-  for(let i=0;i<5;i++){
-    const lx=-30.2+i*2.9;
-    const lp=add(market,new THREE.CylinderGeometry(.07,.09,.95,8),lampM,lx,.475,-8.0);
-    const bulb=add(market,new THREE.SphereGeometry(.11,8,6),stallBulbM,lx,1.03,-8.0);
-    bulb.castShadow=false;lp.castShadow=false;
-  }
 }
 /* 市集全部是静态的：合批，把上千个小零件压成十几个 mesh */
 mergeStatic(market);
@@ -7695,11 +7578,8 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
   const rndM=M(0xd23b32,{roughness:.7}),grnM=M(0x2f8f6b,{roughness:.7});
   const gldM=M(0xe0a33c,{roughness:.55,metalness:.35});
   const snowM=M(0xf2f7fc,{roughness:.9});
-  // 新海诚雪夜高级灯光色板：暖香槟金、琥珀橘、奶白微光、淡冰蓝、柔樱粉（告别杂乱红绿跑马灯）
-  const glowCols=[0xffe29a,0xffc06e,0xfff3d4,0x99ccff,0xffb3c8,0xffd27d];
-  const bulb=(parent,x,y,z,r,ci)=>{
-    const b=add(parent,new THREE.SphereGeometry(r,6,4),getBulbMat(glowCols[ci%glowCols.length],ci),x,y,z);
-    b.castShadow=false;return b;};
+  // 已移除游乐园空中/建筑彩球装饰，保持场景视觉纯净高级
+  const bulb=()=>null;
   /* 地面光池：纯贴片，不占光源预算 */
   const poolGeo=new THREE.CircleGeometry(1,24);
   const pool=(parent,r,y,op,col)=>{
@@ -8465,14 +8345,8 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     });
   }
 
-  /* ── 游乐园路灯柱 + 广域主照明 ── */
+  /* ── 游乐园广域主照明（已去掉黑高灯柱，保持园内通透） ── */
   {
-    // 去掉西侧云霄飞车区域高灯柱（防穿模），仅保留东侧外缘 2 根高灯柱
-    const fairPosts=[
-      [38,22.5,5.6],[38,53.5,5.6]
-    ];
-    for(const [lx,lz,lh] of fairPosts)lightPost(lx,lz,lh);
-    // 2 盏广域暖金主灯照亮全场压雪与游乐设施（降低片元光源循环开销）
     const fairAreaLights=[
       [-8,8.5,34,0xffd68a,145,44],
       [18,9.0,42,0xffe0a0,150,46]
@@ -11618,20 +11492,8 @@ function updateTrain(dt){
   scene.add(icicles);
 }
 
-// 雪地冰晶碎钻反光点
-const snowSparkles=(()=>{
-  const N=220, pos=new Float32Array(N*3);
-  for(let i=0;i<N;i++){
-    pos[i*3]=R(-48,48);pos[i*3+1]=.06;pos[i*3+2]=R(-22,56);
-  }
-  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));
-  const m=new THREE.PointsMaterial({color:0xe8f6ff,size:.16,transparent:true,opacity:.55,depthWrite:false,blending:THREE.AdditiveBlending});
-  const pts=new THREE.Points(g,m);pts.raycast=()=>{};scene.add(pts);
-  return m;
-})();
-
+// 已移除地面雪地碎钻反光点，保持落地干净整洁
 function updateSaltlinePhysics(dt){
-  snowSparkles.opacity=.32+Math.abs(Math.sin(t*2.6))*.36;
   sfx.updateBgmMix(dt);
 }
 
