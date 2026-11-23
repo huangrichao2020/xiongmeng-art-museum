@@ -16,6 +16,16 @@ else:
 os.makedirs(W + '/.deploy', exist_ok=True)
 open(W + '/.deploy/index.html', 'w', encoding='utf-8').write(out)
 
+# 同步音频资源（mp3 / wav 采样），避免新增素材时漏传
+import shutil
+src_audio = W + '/audio'
+dst_audio = W + '/.deploy/audio'
+if os.path.isdir(src_audio):
+    if os.path.isdir(dst_audio):
+        shutil.rmtree(dst_audio)
+    shutil.copytree(src_audio, dst_audio)
+    print('audio synced:', sorted(os.listdir(dst_audio)))
+
 # 校验 importmap 是合法 JSON
 m = re.search(r'<script type="importmap">(.*?)</script>', out, re.S)
 import json

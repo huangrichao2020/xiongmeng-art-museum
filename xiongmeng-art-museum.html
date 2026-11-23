@@ -8891,6 +8891,49 @@ const sfx={
       this.playLead(chord[i],t+i*.072,.42,.042,-.18+i*.09);
     }
   },
+  /* ══ 真实钢琴采样（替代正弦合成的"钢琴"）
+     纯振荡器堆出来的钢琴永远是电钢味，怎么调包络都救不回来 ——
+     所以主旋律直接改用真实钢琴录音（Salamander/Steinway 采样，
+     来自 GitHub nbrosowsky/tonejs-instruments，CC-BY）。
+     曲子里主旋律只用到 G4~G5 共 8 个音，切成 1.7 秒一段拼成单个
+     audio/piano.wav（1.1MB），一次 fetch + decodeAudioData 全部加载。
+     没加载完时自动退回合成音色，不会开天窗。 */
+  PIANO_MAP:{67:0,69:1.7,71:3.4,72:5.1,74:6.8,76:8.5,77:10.2,79:11.9},
+  PIANO_SEG:1.7,
+  pianoBuf:null,pianoReady:false,
+  loadPiano(){
+    if(this.pianoBuf||this._pianoLoading)return;
+    this._pianoLoading=true;
+    fetch('./audio/piano.wav').then(r=>r.arrayBuffer()).then(ab=>{
+      const c=this.ctx;
+      if(!c)return;
+      return c.decodeAudioData(ab).then(buf=>{this.pianoBuf=buf;this.pianoReady=true;});
+    }).catch(()=>{this.pianoBuf=null;}).finally(()=>{this._pianoLoading=false;});
+  },
+  playPiano(midi,t,dur,vel=.22,pan=.08){
+    const c=this.ctx;
+    if(!c)return;
+    if(!this.pianoReady||!this.pianoBuf){this.playLead(midi,t,dur,vel*.5,pan);return;}
+    const map=this.PIANO_MAP;
+    if(map[midi]===undefined){this.playLead(midi,t,dur,vel*.5,pan);return;}
+    const src=c.createBufferSource();
+    src.buffer=this.pianoBuf;
+    src.playbackRate.value=1;               // 采样就是该音高，不需要变调
+    const g=c.createGain();
+    const rel=Math.min(Math.max(dur*1.5,.5),1.6);
+    /* 采样本身自带真实钢琴的自然衰减曲线，这里只做起音淡入和末尾淡出，
+       不再叠一层人为包络（那会把真钢琴压成电钢） */
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(vel,t+.006);
+    g.gain.setValueAtTime(vel,Math.max(t+.01,t+rel-.14));
+    g.gain.exponentialRampToValueAtTime(.0006,t+rel);
+    const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=5200;
+    src.connect(lp);lp.connect(g);
+    const pn=c.createStereoPanner?c.createStereoPanner():null;
+    if(pn){pn.pan.value=pan;g.connect(pn);pn.connect(this.musicBus);}
+    else g.connect(this.musicBus);
+    src.start(t,map[midi],Math.min(this.PIANO_SEG,this.pianoBuf.duration-map[midi]));
+  },
   // 极轻柔圣诞雪橇铃（每八拍温柔点缀一次）
   /* 原来频率 3150/4180 Hz、每 4 拍一次、全曲不停 —— 3~4kHz 的金属高频
      在加色混合下穿透力极强，听着就是"有人一直在敲三角铁"，是 BGM 里最吵的一层。
@@ -8952,8 +8995,9 @@ const sfx={
       this.playBass(chord[0],t,Math.min(dur,1.3));
     }
     if(midi>0){
-      this.playLead(midi,t,dur,.105,.08,true);      // 主旋律带槌击瞬态
-      /* 原来这里还叠了一个高八度装饰音（每 2 步一次，E6 + 谐波到 4k），
+      /* 主旋律走真实钢琴采样（playPiano）；采样没就绪时它自己退回合成音色 */
+      this.playPiano(midi,t,dur,.20,.08);
+      /* 原来这里还叠过一个高八度装饰音（每 2 步一次，E6 + 谐波到 4k），
          听着就是全程不停的"叮"，是第二个吵源 —— 已去掉，只留单音主旋律。 */
     }
     if(i%8===0)this.playSleighBell(t,i%16===0);   // 雪橇铃每八拍点缀一次
@@ -9026,6 +9070,7 @@ const sfx={
       if(this.master&&this.ctx)this.master.gain.setTargetAtTime(.85,this.ctx.currentTime,.20);
       this.initBgmTracks();
       this.startSynthBgm();          // 合成圣诞乐器 BGM（主）
+      this.loadPiano();               // 真实钢琴采样（异步预载，没好就先用合成音）
       if(this.bgmTracks){
         for(const k of ['museum','park','rock']){
           this.bgmTracks[k].a.play().catch(()=>{});
