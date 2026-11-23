@@ -11843,8 +11843,8 @@ function startLaunchRide(){
   launchSys.openK=0;
   chuteGrp.visible=false;
   fp.x=launchSys.x;fp.y=launchSys.y;fp.z=launchSys.z;
-  /* 塔转了 180°，弹射方向也跟着改为正 +z（前向 = (-sin yaw, -cos yaw)） */
-  fp.yaw=Math.PI;fp.pitch=-.15;
+  /* 默认视角反转朝向北侧 (-z) 动漫园区与游乐园全景（前向 = (-sin yaw, -cos yaw) = (0, -1)） */
+  fp.yaw=0;fp.pitch=-.15;
   sfx.blip(660,.15,.08);
 }
 function stopLaunchRide(){
