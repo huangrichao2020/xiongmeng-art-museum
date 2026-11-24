@@ -12068,8 +12068,8 @@ function directorChase(ride,outPos,outLook){
     const th=_dmT.clone(); th.y=0;
     if(th.lengthSq()<1e-6)th.set(0,0,1); else th.normalize();
     const side=new THREE.Vector3(-th.z,0,th.x);
-    P.copy(_dmP).addScaledVector(th,-6.2).addScaledVector(side,4.2); P.y=_dmP.y+1.6;
-    L.copy(_dmP).addScaledVector(th,0.6); L.y=_dmP.y+0.6;
+    P.copy(_dmP).addScaledVector(th,-6.2).addScaledVector(side,4.2); P.y=_dmP.y+1.0;
+    L.copy(_dmP).addScaledVector(th,0.6); L.y=_dmP.y+0.8;
     return true;
   }
   if(ride==='fpv'&&fpvSys.active){
