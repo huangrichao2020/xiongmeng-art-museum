@@ -767,11 +767,12 @@ function mergeStatic(root,skip){
       if(ch.isInstancedMesh)continue;              // InstancedMesh 自身已合批，严禁被拆成原点单例
       if(ch.userData&&ch.userData.keep)continue;   // 标记 keep 的整棵子树不参与合批
       if(ch.isMesh){
+        if(Array.isArray(ch.material))continue;       // 多材质网格没法合成一个，保留原样
         let g=ch.geometry.clone();
         if(g.index)g=g.toNonIndexed();
         g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv,ch.matrixWorld));
-        const key=ch.material.uuid+'|'+(ch.castShadow?1:0);
-        if(!buckets.has(key))buckets.set(key,{mat:ch.material,cast:ch.castShadow,list:[]});
+        const key=ch.material.uuid+'|'+(ch.castShadow?1:0)+'|'+ch.renderOrder;
+        if(!buckets.has(key))buckets.set(key,{mat:ch.material,cast:ch.castShadow,ro:ch.renderOrder,list:[]});
         buckets.get(key).list.push(g);
         victims.push(ch);
       }else walk(ch);
@@ -781,10 +782,61 @@ function mergeStatic(root,skip){
   for(const v of victims){ if(v.parent)v.parent.remove(v); v.geometry.dispose(); }
   for(const b of buckets.values()){
     const mesh=new THREE.Mesh(mergeGeos(b.list),b.mat);
-    mesh.castShadow=b.cast;mesh.receiveShadow=true;
+    mesh.castShadow=b.cast;mesh.receiveShadow=true;mesh.renderOrder=b.ro;
     mesh.userData.tag=root.userData.tag;
     root.add(mesh);
     for(const g of b.list)g.dispose();
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   自动静态合批（开场做一次运动侦测，只合并「确认不动」的零件）
+   ──────────────────────────────────────────────────────────────────────
+   实测瓶颈不在像素量，而在 draw call：
+     · 把渲染分辨率砍到 1/4，帧率只快 1 帧（填充率根本不是瓶颈）；
+     · 全景机位（摩天轮顶 / 热气球）一眼望出去 5000+ draw call，帧率直接腰斩。
+   所以真正该砍的是 call —— 场景里 6000 多个零件，每个零件都是一次 draw call。
+
+   做法：
+     1) 开场 1.6 秒内连续采样每个节点的「本地矩阵」，变过的节点 = 动画节点；
+     2) 动画节点标 keep —— 它整棵子树不会被并进父级（走路/旋转/摇摆全部照旧）；
+     3) 其余静态零件按材质合并成少数几个 mesh（视觉一模一样，零件少了）。
+   合并只发生在「同一个物体内部」或「同一组内部」，绝不跨动画边界。
+   ══════════════════════════════════════════════════════════════════════ */
+const _autoMerge={phase:0,t0:0,snap:null,queue:null};
+function _mergeSnap(){
+  const map=new Map();
+  scene.updateMatrixWorld(true);
+  scene.traverse(o=>{ map.set(o.id,o.matrix.elements.join(',')); });
+  return map;
+}
+function _autoMergeTick(){
+  if(_autoMerge.phase===0){ _autoMerge.snap=_mergeSnap(); _autoMerge.phase=1; _autoMerge.t0=performance.now(); return; }
+  if(_autoMerge.phase===1){
+    if(performance.now()-_autoMerge.t0<1600)return;
+    _autoMerge.phase=2;
+    const now=_mergeSnap();
+    const byId=new Map();
+    scene.traverse(o=>byId.set(o.id,o));
+    /* 1) 动过的节点 = 动画节点，标 keep：整棵子树不参与向上合并 */
+    for(const [id,m] of now){
+      const old=_autoMerge.snap.get(id);
+      if(old!==undefined&&old!==m){ const o=byId.get(id); if(o)o.userData.keep=true; }
+    }
+    /* 2) 顶层组排队合批（一帧只合一个组，把一次性长卡顿摊成几帧小卡顿） */
+    _autoMerge.queue=scene.children.filter(g=>g&&g.isObject3D&&!(g.userData&&g.userData.keep));
+    return;
+  }
+  if(_autoMerge.phase===2){
+    const q=_autoMerge.queue;
+    if(q&&q.length){
+      const g=q.shift();
+      try{ mergeStatic(g); }catch(e){}
+      return;
+    }
+    _autoMerge.phase=3;
+    /* 合批后阴影贴图重算一次（合并前后投影一致，重算更保险） */
+    renderer.shadowMap.needsUpdate=true;
   }
 }
 
@@ -2153,6 +2205,8 @@ function buildGiftBox(w=.46,h=.40,d=.46,boxCol=0xd92e2e,ribCol=0xf7d05c){
     const lp=addNS(g,new THREE.TorusGeometry(w*.16,w*.045,6,12),rm,s*w*.15,h*1.06,0);
     lp.rotation.y=s*.3;lp.rotation.z=s*.35;
   }
+  /* 礼盒内部刚体合批：6 个零件并成 2 个 mesh（盒子皮 + 缎带），draw call 直接省 4 */
+  mergeStatic(g);
   return g;
 }
 function buildCandyCane(h=1.35){
@@ -2194,6 +2248,8 @@ function buildSnowman(sc=1,opts={}){
     addNS(g,new THREE.CylinderGeometry(.175,.175,.05,12),scarfM,0,1.69,0);
   }
   g.scale.setScalar(sc);
+  /* 雪人内部刚体合批：20 来个零件并成几个 mesh（帽子/身体不动，整体摇摆照旧） */
+  mergeStatic(g);
   const ps={g,rx:0,rz:0,vrx:0,vrz:0,by:0,vby:0,sc,ph:R(0,6.28)};
   g.userData.physObj={type:'snowman',ref:ps};
   physSnowmen.push(ps);
@@ -2241,6 +2297,13 @@ function buildChristmasTree(opts={}){
     }
   }
   g.scale.setScalar(sc);
+  /* ── 圣诞树内部刚体合批 ──
+     一棵树是 85 个零件（树基/雪环/树干/6 层枝叶+雪盖/4 个礼盒/顶星），
+     全景机位一眼能看到十几棵 → 光树就吃掉近千个 draw call。
+     枝叶、树基、礼盒全是刚体，合成少数几个 mesh 后视觉一模一样；
+     只有顶星要转，标 keep 单独留着。 */
+  star.userData.keep=true;
+  mergeStatic(g);
   const pt={g,rx:0,rz:0,vrx:0,vrz:0,ph:R(0,6.28),sc};
   g.userData.physObj={type:'tree',ref:pt};
   physTrees.push(pt);
@@ -8159,6 +8222,13 @@ function makePerson(color,skin,opts={}){
   }
 
   mergeStatic(g,new Set([legL,legR,armL,armR]));
+  /* 四肢各自内部合批（腿 3 个零件 → 2 个，臂 2 个 → 2 个）：
+     合批后仍然是四肢的子节点，走路摆腿、挥手全部照旧。 */
+  mergeStatic(legL);mergeStatic(legR);mergeStatic(armL);mergeStatic(armR);
+  /* 四肢再单独标 keep：以后再被外层合批（比如坐进吊篮 / 碰碰车）时，
+     腿和手臂不会被并走 —— 代码还在拿 userData.legL/armR 调姿势。 */
+  legL.userData.keep=true;legR.userData.keep=true;
+  armL.userData.keep=true;armR.userData.keep=true;
   if(opts.scale)g.scale.setScalar(opts.scale);
   g.userData={legL,legR,armL,armR};
   return g;
@@ -8804,7 +8874,13 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       cab.userData.keep=true;
       cab.userData.physObj={type:'wheel',ref:cab};
       wheel.add(cab);amusement.cabs.push(cab);
+      /* 吊篮内部刚体合批：篮体/护栏/坐凳/乘客并成少数几个 mesh。
+         吊杆要能收放（乘坐时隐藏），单独留着不并。 */
+      mergeStatic(cab,new Set(rods));
     }
+    /* 摩天轮骨架合批：轮圈 / 辐条 / 挂轴 / 灯珠全是刚体，整体旋转，
+       并成十来个 mesh 后 draw call 从 150 降到 10 出头；吊篮各自转，不并。 */
+    mergeStatic(wheel,new Set(amusement.cabs));
     // 摩天轮登舱台 + 提示牌（放在支架外侧前方 z=3.6）
     const wDeck=new THREE.Group();wDeck.position.set(0,0,3.6);g.add(wDeck);
     add(wDeck,BX(4.4,.22,2.2),M(0x6b472d,{roughness:.85}),0,.11,0);
@@ -11335,6 +11411,8 @@ function updateAerialHaze(dt,t){
 function animate(){
   requestAnimationFrame(animate);
   renderer.info.reset();
+  /* 开场 1.6 秒的运动侦测 + 静态合批（分帧做完就停，不再有额外开销） */
+  if(_autoMerge.phase<3)_autoMergeTick();
   const dt=Math.min(clock.getDelta(),.05);
   t+=dt;
 
@@ -12386,21 +12464,43 @@ async function xmRecord(opts){
   if(!window.MediaRecorder)return{ok:false,error:'MediaRecorder unsupported'};
   director.recBusy=true;
   try{
-    const stream=renderer.domElement.captureStream(0);   // 0 = 手动逐帧捕获
-    const track=stream.getVideoTracks()[0];
-    director.recTrack=track;
-    const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:10e6});
-    const chunks=[];
-    rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+    /* ── 先「真录着」探帧率，再决定成片分辨率 ──
+       xmSetShot 会把像素比拉到画质档（Retina 上就是 1.55 → 300 多万像素），
+       实测这个场景在 420 万像素只有 11fps，录出来就是幻灯片。
+       现在每一档都开着采集录 18 帧测帧率，跑不到 24fps 就丢掉换低一档，
+       帧率优先于分辨率（用户诉求：录全景时帧率太低）。 */
+    let rec=null,chunks=[],stream=null,track=null,recFps=0;
+    const cands=_recDprCandidates(renderer.getPixelRatio());
+    for(let i=0;i<cands.length;i++){
+      const dpr=_recEvenDpr(cands[i]);
+      applyDpr(dpr);
+      await new Promise(r=>setTimeout(r,260));
+      try{ stream=renderer.domElement.captureStream(0); }
+      catch(e){ return{ok:false,error:'captureStream unsupported'}; }
+      track=stream.getVideoTracks()[0];
+      director.recTrack=track;
+      const r2=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:Math.min(20e6,Math.max(8e6,Math.round(innerWidth*dpr)*Math.round(innerHeight*dpr)*3))});
+      chunks=[];
+      r2.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+      r2.start(200);
+      const fps=await _recProbeFps(14);
+      const last=(i===cands.length-1);
+      if(fps>=_REC_FPS_GOOD||fps>=_REC_FPS_OK||last){rec=r2;recFps=fps;break;}
+      try{r2.stop();}catch(e){}
+      r2.ondataavailable=null;
+      try{track.stop();}catch(e){}
+      director.recTrack=null;
+      await new Promise(r=>setTimeout(r,140));
+    }
+    if(!rec)return{ok:false,error:'recorder start failed'};
     const stopped=new Promise(r=>{rec.onstop=r});
-    rec.start(200);
     await new Promise(r=>setTimeout(r,dur*1000));
     rec.stop();
     await stopped;
     director.recTrack=null;
     const blob=new Blob(chunks,{type:mime});
     const buf=await blob.arrayBuffer();
-    return{ok:true,shot:shotId,mime,size:blob.size,duration:dur,fps,base64:xmB64(buf)};
+    return{ok:true,shot:shotId,mime,size:blob.size,duration:dur,fps,recFps:recFps,dpr:+renderer.getPixelRatio().toFixed(2),base64:xmB64(buf)};
   }catch(e){
     director.recTrack=null;
     return{ok:false,error:String(e&&e.message||e)};
@@ -12516,10 +12616,13 @@ function _recLabel(t){
   if(!b)return;
   b.dataset.label=t;
 }
-/* 录制分辨率：先量一帧率余量，再决定要不要往上提分辨率。
-   实测这个场景的帧率跟像素量强相关（约 136 万像素 40fps、420 万像素 11fps），
-   硬拉到 4K 会把画面录成幻灯片 —— 所以只有机器跑得动时才提一档，
-   跑不动就保持当前预览分辨率，流畅优先。 */
+/* 录制分辨率：改成「开着采集真录着，再量帧率」。
+   之前是在**没开采集**的时候探帧率 —— captureStream(0) + 每帧 requestFrame() 的
+   逐帧拷贝开销完全没算进去，于是「预览 50fps，一按录制就掉到 12fps」，
+   成片全是卡顿（用户实测：录全景明显卡，录起来更卡）。
+   现在每一档分辨率都真录着探 18 帧，跑不到 24fps 就丢掉这一段、换更低一档。
+   帧率跟像素量强相关（约 136 万像素 40fps、420 万像素 11fps），
+   所以宁可降档也要流畅 —— 流畅优先。 */
 function _recProbeFps(n){
   return new Promise(res=>{
     const t0=performance.now();let i=0;
@@ -12527,25 +12630,50 @@ function _recProbeFps(n){
     requestAnimationFrame(tick);
   });
 }
-async function _recTargetDpr(){
-  const cur=renderer.getPixelRatio();
+/* 候选分辨率：从高到低
+   录制时的像素预算上限约 2.8M（手机 2.4M）：
+   1440×900 屏幕按 1.55 倍像素比就是 3.1M 像素，超预算 → 自动降到 1.47 倍。
+   帧率跟像素量强相关，所以宁可降分辨率也要流畅。 */
+function _recDprCandidates(dpr0){
   const w=innerWidth,h=innerHeight;
   const budget=IS_TOUCH_DEV?2.4e6:2.8e6;          // 录制时的像素上限
-  const cap=Math.sqrt(budget/(w*h));
-  /* 掉帧时自适应逻辑会把像素比降到低档。之前降过档的话直接录那个低分辨率，
-     出来的成片是糊的 —— 所以先试着回到画质档应有的分辨率，探一下帧率。
-     只探一次：跑不动就直接用当前分辨率，不再二次探测（省掉一秒等待）。 */
-  const target=Math.min(cap,Math.max(cur,HI_DPR));
-  if(target>cur+0.01){
-    applyDpr(target);
-    const fps=await _recProbeFps(10);
-    if(fps>=24) return target;                       // 画质档跑得动，就用它
-    applyDpr(cur);                                   // 真跑不动，退回当前分辨率
-    return cur;
+  const cap=Math.sqrt(budget/Math.max(1,w*h));
+  const hi=Math.min(cap,Math.max(dpr0,HI_DPR));
+  const list=[hi];                                  // 先试画质档
+  if(dpr0<hi-0.01)list.push(dpr0);                 // 当前档比画质档低就补一档
+  list.push(Math.max(.62,hi*.82));                  // 再降一档
+  list.push(Math.max(.52,hi*.68));                  // 再降一档
+  return list.filter((v,i,a)=>v>=.5&&a.indexOf(v)===i);
+}
+/* 录制帧率门槛：≥28 算流畅（直接用）；≥20 勉强能用（不再往下砍分辨率）；
+   低于 20 就丢掉这一段、换更低一档分辨率重试。 */
+const _REC_FPS_GOOD=28,_REC_FPS_OK=20;
+/* H.264 要求宽高都是偶数，把画布宽度对齐到偶数 */
+function _recEvenDpr(d){
+  const evenW=Math.max(2,Math.round(innerWidth*d)&~1);
+  return evenW/innerWidth;
+}
+/* 建一个采集器（不 start，交给调用方） */
+function _recMakeRecorder(dpr){
+  let mime='video/webm';
+  if(MediaRecorder.isTypeSupported){
+    /* 手机上没有本机服务帮忙转 mp4，能录 mp4(H.264) 就优先录 mp4：
+       存进「下载」后相册能直接播、长按能「存到相册」；webm 小米相册打不开。 */
+    const cand=_recIsPhone()
+      ? ['video/mp4;codecs=avc1.42E01E','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm']
+      : ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'];
+    mime=cand.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
   }
-  const fps=await _recProbeFps(10);
-  if(fps>=46) return Math.min(cap,cur*1.28);         // 有余量：提 1.28 倍（约 1.6 倍像素）
-  return cur;
+  let stream=null;
+  try{stream=renderer.domElement.captureStream(0);}catch(e){return null;}
+  const track=stream.getVideoTracks()[0];
+  const cw=Math.round(innerWidth*dpr),ch=Math.round(innerHeight*dpr);
+  /* 码率：录制时每帧还要把画布整张拷进编码器，码率越高越吃 CPU。
+     1080p 给 8~20Mbps 已经够看（4Mbps 一档的差别肉眼看不出来），
+     但编码压力小一大截 —— 流畅优先。 */
+  const bps=Math.min(20e6,Math.max(8e6,cw*ch*30*0.10));
+  const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:bps});
+  return {rec,stream,track,mime,cw,ch,bps,chunks:[]};
 }
 function _recPreview(url){
   const box=document.getElementById('recpv');
@@ -12671,35 +12799,38 @@ async function _recStart(){
   if(!window.MediaRecorder){_recMsg('这个浏览器不支持画面录制');return;}
   const dpr0=renderer.getPixelRatio();                 // 先记下原值，录完还原
   _recMsg('准备中…正在挑分辨率');
-  let dpr=await _recTargetDpr();
-  /* H.264 要求宽高都是偶数，浏览器算出来的画布宽度可能是奇数（比如 1843），
-     这里把像素比微调到让画布宽度落在偶数上，服务端那边也留了兜底缩放。 */
-  const evenW=Math.max(2,Math.round(innerWidth*dpr)&~1);
-  dpr=evenW/innerWidth;
+  /* ── 逐档试：每一档都「真开着采集」录 18 帧测帧率 ──
+     captureStream(0) 是手动逐帧模式，不调 requestFrame() 就不产生任何拷贝，
+     所以探帧率期间必须把 track 挂上（主循环每帧会 requestFrame），
+     这样量到的才是「一边渲染一边采集」的真实帧率。 */
+  const cands=_recDprCandidates(dpr0);
+  let chosen=null,fallback=null;
+  for(let i=0;i<cands.length;i++){
+    const dpr=_recEvenDpr(cands[i]);
+    applyDpr(dpr);
+    await new Promise(r=>setTimeout(r,260));            // 等新画布尺寸稳定再捕获
+    const t=_recMakeRecorder(dpr);
+    if(!t){applyDpr(dpr0);_recMsg('这个浏览器不支持画面录制');return;}
+    t.rec.ondataavailable=e=>{if(e.data&&e.data.size)t.chunks.push(e.data)};
+    window._uiRecTrack=t.track;window._uiRecFrames=0;  // 探帧率期间也要真的在采集
+    t.rec.start(200);
+    const fps=await _recProbeFps(14);
+    const last=(i===cands.length-1);
+    if(fps>=_REC_FPS_GOOD){chosen=t;chosen.fps=fps;chosen.dpr=dpr;break;}
+    if(fps>=_REC_FPS_OK){fallback=t;fallback.fps=fps;fallback.dpr=dpr;break;}
+    if(last){chosen=t;chosen.fps=fps;chosen.dpr=dpr;break;}
+    /* 跑不动：这一段作废（丢弃分片、停掉轨道），换更低一档重来 */
+    try{t.rec.stop();}catch(e){}
+    t.rec.ondataavailable=null;
+    try{t.track.stop();}catch(e){}
+    await new Promise(r=>setTimeout(r,140));
+  }
+  if(!chosen&&fallback)chosen=fallback;
+  if(!chosen){applyDpr(dpr0);_recMsg('录制启动失败，请重试');return;}
+  const rec=chosen.rec,mime=chosen.mime,cw=chosen.cw,ch=chosen.ch,dpr=chosen.dpr;
   _rec.dpr0=dpr0;
   _rec.ratio=dpr;
-  applyDpr(dpr);
-  await new Promise(r=>setTimeout(r,320));           // 等新画布尺寸稳定再捕获
-  let mime='video/webm';
-  if(MediaRecorder.isTypeSupported){
-    /* 手机上没有本机服务帮忙转 mp4，录出来什么格式就存什么格式：
-       能录 mp4(H.264) 就优先录 mp4 —— 存进「下载」后相册能直接播、
-       长按能「存到相册」；webm 在小米相册里是打不开的。
-       桌面端有本机 ffmpeg 转码兜底，继续用最稳的 webm。 */
-    const cand=_recIsPhone()
-      ? ['video/mp4;codecs=avc1.42E01E','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm']
-      : ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'];
-    mime=cand.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
-  }
-  let stream=null;
-  try{ stream=renderer.domElement.captureStream(0); }
-  catch(e){ applyDpr(_rec.dpr0); _recMsg('这个浏览器不支持画面录制'); return; }
-  const track=stream.getVideoTracks()[0];
-  window._uiRecTrack=track;window._uiRecFrames=0;
-  const cw=Math.round(innerWidth*dpr),ch=Math.round(innerHeight*dpr);
-  const bps=Math.min(36e6,Math.max(12e6,cw*ch*30*0.15));
-  const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:bps});
-  _rec.chunks=[];_rec.mime=mime;
+  _rec.chunks=chosen.chunks;_rec.mime=mime;
   rec.ondataavailable=e=>{if(e.data&&e.data.size)_rec.chunks.push(e.data)};
   rec.onstop=()=>{
     const blob=new Blob(_rec.chunks,{type:mime});
@@ -12724,7 +12855,7 @@ async function _recStart(){
     }else _recMsg('录制失败，画面是空的');
   };
   rec.onerror=()=>{_recMsg('录制出错，请重试')};
-  rec.start(300);
+  /* rec 已经在探帧率时 start 了，这里不能再 start */
   _rec.rec=rec;_rec.on=true;window._recording=true;_rec.t0=performance.now();
   const b=document.getElementById('w-rec');
   if(b)b.classList.add('rec');
@@ -12732,7 +12863,7 @@ async function _recStart(){
     const s=Math.floor((performance.now()-_rec.t0)/1000);
     _recLabel('● '+_recPad(Math.floor(s/60))+':'+_recPad(s%60));
   },400);
-  _recMsg('录制中 · '+cw+'×'+ch+' · 再点一次停止');
+  _recMsg('录制中 · '+cw+'×'+ch+' · 实测 '+(chosen.fps||0)+'fps · 再点一次停止');
 }
 function _recStop(){
   if(!_rec.rec)return;
@@ -13242,6 +13373,14 @@ let trainSteamCursor=0;
     car.userData.physObj={type:'train',ref:car};
     scene.add(car);trainCars.push(car);
   }
+  /* ── 车厢/机车头合批 ──
+     每节车厢是两百来个小零件（底盘、围板、立柱、灯串、轮组、乘客），
+     机车头再加两百来个。全景机位一抬眼就是 1200+ draw call，
+     实测光这一块就吃掉快 1000 个 call（探针：train-chase 317 calls、
+     balloon-above 6100 calls 的主要来源之一）。
+     车厢是整体刚性运动的（只改 position/rotation），零件本身不动，
+     所以按材质各自合批成十几个 mesh，视觉一模一样，call 直接少一千。 */
+  for(const tc of trainCars)mergeStatic(tc);
 
   // 7. 火车头迎风向后翻滚的浓密蒸汽云团粒子池（44 团柔和体积蒸汽 Sprite，随车速迎风猛烈向后上方拖尾扩散）
   const locoSteamTex=(()=>{
