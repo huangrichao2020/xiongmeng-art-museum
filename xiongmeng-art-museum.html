@@ -219,8 +219,10 @@
   }
   .wtools button:hover{color:#fff;border-color:rgba(160,220,250,.6);background:rgba(104,208,245,.18)}
   .wtools button.on{color:var(--accent);border-color:rgba(104,208,245,.5)}
-  body.touch .wtools{right:max(12px,env(safe-area-inset-right));top:max(12px,env(safe-area-inset-top))}
-  body.touch .wtools button{min-width:44px;height:40px;border-radius:20px;font-size:12px}
+  body.touch .wtools{right:max(12px,env(safe-area-inset-right));top:max(12px,env(safe-area-inset-top));gap:5px}
+  body.touch .wtools button{min-width:40px;height:38px;padding:0 6px;border-radius:19px;font-size:11.5px}
+  /* 联机登录卡片打开时，右上角工具条被卡片压住 → 干脆藏起来 */
+  body.mp-login-open .wtools{display:none}
   /* 触屏：沉浸内的 .wtop 隐藏，统一用常驻 .wtools，避免两套按钮叠在一起 */
   body.touch .wtop{display:none!important}
 
@@ -686,6 +688,7 @@
 </div>
 <div class="wtools" id="wtools">
   <button id="w-mode" title="沉浸 / 沙盘" data-label="沉浸"></button>
+  <button id="w-third" title="第一人称 / 第三人称" data-label="三人称"></button>
   <button id="w-fpv" title="FPV 穿越机特技模式 (F)" data-label="穿越"></button>
   <button id="w-quality" title="高画质光滤镜开关" data-label="高画质"></button>
   <button id="w-audio" class="on" title="声音" data-label="♪"></button>
@@ -11748,8 +11751,11 @@ function fpUpdate(dt){
   }
   const headBob=(fpSpd>0.5&&fp.jumpY<=0.01)?Math.sin(t*fpSpd*2.3)*.032*Math.min(1,fpSpd/4):0;
   /* 第三人称时相机由 MP.update 接管（它把相机放在角色背后），
-     这里只更新角色坐标，不写 camera —— 否则两者每帧互相覆盖 */
-  if(!(window.MP&&MP.third)){
+     这里只更新角色坐标，不写 camera —— 否则两者每帧互相覆盖。
+     判断口径统一走 MP.thirdLive()：只有「第三人称真的在接管」时才让出相机，
+     否则（退出联机 / 没登录 / 回到沙盘）第一人称照常写，
+     不然两处都不写 → 相机没人管 → 画面冻住不动 */
+  if(!(window.MP&&MP.thirdLive&&MP.thirdLive())){
     camera.position.set(fp.x,fp.y+FP_EYE+fp.jumpY+headBob,fp.z);
     camera.rotation.set(fp.pitch,fp.yaw,0,'YXZ');
   }
@@ -11967,6 +11973,15 @@ function setViewBtn(){
     const b=document.getElementById(id);
     if(b){b.dataset.label=t;b.textContent='';}   // 文字走伪元素，避免被系统取词浮层圈住
   }
+  /* 第三人称按钮：常驻工具条里，给一个明确的「切回第一人称」入口 */
+  const tb=document.getElementById('w-third');
+  if(tb){
+    const on=!!(window.MP&&MP.third);
+    /* 手机上按钮排得紧，标签用两字 */
+    tb.dataset.label = on ? (IS_TOUCH_DEV?'一人':'一人称') : (IS_TOUCH_DEV?'三人':'三人称');
+    tb.classList.toggle('on',on);
+    tb.textContent='';
+  }
   for(const id of ['w-audio','w-sound']){
     const b=document.getElementById(id);
     if(b)b.classList.toggle('on',sfx.on);
@@ -11986,6 +12001,12 @@ function toggleAudio(){
     const b=document.getElementById(id);
     if(b)b.onclick=e=>{e.preventDefault();e.stopPropagation();toggleView();};
   }
+  /* 第三人称开关：未登录也能用（单机也能切）*/
+  const tb=document.getElementById('w-third');
+  if(tb)tb.onclick=e=>{
+    e.preventDefault();e.stopPropagation();
+    if(window.MP&&MP.toggleThird)MP.toggleThird();
+  };
   for(const id of ['w-audio','w-sound']){
     const b=document.getElementById(id);
     if(b)b.onclick=e=>{e.preventDefault();e.stopPropagation();toggleAudio();};
@@ -12312,6 +12333,8 @@ function updateAerialHaze(dt,t){
         <div class="mp-msg" id="mp-msg"></div>
       </div>`;
     document.body.appendChild(wrap);
+    /* 登录页默认可见 → 右上角工具条先藏起来（卡片会压住它）*/
+    document.body.classList.add('mp-login-open');
     const msg = wrap.querySelector('#mp-msg');
     const acc = wrap.querySelector('#mp-acc');
     const pass = wrap.querySelector('#mp-pass');
@@ -12344,9 +12367,12 @@ function updateAerialHaze(dt,t){
 
   function hideLogin() {
     if (MP._ui) MP._ui.wrap.classList.add('hide');
+    document.body.classList.remove('mp-login-open');
   }
   function showLogin() {
     if (MP._ui) { MP._ui.wrap.classList.remove('hide'); setMsg(''); }
+    /* 登录卡片会盖住右上角工具条，登录时把工具条一起藏了，别让按钮露一半 */
+    document.body.classList.add('mp-login-open');
   }
 
   /* ══════════════════════════════════════════════════════
@@ -12404,6 +12430,13 @@ function updateAerialHaze(dt,t){
         });
         MP.syncPeersUI();
         MP.startThirdPersonBody();
+        /* 单机模式下已经建过本地角色的话，把头顶名牌换成账号名 */
+        if (MP.selfTag) {
+          const s3 = makeTagSprite(MP.display || MP.account, '#ffd9a0');
+          MP.selfTag.material.map.dispose();
+          MP.selfTag.material.map = s3.material.map;
+          MP.selfTag.material.needsUpdate = true;
+        }
         if (window.MP_UI) MP_UI.onLogin(m.you);
         break;
       }
@@ -12461,6 +12494,14 @@ function updateAerialHaze(dt,t){
           MP.onKicked = null;
           MP.connected = false;
           MP.clearPeers();
+          /* 被顶号 = 联机结束，第三人称一并关掉（否则相机没人写，画面冻住）*/
+          MP.third = false;
+          if (MP.self) MP.self.visible = false;
+          if (MP._panel) {
+            MP._panel.third.classList.remove('on');
+            MP._panel.third.textContent = '第三人称';
+          }
+          if (typeof setViewBtn === 'function') setViewBtn();
           showLogin();
           setMsg('该账号在别处登录，已被踢下线', 'err');
         };
@@ -12803,7 +12844,7 @@ function updateAerialHaze(dt,t){
     MP.self = g;
     /* 名牌挂在「不参与挤压」的外层 group 上 ——
        否则 walkCycle 的整体 scale 会把名牌压扁 */
-    MP.selfTag = makeTagSprite(MP.display || MP.account, '#ffd9a0');
+    MP.selfTag = makeTagSprite(MP.display || MP.account || '我', '#ffd9a0');
     MP.selfTag.position.y = 2.05;
     g.add(MP.selfTag);
     g.userData.tag = MP.selfTag;      // 供 walkCycle 做反向 scale 补偿
@@ -12813,10 +12854,22 @@ function updateAerialHaze(dt,t){
   /* ══════════════════════════════════════════════════════
      第三人称相机
      ══════════════════════════════════════════════════════ */
+  /* 「第三人称现在是否真的在接管相机」——全项目唯一判断口径。
+     必须同时满足：开了第三人称 + 处于沉浸（fp.on）+ 角色已创建且可见。
+     fpUpdate 与 MP.update 都查它，避免出现「两边都不写相机 → 画面冻住」。 */
+  MP.thirdLive = function () {
+    return !!(MP.third && fp.on && MP.self && MP.self.visible);
+  };
+
   MP.toggleThird = function () {
     MP.third = !MP.third;
-    if (MP.self) MP.self.visible = MP.third;
-    if (MP._panel) MP._panel.third.classList.toggle('on', MP.third);
+    /* 没联机也能用第三人称：第一次开就地把本地角色建出来 */
+    if (MP.third && !MP.self) MP.startThirdPersonBody();
+    if (MP.self) MP.self.visible = MP.third && fp.on;
+    if (MP._panel) {
+      MP._panel.third.classList.toggle('on', MP.third);
+      MP._panel.third.textContent = MP.third ? '第一人称' : '第三人称';
+    }
     if (MP.third && fp.on) {
       // 从第一人称切到第三人称：先把相机摆到角色背后（同一套 orbit 构图）
       const p0 = Math.max(-.55, Math.min(.6, fp.pitch));
@@ -12836,6 +12889,7 @@ function updateAerialHaze(dt,t){
       const l0 = pivot.clone().addScaledVector(f0, 12);
       camera.lookAt(l0);
     }
+    if (typeof setViewBtn === 'function') setViewBtn();
     if (window.sfx) sfx.blip(660, .08, .05);
   };
 
@@ -12891,47 +12945,7 @@ function updateAerialHaze(dt,t){
      每帧更新（插值远端玩家 + 推本地位置 + 第三人称相机）
      ══════════════════════════════════════════════════════ */
   MP.update = function (dt) {
-    if (!MP.connected) return;
-
-    /* 远端玩家：位置/朝向插值 */
-    const now = performance.now();
-    for (const p of MP.peers.values()) {
-      const k = 1 - Math.pow(.0016, dt);      // 指数平滑
-      const tx = p.target.x, ty = p.target.y, tz = p.target.z;
-      p.cur.x += (tx - p.cur.x) * k;
-      p.cur.y += (ty - p.cur.y) * k;
-      p.cur.z += (tz - p.cur.z) * k;
-      // 朝向：走最短弧
-      let dy = p.target.yaw - p.cur.yaw;
-      while (dy > Math.PI) dy -= Math.PI * 2;
-      while (dy < -Math.PI) dy += Math.PI * 2;
-      p.cur.yaw += dy * k;
-      p.group.position.set(p.cur.x, p.cur.y, p.cur.z);
-      /* 远端：用服务器下发的真实位移推速度和方向 */
-      const mvX = p.rawDx || 0, mvZ = p.rawDz || 0;
-      const vNow = p.rawSpeed !== undefined ? p.rawSpeed : 0;
-      faceByMove(p.group, dt, mvX, mvZ, p.cur.yaw);
-      walkCycle(p.group, dt, vNow, p.phase || (p.phase = { v: 0 }));
-      // 标签始终朝向相机（Sprite 自带）
-      // 远距离时淡出标签，避免糊屏
-      const d = camera.position.distanceTo(p.group.position);
-      p.tag.material.opacity = d > 42 ? 0 : (d > 26 ? (42 - d) / 16 : 1);
-    }
-
-    /* 推本地位置 */
-    const now2 = performance.now();
-    if (now2 - MP.lastSend > 1000 / MP.sendHz) {
-      MP.lastSend = now2;
-      const px = MP._manual ? MP._lastX : (fp.on ? fp.x : (MP._lastX || 0));
-      const py = MP._manual ? MP._lastY : (fp.on ? fp.y : (MP._lastY || 0));
-      const pz = MP._manual ? MP._lastZ : (fp.on ? fp.z : (MP._lastZ || 0));
-      const pyaw = MP._manual ? MP._lastYaw : (fp.on ? fp.yaw : (MP._lastYaw || 0));
-      if (!MP._manual) { MP._lastX = px; MP._lastY = py; MP._lastZ = pz; MP._lastYaw = pyaw; }
-      MP.send({
-        t: 'pos', mode: MP.third ? 'tp' : 'fp',
-        p: { x: px, y: py, z: pz, yaw: pyaw }
-      });
-    }
+    /* ── 本地第三人称角色 + 相机（不依赖联机：没登录也能切第三人称）── */
     /* 本地第三人称角色跟随 */
     if (MP.third && fp.on && MP.self) {
       MP.self.position.set(fp.x, fp.y, fp.z);
@@ -12986,6 +13000,51 @@ function updateAerialHaze(dt,t){
       }
       camera.position.copy(camera.position);  // 保持
     }
+
+    /* 角色只在「第三人称 + 沉浸」时可见；回到沙盘视角就隐藏 */
+    if (MP.self) MP.self.visible = MP.third && fp.on;
+
+    if (!MP.connected) return;
+
+    /* 远端玩家：位置/朝向插值 */
+    const now = performance.now();
+    for (const p of MP.peers.values()) {
+      const k = 1 - Math.pow(.0016, dt);      // 指数平滑
+      const tx = p.target.x, ty = p.target.y, tz = p.target.z;
+      p.cur.x += (tx - p.cur.x) * k;
+      p.cur.y += (ty - p.cur.y) * k;
+      p.cur.z += (tz - p.cur.z) * k;
+      // 朝向：走最短弧
+      let dy = p.target.yaw - p.cur.yaw;
+      while (dy > Math.PI) dy -= Math.PI * 2;
+      while (dy < -Math.PI) dy += Math.PI * 2;
+      p.cur.yaw += dy * k;
+      p.group.position.set(p.cur.x, p.cur.y, p.cur.z);
+      /* 远端：用服务器下发的真实位移推速度和方向 */
+      const mvX = p.rawDx || 0, mvZ = p.rawDz || 0;
+      const vNow = p.rawSpeed !== undefined ? p.rawSpeed : 0;
+      faceByMove(p.group, dt, mvX, mvZ, p.cur.yaw);
+      walkCycle(p.group, dt, vNow, p.phase || (p.phase = { v: 0 }));
+      // 标签始终朝向相机（Sprite 自带）
+      // 远距离时淡出标签，避免糊屏
+      const d = camera.position.distanceTo(p.group.position);
+      p.tag.material.opacity = d > 42 ? 0 : (d > 26 ? (42 - d) / 16 : 1);
+    }
+
+    /* 推本地位置 */
+    const now2 = performance.now();
+    if (now2 - MP.lastSend > 1000 / MP.sendHz) {
+      MP.lastSend = now2;
+      const px = MP._manual ? MP._lastX : (fp.on ? fp.x : (MP._lastX || 0));
+      const py = MP._manual ? MP._lastY : (fp.on ? fp.y : (MP._lastY || 0));
+      const pz = MP._manual ? MP._lastZ : (fp.on ? fp.z : (MP._lastZ || 0));
+      const pyaw = MP._manual ? MP._lastYaw : (fp.on ? fp.yaw : (MP._lastYaw || 0));
+      if (!MP._manual) { MP._lastX = px; MP._lastY = py; MP._lastZ = pz; MP._lastYaw = pyaw; }
+      MP.send({
+        t: 'pos', mode: MP.third ? 'tp' : 'fp',
+        p: { x: px, y: py, z: pz, yaw: pyaw }
+      });
+    }
   };
 
   /* ══════════════════════════════════════════════════════
@@ -13033,8 +13092,17 @@ function updateAerialHaze(dt,t){
       try { MP.ws && MP.ws.close(); } catch (e) { }
       MP.ws = null; MP.connected = false; MP.onKicked = null; MP._kicked = true;
       MP.clearPeers();
+      /* 退出联机 = 回到纯单机：第三人称随之关闭，
+         不然 MP.third 残留 true 会让第一人称和多人模块都不写相机 → 画面冻住 */
+      MP.third = false;
+      if (MP.self) MP.self.visible = false;
+      if (MP._panel) {
+        MP._panel.third.classList.remove('on');
+        MP._panel.third.textContent = '第三人称';
+      }
       try { localStorage.removeItem('xm_mp_acc'); localStorage.removeItem('xm_mp_pass'); } catch (e) { }
       if (MP._panel) MP._panel.p.style.display = 'none';
+      if (typeof setViewBtn === 'function') setViewBtn();
       showLogin();
     };
     MP._panel = { p, self, peers, nameI, meAv: p.querySelector('#mp-me-av'), third: p.querySelector('#mp-third') };
