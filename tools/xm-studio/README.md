@@ -12,6 +12,16 @@ node server.js          # 或 ./start.sh
 服务监听 `http://127.0.0.1:8789`，产物写到 `~/Desktop/xm-shots/`。
 服务自带无头 Chromium（真实 GPU 渲染，ANGLE/Metal），不要求你先把页面打开。
 
+### 常驻（开机自启，已在本机装好）
+
+```bash
+launchctl load ~/Library/LaunchAgents/com.tingchim2pro.xmstudio.plist
+```
+
+常驻副本放在 `~/.minimax/tools/xm-studio/`（不随会话目录被清理），
+通过 `run.sh` 包装启动 —— launchd 环境里没有 nvm / homebrew 的 PATH，
+`run.sh` 会自己找 node 与 ffmpeg 的真实路径。日志：`/tmp/xm-studio.log`。
+
 ## 接口
 
 | 方法 | 路径 | 说明 |
