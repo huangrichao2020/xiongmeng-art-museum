@@ -93,6 +93,9 @@
   - **强制登录**：没有「先逛逛」模式，进场必须用账号登录，全场只有一个在线世界（服务端 `room:'main'`）。
   - **弱网重连**：`MP.gen` 连接代数作废旧连接的回调；应用层心跳 8 秒 `ping`、12 秒收不到 `pong` 判定半开并主动重连；退避 0.8s→6s 带 ±25% 抖动；`visibilitychange` / `online` 事件立刻拉连接；断线时顶部显示 `#mp-net` 提示条（**不要把提示写进已隐藏的登录卡片，玩家看不到**）。
   - **显示 ID 持久化**：客户端 `localStorage.xm_mp_names`（按账号存）+ 服务端 `names.json` 落盘，改过的 ID 重进、重启都在。
+  - **角色尺寸**：`AV_SCALE=.74` / `AV_TOP=1.36`（整体缩放放在 `rig` 组，名牌不缩）。改角色比例时这两个数和名牌高度（`AV_TOP+.28`）、第三人称相机基准（pivot `1.42`、`camDist 5.2`）要一起改。
+  - **乘坐设施一律第一人称**：上车 `MP.pushFirstPerson()`（关掉第三人称），下车 `MP.popFirstPerson()`（恢复用户原选择）。
+  - **碰碰车撞击表现**：`bumperBump()`（压扁/侧倾/雪沫/驾驶员举手）+ `bumperBumpAnim()`（弹簧回弹），`st` 里的 `sq/pitch/roll/react/spin` 是动画状态。
 - **服务端**：`server/xm-ws-server.js`（零依赖，自实现 RFC6455），`systemd` 单元 `xm-ws.service`，监听 `127.0.0.1:18888`。
   - 账号 `test01`/`test02`（真人）+ `test03`~`test08`（探针专用，按进程号分配，绝不占真人的号）。
   - **收到客户端 CLOSE 必须回 CLOSE 帧**，否则浏览器永远停在 `CLOSING`，`onclose` 不触发、前端不会重连。

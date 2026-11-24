@@ -7895,6 +7895,7 @@ function toggleBalloonRide(i){
   if(launchSys.active)stopLaunchRide();
   if(!fp.on)fpEnter(true);
   balloonSys.riding=true;balloonSys.idx=i;balloonSys.vy=0;
+  if(window.MP)MP.pushFirstPerson();
   const b=balloons[i];
   fp.x=b.x;fp.z=b.z;fp.y=b.y;fp.vx=fp.vz=0;
   /* 初始朝向前方场地中心（游乐园），而不是背对 */
@@ -7906,6 +7907,7 @@ function stopBalloonRide(){
   if(!balloonSys.riding)return;
   const b=balloons[balloonSys.idx];
   balloonSys.riding=false;balloonSys.idx=-1;balloonSys.vy=0;
+  if(window.MP)MP.popFirstPerson();
   if(b){fp.x=b.x;fp.z=b.z;fp.y=groundY(b.x,b.z);}
   fp.vx=fp.vz=0;
   hudHide();
@@ -10018,8 +10020,11 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
         spd:(outer?.52:.68)*(outer?1:-1),
         spd0:(outer?.52:.68)*(outer?1:-1),
         ph:i*1.3,
-        kx:0,kz:0,vx:0,vz:0
+        kx:0,kz:0,vx:0,vz:0,
+        /* 撞击表现：压扁 sq / 俯仰 pitch / 侧倾 roll / 驾驶员反应 react / 甩尾 spin */
+        sq:0,pitch:0,pitchV:0,roll:0,rollV:0,react:0,spin:0,spinV:0,hitCd:0
       };
+      car.rotation.order='YXZ';   // 先偏航再俯仰侧倾，倾倒方向才对得上车头
       car.position.set(Math.cos(ang)*car.userData.st.rx,.12,Math.sin(ang)*car.userData.st.rz);
       g.add(car);
       amusement.bumper.push(car);
@@ -11833,6 +11838,13 @@ window.diorama={cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.t
   /* 调试：单独关掉某片区域，做性能对照 */
   hide:(what)=>{const m={market:market,shopRow:shopRow,fair:fair};for(const k in m){if(k===what||what==='all')m[k].visible=false;}return 'hidden';},
   show:(what)=>{const m={market:market,shopRow:shopRow,fair:fair};for(const k in m){if(k===what||what==='all')m[k].visible=true;}return 'shown';},
+  /* 调试：直接上车（测乘车视角），返回坐上的那台车 */
+  ride:(kind)=>{
+    if(kind==='bumper'&&amusement.bumper.length)toggleRideFacility({kind:'bumper',car:amusement.bumper[0],label:'冰面碰碰车'});
+    else toggleRideFacility({kind:kind,label:kind});
+    return (wheelSys.bump&&wheelSys.bump.car)||null;
+  },
+  bumpers:()=>amusement.bumper,
   perf:()=>{let lights=0;scene.traverse(o=>{if(o.isPointLight||o.isSpotLight)lights++;});
     return {calls:renderer.info.render.calls,tris:renderer.info.render.triangles,
             geo:renderer.info.memory.geometries,tex:renderer.info.memory.textures,lights};}
@@ -11942,6 +11954,10 @@ function lookMidY(){
   lookPts.forEach(p=>{sy+=p.y;n++;});
   return n?sy/n:null;
 }
+/* 触屏转视角灵敏度：手机屏幕小、拇指粗，原来 .0045 明显偏钝，
+   拖半天转不了多少角度。immersive（走路时转头）给更高，sandbox 轨道略低。 */
+const TOUCH_LOOK=.0078, TOUCH_ORBIT=.0062;
+
 renderer.domElement.addEventListener('pointerdown',e=>{
   if(e.pointerType==='mouse')return;   // 鼠标交给 document 的 mousemove
   // 触屏沙盒：相机旋转由 fp.yaw/pitch 接管，挡住 OrbitControls 的 pointerdown，
@@ -11963,16 +11979,16 @@ renderer.domElement.addEventListener('pointermove',e=>{
     const _bd=wheelSys.bump;
     if(_bd&&wheelSys.riding&&wheelSys.kind==='bumper'){
       /* 开车时单指拖动 = 相对车头环顾，转向交给左手摇杆 */
-      _bd.look-=dx*.0045;
-      fp.pitch=Math.max(-1.4,Math.min(1.4,fp.pitch-dy*.0045));
+      _bd.look-=dx*TOUCH_LOOK;
+      fp.pitch=Math.max(-1.4,Math.min(1.4,fp.pitch-dy*TOUCH_LOOK));
     }else{
-      fp.yaw-=dx*.0045;fp.pitch-=dy*.0045;
+      fp.yaw-=dx*TOUCH_LOOK;fp.pitch-=dy*TOUCH_LOOK;
       fp.pitch=Math.max(-1.4,Math.min(1.4,fp.pitch));
     }
     // 触屏沙盒：沉浸之外，单指拖动改为绕沙盘 target 转镜头
     if(!fp.on&&IS_TOUCH_DEV){
-      touchCam.yaw-=dx*.0045;
-      touchCam.pitch=Math.max(-0.35,Math.min(1.45,touchCam.pitch+dy*.005));
+      touchCam.yaw-=dx*TOUCH_ORBIT;
+      touchCam.pitch=Math.max(-0.35,Math.min(1.45,touchCam.pitch+dy*TOUCH_ORBIT));
       touchCamApply();
     }
   }else if(lookPts.size===2){
@@ -12336,7 +12352,7 @@ function updateAerialHaze(dt,t){
     peers: new Map(),          // account -> {display, target:{x,y,z,yaw}, cur:{...}, group, tag}
     self: null,                // 本地第三人称角色
     third: false,              // 是否第三人称
-    camDist: 6.2, camHeight: 2.35, camSide: 0.55,
+    camDist: 5.2, camHeight: 2.35, camSide: 0.55,
     lastSend: 0, sendHz: 15,
     reconnectAt: 0, tries: 0,
     onKicked: null,
@@ -12368,6 +12384,12 @@ function updateAerialHaze(dt,t){
       localStorage.setItem('xm_mp_names', JSON.stringify(map));
     } catch (e) { }
   };
+
+  /* ── 角色整体尺寸 ──
+     主角原来 1.83m，站在园里的维尼小熊（~1.3m）旁边像个巨人。
+     现在整体缩到 0.74 → 头顶 1.36m，比 NPC 高一点点刚好。
+     缩放放在 rig 组里做，名牌不跟着缩（名字要看得清）。 */
+  const AV_SCALE = .74, AV_TOP = 1.36;
 
   /* ── WebSocket URL：同源 wss ── */
   function wsURL() {
@@ -12798,7 +12820,7 @@ function updateAerialHaze(dt,t){
     const group = buildAvatar(color);
     scene.add(group);
     const tag = makeTagSprite(pl.display || pl.account, '#' + color.toString(16).padStart(6, '0'));
-    tag.position.y = 2.05;
+    tag.position.y = AV_TOP + .28;
     /* 名牌直接挂在 group 上（形变只作用在身体组，名牌不受影响）*/
     group.add(tag);
     group.userData.tag = tag;
@@ -12954,17 +12976,24 @@ function updateAerialHaze(dt,t){
       g.add(st);
     }
 
-    /* 圆脚：每只脚挂一个 footGrp，跳跃时整只脚能一起抬起/前伸 */
+    /* 圆脚：每只脚挂一个 footGrp，跳跃时整只脚能一起抬起/前伸
+       —— 鞋底要落在地面上（y=0），鞋帮还得跟身体底面接上；
+          中间留一截缝，看起来就是「身体和鞋子分离了」 */
     const feet = [];
     for (const s of [-1, 1]) {
       const fg = new THREE.Group();
-      const ft = new THREE.Mesh(new THREE.SphereGeometry(.135, 10, 8), darkM);
-      ft.position.set(s * .165, .125, .035); ft.scale.set(1, .72, 1.3);
+      /* 矮胖圆鞋 */
+      const ft = new THREE.Mesh(new THREE.SphereGeometry(.13, 12, 9), darkM);
+      ft.position.set(s * .155, .112, .035); ft.scale.set(1, .72, 1.3);
       fg.add(ft);
-      /* 脚底白边 */
-      const sole = new THREE.Mesh(new THREE.SphereGeometry(.13, 10, 8), snowM);
-      sole.position.set(s * .165, .08, .035); sole.scale.set(1, .5, 1.25);
+      /* 白鞋底 */
+      const sole = new THREE.Mesh(new THREE.SphereGeometry(.125, 12, 9), snowM);
+      sole.position.set(s * .155, .045, .035); sole.scale.set(1, .42, 1.25);
       fg.add(sole);
+      /* 脚踝：把鞋和身体连起来的一小团，缺了它身体就悬在鞋上面 */
+      const ank = new THREE.Mesh(new THREE.SphereGeometry(.115, 12, 9), darkM);
+      ank.position.set(s * .145, .195, .02); ank.scale.set(.92, 1.05, .92);
+      fg.add(ank);
       g.add(fg);
       feet.push(fg);
     }
@@ -13006,6 +13035,14 @@ function updateAerialHaze(dt,t){
     const bodyParts = [];
     g.children.forEach(c => { if (c !== bodyGrp && !shoulders.includes(c) && !feet.includes(c)) bodyParts.push(c); });
     bodyParts.forEach(c => bodyGrp.add(c));
+    /* 整体缩放：身体/手脚一起缩，名牌留在外面不缩 */
+    const rig = new THREE.Group();
+    rig.scale.setScalar(AV_SCALE);
+    rig.userData.keep = true;
+    g.add(rig);
+    rig.add(bodyGrp);
+    shoulders.forEach(s => rig.add(s));
+    feet.forEach(f => rig.add(f));
     return g;
   }
 
@@ -13123,7 +13160,7 @@ function updateAerialHaze(dt,t){
     /* 名牌贴着头顶：身体拉伸/压扁时一起升降，别悬在半空
        （角色改小后头顶到 1.81，牌子跟着降）*/
     const tg = avatar.userData.tag;
-    if (tg) tg.position.y = 1.81 * sy + .24;
+    if (tg) tg.position.y = AV_TOP * sy + .28;
     return inAir;
   }
 
@@ -13139,7 +13176,7 @@ function updateAerialHaze(dt,t){
     /* 名牌挂在「不参与形变」的外层 group 上 —— 身体压缩/拉伸只作用在 bodyGrp，
        名牌既不会被压扁，也不会跟着上下点头 */
     MP.selfTag = makeTagSprite(MP.display || MP.account || '我', '#ffd9a0');
-    MP.selfTag.position.y = 2.05;
+    MP.selfTag.position.y = AV_TOP + .28;
     g.add(MP.selfTag);
     g.userData.tag = MP.selfTag;
     MP._phase = { v: 0 };
@@ -13167,7 +13204,7 @@ function updateAerialHaze(dt,t){
     if (MP.third && fp.on) {
       // 从第一人称切到第三人称：先把相机摆到角色背后（同一套 orbit 构图）
       const p0 = Math.max(-1.05, Math.min(1.05, fp.pitch));
-      const pivot = new THREE.Vector3(fp.x, fp.y + 1.90, fp.z);
+      const pivot = new THREE.Vector3(fp.x, fp.y + 1.42, fp.z);
       const f0 = new THREE.Vector3(
         -Math.sin(fp.yaw) * Math.cos(p0),
         Math.sin(p0),
@@ -13191,6 +13228,20 @@ function updateAerialHaze(dt,t){
   MP.setLocalPos = function (x, y, z, yaw) {
     MP._manual = true;
     MP._lastX = x; MP._lastY = y || 0; MP._lastZ = z; MP._lastYaw = yaw || 0;
+  };
+
+  /* ── 乘坐设施一律第一人称 ──
+     上车前把第三人称关掉（第三人称相机会跟设施的座位视角打架，
+     而且自己的角色会糊在镜头前面）；下车后恢复用户原来的选择。 */
+  MP.pushFirstPerson = function () {
+    if (MP._fpSaved !== undefined) return;
+    MP._fpSaved = MP.third;
+    if (MP.third) MP.toggleThird();   // 会同步按钮状态和角色显隐
+  };
+  MP.popFirstPerson = function () {
+    if (MP._fpSaved === undefined) return;
+    const v = MP._fpSaved; MP._fpSaved = undefined;
+    if (v && !MP.third) MP.toggleThird();
   };
 
   /* 把相机钉死在一个机位（自动化截图用）：
@@ -13244,7 +13295,7 @@ function updateAerialHaze(dt,t){
         const d = new THREE.Vector3();
         camera.getWorldDirection(d);
         return {
-          head: pr(1.70), feet: pr(0),
+          head: pr(1.25), feet: pr(0),
           camPitchDeg: +(Math.asin(Math.max(-1, Math.min(1, d.y))) * 180 / Math.PI).toFixed(2)
         };
       })() : null,
@@ -13280,7 +13331,7 @@ function updateAerialHaze(dt,t){
       const pitch = MP._cp;
       const dist = MP.camDist;
       /* pivot = 角色头顶略上方（跟着离地高度一起抬，跳跃时相机才不会把角色甩出画面）*/
-      const pivot = new THREE.Vector3(fp.x, fp.y + fp.jumpY + 1.90, fp.z);
+      const pivot = new THREE.Vector3(fp.x, fp.y + fp.jumpY + 1.42, fp.z);
       const fwd = new THREE.Vector3(
         -Math.sin(yaw) * Math.cos(pitch),
         Math.sin(pitch),
@@ -14275,6 +14326,37 @@ function animate(){
     st.vx=vx+(st.kx||0);st.vz=vz+(st.kz||0);
     car.position.set(nx+(st.kx||0),.12,nz+(st.kz||0));
     car.rotation.y=Math.atan2(vx,vz);
+  }
+  /* 碰碰车互撞：两台车真的会弹开（原来 NPC 车之间直接穿过去）*/
+  {
+    const bl=amusement.bumper;
+    for(let i=0;i<bl.length;i++){
+      const A=bl[i],sa=A.userData.st;
+      for(let j=i+1;j<bl.length;j++){
+        const B=bl[j],sb=B.userData.st;
+        if(sa.driven||sb.driven)continue;    // 玩家的车由驾驶逻辑处理
+        const dx=B.position.x-A.position.x, dz=B.position.z-A.position.z;
+        const d=Math.hypot(dx,dz), rr=BUMPER.carR*2;
+        if(d>=rr||d<1e-4)continue;
+        const nx=dx/d, nz=dz/d, push=(rr-d)*.5;
+        A.position.x-=nx*push; A.position.z-=nz*push;
+        B.position.x+=nx*push; B.position.z+=nz*push;
+        const rel=((sa.vx||0)-(sb.vx||0))*nx+((sa.vz||0)-(sb.vz||0))*nz;
+        const power=Math.max(.3,-rel*.6+.3);
+        bumperBump(A,-nx,-nz,power);
+        bumperBump(B,nx,nz,power);
+        sa.kx-=nx*power*.42;sa.kz-=nz*power*.42;
+        sb.kx+=nx*power*.42;sb.kz+=nz*power*.42;
+        const cx=(A.position.x+B.position.x)*.5, cz=(A.position.z+B.position.z)*.5;
+        const dd=Math.hypot(cx-camera.position.x,cz-camera.position.z);
+        if(dd<28){ bumperClash(power,dd); }
+      }
+    }
+  }
+  for(const car of amusement.bumper){
+    const st=car.userData.st;
+    if(st.driven)continue;
+    bumperBumpAnim(car,dt);
   }
   updateBumperDrive(dt);
   /* 镜头飞行 */
@@ -15576,6 +15658,7 @@ function hudHide(){trainHud.classList.remove('show','bare');}
 function toggleRideTrain(){
   if(trainSys.riding){
     trainSys.riding=false;
+    if(window.MP)MP.popFirstPerson();
     applyDpr(HI_DPR);
     const caboose=trainCars[trainCars.length-1];
     const p=caboose.position;
@@ -15588,6 +15671,7 @@ function toggleRideTrain(){
   }else{
     if(!fp.on)enterWalk();
     trainSys.riding=true;
+    if(window.MP)MP.pushFirstPerson();
     applyDpr(LO_DPR);
     sfx.blip(880,.12,.08);
   }
@@ -15610,6 +15694,7 @@ function stopFacilityRide(){
     st.kx=0;st.kz=0;
   }
   wheelSys.bump=null;
+  if(window.MP)MP.popFirstPerson();
   const ex=RIDE_EXITS[wheelSys.kind]||[4,24];
   wheelSys.riding=false;wheelSys.cab=null;wheelSys.kind=null;wheelSys.car=null;
   fp.x=ex[0];fp.z=ex[1];fp.y=0;fp.vx=fp.vz=0;
@@ -15621,6 +15706,7 @@ function toggleRideFacility(info){
   if(!fp.on)enterWalk();
   wheelSys.kind=info.kind;wheelSys.car=info.car||null;wheelSys.heli=info.heli||null;wheelSys.label=info.label||'游乐设施';
   wheelSys.riding=true;
+  if(window.MP)MP.pushFirstPerson();
   if(info.kind==='bumper'&&info.car){
     /* 坐上碰碰车 = 玩家接管：车上那只小熊驾驶员先收起来，换成玩家自己开。 */
     const c=info.car;
@@ -15645,6 +15731,7 @@ function toggleRideWheel(cab){
     cab=best;
   }
   wheelSys.kind='wheel';wheelSys.cab=cab;wheelSys.label='敞篷摩天轮';wheelSys.riding=true;
+  if(window.MP)MP.pushFirstPerson();
   if(cab&&cab.userData.rods)cab.userData.rods.forEach(r=>r.visible=false);
   sfx.blip(988,.14,.08);
 }
@@ -15680,6 +15767,7 @@ function startLaunchRide(){
   if(wheelSys.riding)stopFacilityRide();
   if(!fp.on)fpEnter(true);
   launchSys.active=true;
+  if(window.MP)MP.pushFirstPerson();
   launchSys.stage='charge';
   launchSys.timer=0.65;
   launchSys.x=27.5;launchSys.y=1.4;launchSys.z=53.0;
@@ -15694,6 +15782,7 @@ function startLaunchRide(){
 function stopLaunchRide(){
   if(!launchSys.active)return;
   launchSys.active=false;launchSys.stage='idle';
+  if(window.MP)MP.popFirstPerson();
   chuteGrp.visible=false;
   fp.x=Math.max(-72,Math.min(72,launchSys.x));
   fp.z=Math.max(-38,Math.min(68,launchSys.z));
@@ -16036,6 +16125,80 @@ function updateFpvDrone(dt){
    横向抓地力弱 → 转向会甩尾；撞到别的车会被弹开并把它撞出轨道。 */
 const BUMPER={maxV:8.0,acc:9.6,rev:5.6,drag:1.10,lat:2.70,turn:1.85,minTurnV:1.25,steerLag:5.2,
               edgeX:11.15,edgeZ:7.15,carR:.76,push:.42};
+
+/* ══ 碰碰车撞击表现 ══
+   撞车不该只是「弹开 + 缩一下」，要看得见：
+     · 车身朝撞击方向压扁（上下扁、四周鼓）
+     · 朝撞击方向侧倾 + 回弹（弹簧，不是硬停）
+     · 撞击点飞起一蓬雪沫
+     · 车上那只小熊驾驶员举手惊呼
+   力度 power 0~1.6，(nx,nz) 是撞击方向（世界坐标单位向量）。 */
+function bumperBump(car,nx,nz,power){
+  const st=car.userData.st;
+  if(!st)return;
+  const p=Math.min(1.6,Math.max(0,power));
+  if(p<.05)return;
+  st.sq=Math.min(1.1,st.sq+p*.8);
+  /* 撞击方向换算到车身本地（车头 = +Z）*/
+  const ang=car.rotation.y;
+  const lx=nx*Math.cos(ang)-nz*Math.sin(ang);
+  const lz=nx*Math.sin(ang)+nz*Math.cos(ang);
+  st.pitchV+=lz*p*1.5;      // 被推着走 → 车头跟着下沉（正面顶 → 车头一沉）
+  st.rollV+=lx*p*1.2;       // 侧向被推 → 车身侧倾
+  st.spinV+=lx*p*.9;        // 挨撞侧的车会被顶得转个角度
+  st.react=Math.min(1,st.react+p*.65);
+  /* 撞击点雪沫（接触点在被推方向的反侧） */
+  const px=car.position.x-nx*.62, pz=car.position.z-nz*.62;
+  const n=3+Math.round(p*4);
+  for(let i=0;i<n;i++){
+    spawnSnowPuff(px+R(-.14,.14),.30+R(0,.1),pz+R(-.14,.14),
+      nx*R(.5,1.9)+R(-.6,.6),R(.9,2.4),nz*R(.5,1.9)+R(-.6,.6),R(.05,.13),R(.30,.62));
+  }
+}
+/* 撞击动画推进：弹簧回弹 + 压扁 + 驾驶员反应 */
+function bumperBumpAnim(car,dt){
+  const st=car.userData.st;
+  if(!st)return;
+  if(st.sq>0)st.sq=Math.max(0,st.sq-dt*3.2);
+  const K=58,C=10.5;
+  st.pitchV+=(-st.pitch*K-st.pitchV*C)*dt; st.pitch+=st.pitchV*dt;
+  st.rollV+=(-st.roll*K-st.rollV*C)*dt;   st.roll+=st.rollV*dt;
+  st.spinV+=(-st.spin*46-st.spinV*8.5)*dt; st.spin+=st.spinV*dt;
+  /* 压扁：上下扁、四周鼓；叠一点侧倾摇摆 */
+  const s=.62*(1+st.sq*.04);
+  car.scale.set(s*(1+st.sq*.055), s*(1-st.sq*.105), s*(1+st.sq*.055));
+  car.rotation.x=st.pitch;
+  car.rotation.z=st.roll+Math.sin(t*7.3+st.ph)*st.sq*.05;
+  if(st.spin)car.rotation.y+=st.spin;
+  /* 驾驶员：被撞到就举手 */
+  const drv=car.userData.driver;
+  if(st.react>0){
+    st.react=Math.max(0,st.react-dt*1.5);
+    st.reactWas=1;
+    if(drv&&drv.userData.armL){
+      const r=st.react;
+      drv.userData.armL.rotation.x=-.78-r*1.45;
+      drv.userData.armR.rotation.x=-.78-r*1.45;
+      drv.userData.armL.rotation.z=r*.35;
+      drv.userData.armR.rotation.z=-r*.35;
+    }
+  }else if(st.reactWas){
+    st.reactWas=0;
+    if(drv&&drv.userData.armL){
+      drv.userData.armL.rotation.x=-.78;drv.userData.armR.rotation.x=-.78;
+      drv.userData.armL.rotation.z=0;drv.userData.armR.rotation.z=0;
+    }
+  }
+}
+/* 撞击声：闷响 + 金属余韵，力度越大越响 */
+function bumperClash(power,dist){
+  const pw=Math.min(1,Math.max(.15,power));
+  const vol=Math.max(0,1-(dist||0)/30);
+  if(vol<=0)return;
+  sfx.blip(92+pw*44,.20,(.055+pw*.075)*vol);
+  sfx.blip(720+pw*430,.11,.045*pw*vol);
+  sfx.blip(1210,.07,.028*pw*vol);
+}
 function updateBumperDrive(dt){
   const b=wheelSys.bump;
   if(!b||!wheelSys.riding||wheelSys.kind!=='bumper'||!b.car)return;
@@ -16080,14 +16243,14 @@ function updateBumperDrive(dt){
   /* ── 位移 ── */
   let px=car.position.x+vx*dt, pz=car.position.z+vz*dt;
   /* ── 撞围栏 ── */
-  let hitWall=0;
-  if(px> BUMPER.edgeX){px= BUMPER.edgeX;vx=-vx*.45;hitWall=1;}
-  if(px<-BUMPER.edgeX){px=-BUMPER.edgeX;vx=-vx*.45;hitWall=1;}
-  if(pz> BUMPER.edgeZ){pz= BUMPER.edgeZ;vz=-vz*.45;hitWall=1;}
-  if(pz<-BUMPER.edgeZ){pz=-BUMPER.edgeZ;vz=-vz*.45;hitWall=1;}
+  let hitWall=0,wallNx=0,wallNz=0;
+  if(px> BUMPER.edgeX){px= BUMPER.edgeX;vx=-vx*.45;hitWall=1;wallNx=-1;}
+  if(px<-BUMPER.edgeX){px=-BUMPER.edgeX;vx=-vx*.45;hitWall=1;wallNx=1;}
+  if(pz> BUMPER.edgeZ){pz= BUMPER.edgeZ;vz=-vz*.45;hitWall=1;wallNz=-1;}
+  if(pz<-BUMPER.edgeZ){pz=-BUMPER.edgeZ;vz=-vz*.45;hitWall=1;wallNz=1;}
   car.position.x=px;car.position.z=pz;
   /* ── 撞其他车：互相弹开 + 把对方撞出轨道 ── */
-  let hitCar=0;
+  let hitCar=0,carNx=0,carNz=0,carPower=0;
   for(const o of amusement.bumper){
     if(o===car)continue;
     const dx=px-o.position.x, dz=pz-o.position.z;
@@ -16105,24 +16268,32 @@ function updateBumperDrive(dt){
       const ost=o.userData.st;
       ost.kx=(ost.kx||0)-nx*imp*1.15;
       ost.kz=(ost.kz||0)-nz*imp*1.15;
-      hitCar=1;
+      hitCar=1;carNx=nx;carNz=nz;
+      carPower=Math.max(carPower,Math.min(1.5,-rel*.42));
+      /* 对方那台也要有反应：被顶得歪一下、驾驶员举手 */
+      bumperBump(o,-nx,-nz,carPower);
     }
   }
   car.position.x=px;car.position.z=pz;
   car.rotation.y=ang;
   b.ang=ang;b.vx=vx;b.vz=vz;b.speed=Math.hypot(vx,vz);
-  /* ── 撞击反馈：闷响 + 车身挤一下 ── */
+  /* ── 撞击反馈：闷响 + 车身压扁侧倾 + 镜头一抖 ── */
+  if(hitCar&&carPower>.05){
+    bumperBump(car,carNx,carNz,carPower);             // 自己被顶着走
+    b.shake=Math.min(1,(b.shake||0)+carPower*.85);   // 镜头抖一下
+  }
+  if(hitWall){
+    const wl=Math.hypot(wallNx,wallNz)||1;
+    bumperBump(car,wallNx/wl,wallNz/wl,.55+Math.min(.7,Math.abs(b.speed||0)*.09));
+    b.shake=Math.min(1,(b.shake||0)+.35);
+  }
   if((hitCar||hitWall)&&b.hitCd<=0){
-    b.hitCd=.22;b.hit=1;
-    sfx.blip(hitCar?132:104,.17,hitCar?.11:.09);
-    if(hitCar)sfx.blip(880,.06,.05);
+    b.hitCd=.22;
+    bumperClash(hitCar?carPower:.5,0);
   }
   if(b.hitCd>0)b.hitCd-=dt;
-  if(b.hit>0){
-    b.hit=Math.max(0,b.hit-dt*4.2);
-    const h=b.hit;
-    car.scale.set(.62*(1+h*.05),.62*(1-h*.06),.62*(1+h*.06));
-  }
+  if(b.shake>0)b.shake=Math.max(0,b.shake-dt*2.8);
+  bumperBumpAnim(car,dt);   // 弹簧回弹 + 压扁 + 驾驶员反应
   car.updateMatrixWorld(true);
 }
 
@@ -16163,7 +16334,14 @@ function updateWheelRide(dt){
       camera.position.copy(wp);
       const ang=(b&&b.ang!==undefined)?b.ang:car.rotation.y;
       const look=(b&&b.look)||0;
-      camera.rotation.set(fp.pitch,ang+Math.PI+look,0,'YXZ');
+      /* 撞击瞬间镜头抖一下（力度 b.shake 随时间衰减） */
+      const sh=(b&&b.shake)||0;
+      if(sh>0){
+        camera.position.x+=R(-.055,.055)*sh;
+        camera.position.y+=R(-.05,.05)*sh;
+        camera.position.z+=R(-.055,.055)*sh;
+      }
+      camera.rotation.set(fp.pitch+(sh?R(-.05,.05)*sh:0),ang+Math.PI+look,sh?R(-.07,.07)*sh:0,'YXZ');
       hudShow('','下车 (E)',stopFacilityRide,true);
       return;
     }else if(wheelSys.kind==='sleigh'){
