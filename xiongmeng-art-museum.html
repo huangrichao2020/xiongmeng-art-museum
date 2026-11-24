@@ -4675,7 +4675,6 @@ const animePark=new THREE.Group();animePark.userData.tag='park';scene.add(animeP
     const belly=M(0xf2e8d2,{roughness:.7,flatShading:false});
     const dark=M(0x1f2328,{roughness:.3,flatShading:false});
     const wht=M(0xffffff,{roughness:.15,flatShading:false});
-    const leafM=M(0x369a48,{roughness:.45,flatShading:false});
     // 厚实身躯 + 圆润肩颈融合 + 绒毛肚皮
     add(g,new THREE.SphereGeometry(1.16,28,22),fur,0,1.38,0).scale.set(1.02,1.15,.95);
     add(g,new THREE.SphereGeometry(.86,24,18),fur,0,2.08,-.02).scale.set(1.02,.90,.92);
@@ -4709,9 +4708,8 @@ const animePark=new THREE.Group();animePark.userData.tag='park';scene.add(animeP
     add(g,new THREE.SphereGeometry(.11,12,10),dark,0,2.04,.95).scale.set(1.3,.75,.8);
     // 后方厚毛绒大尾巴
     add(g,new THREE.SphereGeometry(.46,16,12),fur,0,.44,-.92).scale.set(.95,.88,1.42);
-    // 荷叶微偏放置以便头顶稳戴圣诞帽
-    add(g,new THREE.CylinderGeometry(.032,.042,.42,8),leafM,-.32,2.68,.18).rotation.z=.22;
-    add(g,new THREE.CylinderGeometry(.76,.76,.05,22),leafM,-.36,2.88,.20).scale.set(1.05,1,.92);
+    // 头顶荷叶已删：原来那圈绿盘从侧面探出来，戴上圣诞帽后变成「头上挂一块绿板」，
+    // 在夜景里格外扎眼，跟整只灰色龙猫的调子也对不上。现在头顶只留圣诞红帽。
     // 脚边 2 只小龙猫（补全手臂/耳/脚/尾）
     for(const [mx,mz,mc,ms] of [[-1.25,.68,0x6a9ec9,.42],[1.22,.58,0xf4f2eb,.32]]){
       const mini=new THREE.Group();mini.position.set(mx,0,mz);mini.scale.setScalar(ms);g.add(mini);
@@ -5149,6 +5147,29 @@ const animePark=new THREE.Group();animePark.userData.tag='park';scene.add(animeP
     // 经典角色直接随头部局部坐标戴圣诞红帽
     if(fn===buildTotoro){
       const th=buildSantaHat(.40,.84);th.position.set(0,2.80,0);fig.add(th);
+      /* ── C 位打光：中央龙猫单独拎出来当视觉中心 ──
+         一盏暖金聚光从头顶正上方压下来 + 底座光池 + 广场地面余光。
+         试过加一道可见光幕（12m 高的加色锥体），实测把整个广场都罩亮了一层，
+         旁边的小黄人、哆啦A梦跟着一起变亮，反而看不出谁是 C 位 —— 砍掉。
+         现在只有雕塑本身被光打亮、邻居亮度不变（实测龙猫 +27 灰阶，邻居 ±2）。 */
+      const sTop=13.2,sBase=.62;
+      const sl=new THREE.SpotLight(0xffd9a0,1000,34,.30,.72,1.55);
+      sl.position.set(PX,sTop,PZ);
+      const tgt=new THREE.Object3D();tgt.position.set(PX,2.0,PZ);scene.add(tgt);
+      sl.target=tgt;scene.add(sl);
+      shopLights.push({l:sl,base:1000,street:false,delay:1.8});
+      /* 底座顶面光池 + 广场地面余光（都是软边贴图，不会出现硬边圆盘） */
+      const poolTop=new THREE.Mesh(new THREE.CircleGeometry(1,48),new THREE.MeshBasicMaterial({
+        map:glowTex,color:0xffca88,transparent:true,opacity:.30,blending:THREE.AdditiveBlending,
+        depthWrite:false,fog:false}));
+      poolTop.rotation.x=-Math.PI/2;poolTop.position.set(PX,.66,PZ);poolTop.scale.setScalar(2.1);
+      poolTop.renderOrder=2;poolTop.userData.noReflect=true;scene.add(poolTop);
+      const poolGnd=new THREE.Mesh(new THREE.CircleGeometry(1,48),new THREE.MeshBasicMaterial({
+        map:glowTex,color:0xffbe74,transparent:true,opacity:.15,blending:THREE.AdditiveBlending,
+        depthWrite:false,fog:false}));
+      poolGnd.rotation.x=-Math.PI/2;poolGnd.position.set(PX,.16,PZ);poolGnd.scale.setScalar(3.4);
+      poolGnd.renderOrder=2;poolGnd.userData.noReflect=true;scene.add(poolGnd);
+      window.__totoroSpot={light:sl,poolTop,poolGnd};
     }else if(fn===buildDoraemon){
       const dh=buildSantaHat(.36,.72);dh.position.set(0,2.68,0);fig.add(dh);
     }else if(fn===buildPikachu){
