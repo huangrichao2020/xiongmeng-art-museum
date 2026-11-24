@@ -142,6 +142,43 @@ const server = http.createServer((req, res) => {
         console.log('[record]', out.shot, out.duration + 's', out.size + 'B', '→', out.file);
         return send(res, 200, { ok: true, ...out });
       }
+      if (url.pathname === '/convert' && req.method === 'POST') {
+        /* 浏览器端录制产物 → mp4。Chrome 的 MediaRecorder 只能出 webm，
+           这里用 ffmpeg 补一份 H.264 mp4，页面拿回去直接下载。 */
+        const chunks = [];
+        let size = 0;
+        req.on('data', c => { chunks.push(c); size += c.length; if (size > 400e6) req.destroy(); });
+        req.on('end', () => {
+          try {
+            fs.mkdirSync(OUTDIR, { recursive: true });
+            const stem = '_conv_' + Date.now();
+            const src = path.join(OUTDIR, stem + '.webm');
+            const dst = path.join(OUTDIR, stem + '.mp4');
+            fs.writeFileSync(src, Buffer.concat(chunks));
+            /* MediaRecorder 的 webm 没有时长头，用 genpts 让 ffmpeg 按帧时间戳补；
+               宽高取偶数（x264 不接受奇数），再加 faststart 方便边下边播。 */
+            const fps = Math.min(60, Math.max(1, +(url.searchParams.get('fps') || 30)));
+            execFileSync('ffmpeg', ['-y', '-v', 'error', '-fflags', '+genpts', '-i', src,
+              '-vf', 'fps=' + fps + ',scale=trunc(iw/2)*2:trunc(ih/2)*2',
+              '-r', String(fps),
+              '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19',
+              '-pix_fmt', 'yuv420p', '-movflags', '+faststart', dst], { stdio: 'ignore' });
+            const buf = fs.readFileSync(dst);
+            try { fs.unlinkSync(src); fs.unlinkSync(dst); } catch (_) {}
+            res.writeHead(200, {
+              'Content-Type': 'video/mp4',
+              'Content-Length': buf.length,
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
+            });
+            res.end(buf);
+          } catch (e) {
+            console.error('[convert]', e.message);
+            send(res, 500, { ok: false, error: String(e.message || e) });
+          }
+        });
+        return;
+      }
       send(res, 404, { ok: false, error: 'no route ' + url.pathname });
     } catch (e) {
       console.error('[err]', e.message);

@@ -223,6 +223,45 @@
   body.touch .wtools button{min-width:44px;height:40px;border-radius:20px;font-size:12px}
   /* 触屏：沉浸内的 .wtop 隐藏，统一用常驻 .wtools，避免两套按钮叠在一起 */
   body.touch .wtop{display:none!important}
+
+  /* ── 页面原生录制按钮 ── */
+  #w-rec::before{
+    content:'';display:inline-block;width:8px;height:8px;border-radius:50%;
+    background:#ff5a5a;margin-right:6px;vertical-align:middle;
+    box-shadow:0 0 7px rgba(255,90,90,.85);
+  }
+  #w-rec.rec{color:#ffb0b0;border-color:rgba(255,120,120,.62);background:rgba(96,18,18,.46)}
+  #w-rec.rec::before{animation:recblink 1s steps(1,end) infinite}
+  @keyframes recblink{0%,100%{opacity:1}50%{opacity:.2}}
+
+  /* 全局提示条 */
+  #xmsg{
+    position:fixed;left:50%;bottom:74px;transform:translate(-50%,8px);z-index:60;
+    padding:9px 16px;border-radius:4px;pointer-events:none;opacity:0;
+    font-family:var(--han);font-size:12.5px;color:#eaf4ff;letter-spacing:.02em;
+    background:rgba(8,14,22,.9);border:1px solid var(--line-strong);
+    box-shadow:0 8px 26px rgba(0,0,0,.5);transition:opacity .2s,transform .2s;
+    max-width:86vw;text-align:center;
+  }
+  #xmsg.show{opacity:1;transform:translate(-50%,0)}
+
+  /* 录完预览兜底（iOS 上部分浏览器不认 download 属性，只能长按保存） */
+  #recpv{
+    position:fixed;inset:0;z-index:70;display:none;place-items:center;
+    background:rgba(4,8,13,.82);backdrop-filter:blur(6px);
+  }
+  #recpv.show{display:grid}
+  #recpv .rpv-box{
+    width:min(92vw,560px);padding:14px;border-radius:6px;
+    background:rgba(10,16,24,.94);border:1px solid var(--line-strong);
+    display:flex;flex-direction:column;gap:10px;align-items:center;
+  }
+  #recpv video{width:100%;max-height:62vh;background:#000;border-radius:3px}
+  #recpv p{font-family:var(--han);font-size:12px;color:#a9c4d8;text-align:center;line-height:1.6}
+  #recpv button{
+    padding:7px 20px;border-radius:16px;cursor:pointer;font-family:var(--han);font-size:12px;
+    background:rgba(104,208,245,.16);border:1px solid rgba(160,220,250,.45);color:#dff2ff;
+  }
   /* ── 触屏端视觉优化 ──
      手机屏像素密度高（1px 扫描线会变摩尔纹），混合模式暗角在 OLED 上发闷，
      所以触屏端去掉扫描线、换成普通 rgba 暗角，并把整体色调提亮一点。 */
@@ -521,6 +560,7 @@
   <button id="w-fpv" title="FPV 穿越机特技模式 (F)" data-label="穿越"></button>
   <button id="w-quality" title="高画质光滤镜开关" data-label="高画质"></button>
   <button id="w-audio" class="on" title="声音" data-label="♪"></button>
+  <button id="w-rec" title="录制画面，录完自动保存到本机" data-label="录制"></button>
 </div>
 <div id="fpv-osd">
   <i class="corner c-tl"></i><i class="corner c-tr"></i><i class="corner c-bl"></i><i class="corner c-br"></i>
@@ -570,6 +610,15 @@
       <div id="gb-list"></div>
       <div id="gb-main"></div>
     </div>
+  </div>
+</div>
+
+<div id="xmsg"></div>
+<div id="recpv">
+  <div class="rpv-box">
+    <video id="recpv-video" controls playsinline></video>
+    <p id="recpv-tip">长按视频 → 存储到「文件」/「照片」</p>
+    <button id="recpv-close">关闭</button>
   </div>
 </div>
 
@@ -11975,6 +12024,12 @@ function animate(){
   directorUpdate(dt);                    // XM Studio：导演机位（覆盖玩家视角）
   composer.render();
   if(director.recTrack&&director.recTrack.requestFrame)director.recTrack.requestFrame();
+  /* UI 录制走自己的轨道（captureStream(0) 是手动逐帧模式），
+     不调 requestFrame 的话整段视频只会剩一帧 —— 这里每帧补一发并计数。 */
+  if(window._uiRecTrack&&window._uiRecTrack.requestFrame){
+    window._uiRecTrack.requestFrame();
+    window._uiRecFrames=(window._uiRecFrames||0)+1;
+  }
 
   /* FPS + 全局自适应 DPR 稳帧控制器（任意视角掉帧自动降像素比保流畅，回稳后自动恢复高清） */
   fpsFrames++;
@@ -11985,7 +12040,7 @@ function animate(){
     /* 移动端：掉帧连续 3 次降到低分辨率档，回稳后连续 6 次升回高清档
        （旧逻辑只降不升，掉一次帧就永久留在低分辨率，越看越糊）。
        桌面：只有低画质档才允许自动调节，高画质档用户点了就不动。 */
-    if(!ridingFast&&IS_TOUCH_DEV){
+    if(!ridingFast&&IS_TOUCH_DEV&&!window._recording){
       if(f<36){
         window._lowFpsStreak=(window._lowFpsStreak||0)+1;window._hiFpsStreak=0;
         if(window._lowFpsStreak>=3&&renderer.getPixelRatio()>LO_DPR+.05)applyDpr(LO_DPR);
@@ -11993,7 +12048,7 @@ function animate(){
         window._hiFpsStreak=(window._hiFpsStreak||0)+1;window._lowFpsStreak=0;
         if(window._hiFpsStreak>=6)applyDpr(HI_DPR);
       }
-    }else if(!ridingFast&&!state.quality){
+    }else if(!ridingFast&&!state.quality&&!window._recording){
       if(f<36){
         window._lowFpsStreak=(window._lowFpsStreak||0)+1;window._hiFpsStreak=0;
         if(window._lowFpsStreak>=3&&renderer.getPixelRatio()>LO_DPR+.05)applyDpr(LO_DPR);
@@ -12317,6 +12372,186 @@ window.XM={
     };
   }
 };
+
+/* ══════════════════════════════════════════════════════════════════════
+   页面原生录制按钮（右上角「● 录制」）
+   ──────────────────────────────────────────────────────────────────────
+   点一下开始录，再点一下停止；录完自动下载到本机 ——
+   电脑 → 浏览器「下载」文件夹；手机 → 「文件」/「照片」。
+
+   要点：
+   · MediaRecorder 只能录 canvas 的当前像素尺寸，所以「更清晰」的做法是
+     先把像素比临时提上去 → 等两帧让新画布尺寸生效 → 再 captureStream，
+     录完再把像素比还原。
+   · 录制期间锁死自适应降档（window._recording），否则掉帧时分辨率会在
+     视频中途偷偷跳变，成片看着像卡带。
+   · 手机 Safari 对 download 属性支持不稳：优先走系统分享（存到「文件」），
+     失败再退回 <a download>，最后兜一个可长按保存的预览层。
+   ══════════════════════════════════════════════════════════════════════ */
+const _rec={on:false,rec:null,chunks:[],t0:0,timer:0,dpr0:1,ratio:1,mime:'',msgT:0};
+
+function _recPad(n){return String(n).padStart(2,'0')}
+function _recStamp(){
+  const d=new Date();
+  return d.getFullYear()+_recPad(d.getMonth()+1)+_recPad(d.getDate())+'-'+_recPad(d.getHours())+_recPad(d.getMinutes())+_recPad(d.getSeconds());
+}
+function _recIsIOS(){
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+}
+function _recMsg(t,ms){
+  const el=document.getElementById('xmsg');
+  if(!el)return;
+  el.textContent=t;el.classList.add('show');
+  clearTimeout(_rec.msgT);
+  _rec.msgT=setTimeout(()=>el.classList.remove('show'),ms||2800);
+}
+function _recLabel(t){
+  const b=document.getElementById('w-rec');
+  if(!b)return;
+  b.dataset.label=t;
+}
+/* 录制分辨率：先量一帧率余量，再决定要不要往上提分辨率。
+   实测这个场景的帧率跟像素量强相关（约 136 万像素 40fps、420 万像素 11fps），
+   硬拉到 4K 会把画面录成幻灯片 —— 所以只有机器跑得动时才提一档，
+   跑不动就保持当前预览分辨率，流畅优先。 */
+function _recProbeFps(n){
+  return new Promise(res=>{
+    const t0=performance.now();let i=0;
+    const tick=()=>{ i++; if(i>=n)return res(+(n*1000/(performance.now()-t0)).toFixed(1)); requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  });
+}
+async function _recTargetDpr(){
+  const cur=renderer.getPixelRatio();
+  const w=innerWidth,h=innerHeight;
+  const budget=IS_TOUCH_DEV?2.4e6:2.8e6;          // 录制时的像素上限
+  const cap=Math.sqrt(budget/(w*h));
+  const fps=await _recProbeFps(16);
+  let dpr=cur;
+  if(fps>=46) dpr=Math.min(cur*1.28,cap);            // 有余量：提 1.28 倍（约 1.6 倍像素）
+  return Math.max(1,Math.min(cap,Math.max(cur,dpr)));
+}
+function _recPreview(url){
+  const box=document.getElementById('recpv');
+  const v=document.getElementById('recpv-video');
+  if(!box||!v)return;
+  v.src=url;
+  box.classList.add('show');
+}
+async function _recSave(blob){
+  const name='xiongmeng-'+_recStamp()+(_rec.mime.indexOf('mp4')>=0?'.mp4':'.webm');
+  let outBlob=blob,outName=name;
+  /* 本机 XM Studio 服务在跑的话，顺便让 ffmpeg 转一份 mp4 ——
+     Chrome 的 MediaRecorder 只能出 webm，剪辑软件里 mp4 省事得多。 */
+  try{
+    const ac=new AbortController();
+    const to=setTimeout(()=>ac.abort(),8000);
+    const q='?fps='+(_rec.fps||30)+'&frames='+(_rec.frames||0);
+    const r=await fetch('http://127.0.0.1:8789/convert'+q,{method:'POST',body:blob,signal:ac.signal});
+    clearTimeout(to);
+    if(r.ok&&(r.headers.get('content-type')||'').indexOf('video/mp4')>=0){
+      outBlob=await r.blob();
+      outName=name.replace(/\.webm$/,'.mp4');
+    }
+  }catch(e){ /* 服务没开就算了，直接存原格式 */ }
+  const url=URL.createObjectURL(outBlob);
+  const file=new File([outBlob],outName,{type:outBlob.type||'video/mp4'});
+  if(_recIsIOS()&&navigator.canShare&&navigator.canShare({files:[file]})){
+    /* iOS 上系统分享面板是唯一可靠的「存到文件/照片」通道；
+       但面板一直挂着不响应时不能把用户晾在这儿 —— 45 秒后自己兜底。 */
+    let done=false;
+    const bail=setTimeout(()=>{ if(!done){done=true;_recSaveFallback(url,outName);} },45000);
+    navigator.share({files:[file],title:outName})
+      .catch(()=>{ if(!done){done=true;clearTimeout(bail);_recSaveFallback(url,outName);} });
+    return;
+  }
+  _recSaveFallback(url,outName);
+}
+function _recSizeText(b){
+  return b>=1048576?Math.round(b/1048576)+'MB':Math.max(1,Math.round(b/1024))+'KB';
+}
+function _recSaveFallback(url,name){
+  const a=document.createElement('a');
+  a.href=url;a.download=name;a.rel='noopener';
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{a.remove();URL.revokeObjectURL(url)},10000);
+  if(_recIsIOS())_recPreview(url);      // iOS 上再给一个可长按保存的入口
+}
+async function _recStart(){
+  if(_rec.on)return;
+  if(!window.MediaRecorder){_recMsg('这个浏览器不支持画面录制');return;}
+  let dpr=await _recTargetDpr();
+  /* H.264 要求宽高都是偶数，浏览器算出来的画布宽度可能是奇数（比如 1843），
+     这里把像素比微调到让画布宽度落在偶数上，服务端那边也留了兜底缩放。 */
+  const evenW=Math.max(2,Math.round(innerWidth*dpr)&~1);
+  dpr=evenW/innerWidth;
+  _rec.dpr0=renderer.getPixelRatio();
+  _rec.ratio=dpr;
+  applyDpr(dpr);
+  await new Promise(r=>setTimeout(r,420));           // 等新画布尺寸稳定再捕获
+  let mime='video/webm';
+  if(MediaRecorder.isTypeSupported){
+    mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4']
+      .find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
+  }
+  let stream=null;
+  try{ stream=renderer.domElement.captureStream(0); }
+  catch(e){ applyDpr(_rec.dpr0); _recMsg('这个浏览器不支持画面录制'); return; }
+  const track=stream.getVideoTracks()[0];
+  window._uiRecTrack=track;window._uiRecFrames=0;
+  const cw=Math.round(innerWidth*dpr),ch=Math.round(innerHeight*dpr);
+  const bps=Math.min(36e6,Math.max(12e6,cw*ch*30*0.15));
+  const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:bps});
+  _rec.chunks=[];_rec.mime=mime;
+  rec.ondataavailable=e=>{if(e.data&&e.data.size)_rec.chunks.push(e.data)};
+  rec.onstop=()=>{
+    const blob=new Blob(_rec.chunks,{type:mime});
+    const frames=window._uiRecFrames||0;
+    _rec.frames=frames;
+    const secs=(performance.now()-_rec.t0)/1000;
+    _rec.fps=secs>0.2?Math.round(frames/secs):30;
+    window._uiRecTrack=null;
+    _rec.chunks=[];_rec.on=false;_rec.rec=null;
+    window._recording=false;
+    applyDpr(_rec.dpr0);
+    clearInterval(_rec.timer);
+    const b=document.getElementById('w-rec');
+    if(b)b.classList.remove('rec');
+    _recLabel('录制');
+    if(blob.size>2048){
+      _recSave(blob);
+      _recMsg('已保存到本机 · '+cw+'×'+ch+' · '+_recSizeText(blob.size)+' · '+(_rec.fps||30)+'fps');
+    }else _recMsg('录制失败，画面是空的');
+  };
+  rec.onerror=()=>{_recMsg('录制出错，请重试')};
+  rec.start(300);
+  _rec.rec=rec;_rec.on=true;window._recording=true;_rec.t0=performance.now();
+  const b=document.getElementById('w-rec');
+  if(b)b.classList.add('rec');
+  _rec.timer=setInterval(()=>{
+    const s=Math.floor((performance.now()-_rec.t0)/1000);
+    _recLabel('● '+_recPad(Math.floor(s/60))+':'+_recPad(s%60));
+  },400);
+  _recMsg('录制中 · '+cw+'×'+ch+' · 再点一次停止');
+}
+function _recStop(){
+  if(!_rec.rec)return;
+  try{_rec.rec.stop()}catch(e){}
+}
+(function bindRec(){
+  const b=document.getElementById('w-rec');
+  if(b)b.addEventListener('click',()=>{ _rec.on?_recStop():_recStart(); });
+  const close=document.getElementById('recpv-close');
+  const box=document.getElementById('recpv');
+  if(close&&box)close.addEventListener('click',()=>{
+    box.classList.remove('show');
+    const v=document.getElementById('recpv-video');
+    if(v)v.removeAttribute('src');
+  });
+  /* 旋转屏幕 / 改窗口大小会让画布尺寸突变，正在录的视频会花 —— 直接收尾 */
+  addEventListener('resize',()=>{ if(_rec.on)setTimeout(_recStop,80); });
+  addEventListener('pagehide',()=>{ if(_rec.on)_recStop(); });
+})();
 
 function baseKeyIntensity(){
   const elev=Math.sin(((state.hour-6)/12)*Math.PI);

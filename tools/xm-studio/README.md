@@ -30,6 +30,7 @@ launchctl load ~/Library/LaunchAgents/com.tingchim2pro.xmstudio.plist
 | GET | `/shots` | 列出全部机位（id / 中文名 / 类型 / 描述） |
 | POST | `/shot` | `{"id":"coaster-chase"}` 切机位，不录 |
 | POST | `/record` | `{"shot":"coaster-chase","duration":8,"fps":30,"saturation":1.3}` 录制并落盘 |
+| POST | `/convert` | 浏览器端录制产物 → mp4（页面「录制」按钮自动调用，body 直接放视频字节，`?fps=30` 指定输出帧率） |
 
 `/record` 返回：
 
@@ -61,6 +62,16 @@ curl -s -XPOST http://127.0.0.1:8789/record \
 # 批量出样片
 ./shoot-demo.sh "coaster-chase fpv-chase balloon-chase" 8
 ```
+
+## 页面原生录制按钮（右上角「● 录制」）
+
+页面右上角工具条里有个红点按钮，**点一下开始录，再点一下停止，录完自动下载到本机**：
+
+- 电脑 → 浏览器「下载」文件夹；手机（iOS）→ 系统分享面板里「存储到文件 / 照片」
+- 分辨率不是硬拉 4K：先量一帧率余量，机器跑得动才往上提一档（×1.28），跑不动就保持当前预览分辨率 —— 流畅优先
+- 录制期间锁死自适应降档（`window._recording`），成片中途不会偷偷掉分辨率
+- 录完先问本机 XM 服务要一份 mp4（Chrome 的 MediaRecorder 只出 webm），拿不到就存原格式
+- 实测：桌面 1440×900 → 1840×1150 / 38fps；iPhone 393×852 → 628×1361 / 43fps
 
 ## 页面内 API（任何能驱动浏览器/CDP 的 AI 都能直接用）
 
