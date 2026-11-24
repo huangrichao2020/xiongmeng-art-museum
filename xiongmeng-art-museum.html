@@ -13808,7 +13808,9 @@ function updateWheelRide(dt){
       const look=(b&&b.look)||0;
       camera.rotation.set(fp.pitch,ang+Math.PI+look,0,'YXZ');
       trainHud.classList.add('show');
-      trainMsgEl.textContent='冰面碰碰车 · W/↑ 油门 S/↓ 刹车倒车 A/← D/→ 转向 · 拖动鼠标环顾 · 速度 '+((b&&b.speed)||0).toFixed(1)+' m/s';
+      trainMsgEl.textContent=IS_TOUCH_DEV
+        ? '冰面碰碰车 · 左手摇杆上下=油门 / 左右=转向 · 单指拖动环顾 · 速度 '+((b&&b.speed)||0).toFixed(1)+' m/s'
+        : '冰面碰碰车 · W/↑ 油门 S/↓ 刹车倒车 A/← D/→ 转向 · 拖动鼠标环顾 · 速度 '+((b&&b.speed)||0).toFixed(1)+' m/s';
       trainBtnEl.textContent='下车 (E)';
       trainBtnEl.onclick=stopFacilityRide;
       return;
