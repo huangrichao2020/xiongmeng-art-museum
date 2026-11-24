@@ -20,6 +20,25 @@ const PORT = 18888;
 const HOST = '127.0.0.1';
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
+/* ══════════════════════════════════════════════════════════════════════
+   全局时间基准
+   ──────────────────────────────────────────────────────────────────────
+   多人世界里所有「表演性」的循环动画（旋转木马、马戏团四幕、热气球浮动、
+   灯串扫光）以前各客户端各转各的：每个页面用自己的 t += dt 累加，
+   起点是页面加载那一刻，累加速率还受各自帧率影响 —— 于是同一部
+   旋转木马，在甲的手机上转了两圈，在乙的手机上才转了一圈半。
+
+   解决办法：时间是唯一的，动画相位只能是时间的纯函数。
+     · TIME_EPOCH = 全端约定的固定纪元（不用服务器启动时刻，
+       否则服务器一重启所有人的画面相位就整体跳一次）
+     · 客户端拿服务器时间做偏移校准（NTP 方式：ping 带 c1，
+       服务端回 s2/s3，客户端算 ((s2-c1)+(s3-t4))/2）
+     · 客户端的 t = (服务器时间 - TIME_EPOCH)/1000，直接算，不累加
+   这样只要两端时钟对齐，同一时刻看到的就是同一帧。
+   ══════════════════════════════════════════════════════════════════════ */
+const TIME_EPOCH = Date.UTC(2026, 0, 1, 0, 0, 0);   // 固定纪元，全端一致
+const startedAt = Date.now();                       // 服务端本次启动时刻（仅用于展示/诊断）
+
 /* ── 账号表 ──
    test01 / test02 是给真人玩家用的（游戏登录页的快捷按钮就是这两个）；
    test03~test08 是自动化探针专用的 —— 探针按进程号分配账号，
@@ -221,6 +240,14 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({ build: currentBuild(), ts: Date.now() }));
     return;
   }
+  /* 服务器权威时间：页面一加载就能拿到（不需要先登录），
+     客户端据此校准自己的时钟偏移，之后所有循环动画都用服务器时间算相位。 */
+  if (path.endsWith('/time')) {
+    const now = Date.now();
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({ epoch: TIME_EPOCH, st: startedAt, now: now }));
+    return;
+  }
   /* 部署脚本上传完立刻调它：新版本马上推给所有在线设备，不用等 5 秒轮询 */
   if (path.endsWith('/notify-update')) {
     const b = currentBuild();
@@ -348,6 +375,8 @@ function handleConn(socket) {
 
   function onMessage(msg) {
     const t = msg.t;
+    /* 记录「收到这条消息的时刻」，ping 回包时作为 NTP 的 s2 用 */
+    try { msg.__s2 = Date.now(); } catch (e) { }
     if (t === 'login') {
       const acc = String(msg.account || '').trim().toLowerCase();
       const pass = String(msg.pass || '');
@@ -417,6 +446,9 @@ function handleConn(socket) {
         players: roomPlayers(),
         server: os.hostname(),
         build: currentBuild(),
+        epoch: TIME_EPOCH,
+        st: startedAt,
+        now: Date.now(),
       });
       broadcastRoom(session.room);
       log('online', acc, 'online=' + sessions.size);
@@ -506,7 +538,11 @@ function handleConn(socket) {
         break;
       }
       case 'ping':
-        send({ t: 'pong', ts: Date.now() });
+        /* NTP 风格时间同步：客户端带 c1（自己发出的时刻），
+           服务端回 s2（收到的时刻）和 s3（发出的时刻），
+           客户端算 offset = ((s2-c1)+(s3-t4))/2 —— 这是消除
+           「每个人手机上的动画轨迹对不上」的关键。 */
+        send({ t: 'pong', ts: Date.now(), c1: msg.c1, s2: msg.__s2 || Date.now(), s3: Date.now(), epoch: TIME_EPOCH, st: startedAt });
         break;
       case 'chat': {
         const txt = String(msg.text || '').slice(0, 120);

@@ -7165,6 +7165,180 @@ const skylineMats=[];
       addNS(ch,BX(.88,.14,.14),goldGlowM,tx,24.9,tz);
     }
 
+    /* ══════════════════════════════════════════════════════════════════
+       ★ 大本钟 —— 全服统一时间的可视化
+       ──────────────────────────────────────────────────────────────
+       钟楼立在西立面正中、双塔之间，比两侧塔还高一截（巴黎圣母院西立面
+       的构图：中央最高）。做法跟旁边两座塔完全一致：砂岩砖主体 +
+       多层线脚 + 四角壁柱 + 八角过渡层 + 深暮蓝石板尖塔 + 独立雪檐，
+       不做纯色大方盒。钟盘直径 3.2m，四面都有，罗马数字 + 铁艺金圈。
+
+       三根指针走的是「服务器权威时间」——和旋转木马、马戏团四幕共用
+       同一个 t：不管谁在哪台设备上登录，抬头看到的都是同一时刻。
+       这就是这套统一时间机制最直观的一个证据。
+       ══════════════════════════════════════════════════════════════════ */
+    const CLOCK_R=1.72;                      // 钟盘半径
+    const CLOCK_Y=15.90;                     // 钟盘中心高度
+    const CLOCK_Z=7.10;                      // 钟楼 z（西立面正中，架在双塔之间、玫瑰窗正上方）
+    const CLOCK_HW=2.15;                     // 塔身半宽（双塔内壁在 ±2.2，正好塞进去不穿模）
+    const CLOCK_HD=2.30;                     // 塔身半深
+    /* ── 盘面：罗马数字 + 分钟刻度 + 金环（512 画布）── */
+    const clockFaceTex=(()=>{
+      const [c,x]=cv(512,512);
+      const cx=256,cy=256,R0=250;
+      const g=x.createRadialGradient(cx,cy,18,cx,cy,R0);
+      g.addColorStop(0,'#2a3a5e');g.addColorStop(.70,'#17223c');g.addColorStop(1,'#0c1326');
+      x.fillStyle=g;x.beginPath();x.arc(cx,cy,R0,0,Math.PI*2);x.fill();
+      x.strokeStyle='#e6bb5e';x.lineWidth=8;
+      x.beginPath();x.arc(cx,cy,R0-6,0,Math.PI*2);x.stroke();
+      x.strokeStyle='rgba(230,187,94,.38)';x.lineWidth=2.5;
+      x.beginPath();x.arc(cx,cy,R0-30,0,Math.PI*2);x.stroke();
+      for(let i=0;i<60;i++){
+        const a=(i/60)*Math.PI*2-Math.PI/2, big=(i%5===0);
+        const r1=R0-36, r2=R0-(big?68:52);
+        x.strokeStyle=big?'#f6e0a8':'rgba(228,198,142,.50)';
+        x.lineWidth=big?6.5:2.4;
+        x.beginPath();
+        x.moveTo(cx+Math.cos(a)*r1,cy+Math.sin(a)*r1);
+        x.lineTo(cx+Math.cos(a)*r2,cy+Math.sin(a)*r2);
+        x.stroke();
+      }
+      /* 罗马数字（钟面惯例：4 点写 IIII）*/
+      const ROM=['XII','I','II','III','IIII','V','VI','VII','VIII','IX','X','XI'];
+      x.textAlign='center';x.textBaseline='middle';
+      x.font='bold 44px Georgia,"Times New Roman",serif';
+      for(let i=0;i<12;i++){
+        const a=(i/12)*Math.PI*2-Math.PI/2, rr=R0-100;
+        x.save();
+        x.translate(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr);
+        x.rotate(a+Math.PI/2);
+        x.fillStyle='#f7e4b0';
+        x.shadowColor='rgba(255,206,112,.55)';x.shadowBlur=11;
+        x.fillText(ROM[i],0,0);
+        x.restore();
+      }
+      x.shadowBlur=0;
+      x.fillStyle='#0b1122';x.beginPath();x.arc(cx,cy,26,0,Math.PI*2);x.fill();
+      x.strokeStyle='#e6bb5e';x.lineWidth=3;x.stroke();
+      return ctex(c);
+    })();
+    const clockFaceM=new THREE.MeshStandardMaterial({
+      map:clockFaceTex,emissive:0xffffff,emissiveMap:clockFaceTex,
+      emissiveIntensity:.42,roughness:.58,metalness:.12});
+    /* ── 塔身：主体 + 四角壁柱 + 双层线脚 ── */
+    add(ch,BX(CLOCK_HW*2,6.2,CLOCK_HD*2),gothicStoneM,0,15.3,CLOCK_Z);
+    for(const sx of [-1,1])for(const sz of [-1,1])
+      add(ch,BX(.54,6.4,.54),gothicTrimM,sx*(CLOCK_HW-.27),15.3,CLOCK_Z+sz*(CLOCK_HD-.27));
+    add(ch,BX(CLOCK_HW*2+.44,.30,CLOCK_HD*2+.44),gothicTrimM,0,12.42,CLOCK_Z);
+    add(ch,BX(CLOCK_HW*2+.64,.26,CLOCK_HD*2+.64),gothicTrimM,0,18.56,CLOCK_Z);
+    add(ch,BX(CLOCK_HW*2+.30,.22,CLOCK_HD*2+.30),gothicTrimM,0,18.84,CLOCK_Z);
+    /* 钟盘下方两侧的小尖拱窗（打破大白墙，也给钟室一点暖光）*/
+    for(const s of [-1,1]){
+      add(ch,makePointedArchGeo(.78,1.72,.20),gothicTrimM,s*1.42,12.98,CLOCK_Z+CLOCK_HD+.02);
+      add(ch,makePointedArchGeo(.58,1.48,.14),warmGlowM,s*1.42,13.04,CLOCK_Z+CLOCK_HD+.09);
+    }
+    /* ── 檐口之上：八角过渡 + 石板尖塔 + 雪檐 + 金顶饰 ── */
+    add(ch,new THREE.CylinderGeometry(2.40,2.76,1.20,8),gothicStoneM,0,19.68,CLOCK_Z);
+    const clkSpire=add(ch,new THREE.ConeGeometry(2.56,7.0,8),churchSlateM,0,23.70,CLOCK_Z);
+    clkSpire.rotation.y=Math.PI/8;
+    const clkSnow=addNS(ch,new THREE.ConeGeometry(2.46,2.60,8),churchSnowM,0,26.10,CLOCK_Z);
+    clkSnow.rotation.y=Math.PI/8;
+    addNS(ch,BX(.16,1.9,.16),goldGlowM,0,28.20,CLOCK_Z);
+    addNS(ch,BX(1.0,.16,.16),goldGlowM,0,28.60,CLOCK_Z);
+    add(ch,new THREE.OctahedronGeometry(.30,0),goldTrimM,0,29.30,CLOCK_Z);
+    /* 四角小尖顶（呼应双塔的 pinnacles）*/
+    for(const sx of [-1,1])for(const sz of [-1,1]){
+      const cn=add(ch,new THREE.ConeGeometry(.30,1.5,6),gothicTrimM,sx*(CLOCK_HW-.2),18.5,CLOCK_Z+sz*(CLOCK_HD-.2));
+      cn.rotation.y=Math.PI/6;
+    }
+    /* ── 指针 + 盘面（同一组，脱离合批）──
+       合批会把静态子树冻住；CircleGeometry 被合批之后，
+       绕 Y 转过 180° 的那两面会跑到错的位置上（从侧面看钟盘整个消失，
+       只剩一面空墙）。所以盘面、金环、指针全都放进 keep 组。 */
+    const clockHands=new THREE.Group();
+    clockHands.userData.keep=true;
+    ch.add(clockHands);
+    clockGroupRef=clockHands;
+    /* ── 四面钟盘 ── */
+    /* 只开两面盘：西面（正对广场，主视面）+ 东面（教堂后侧）。
+       北面被双塔挡住、南面贴着教堂主体，都开不出来，硬开就是白墙。 */
+    const CLOCK_FACES=[
+      {ry:0,          px:0,                pz:CLOCK_Z+CLOCK_HD},
+    ];
+    /* 钟盘做成「凸出墙面 0.17m 的圆饼」：只贴一层平面的话，
+       40 米外那个 0.04m 的凸出量会被深度缓冲吃掉，整面盘直接消失。 */
+    const clockShellM=M(0x2b3654,{roughness:.55,metalness:.18,emissive:0x1b1308,emissiveIntensity:.22});
+    for(const f of CLOCK_FACES){
+      const fg=new THREE.Group();
+      fg.position.set(f.px,CLOCK_Y,f.pz);
+      fg.rotation.y=f.ry;
+      const shell=new THREE.Mesh(new THREE.CylinderGeometry(CLOCK_R,CLOCK_R,.17,64),clockShellM);
+      shell.rotation.x=Math.PI/2;
+      shell.position.z=.055;
+      shell.castShadow=false;
+      fg.add(shell);
+      const fc=new THREE.Mesh(new THREE.CircleGeometry(CLOCK_R*.985,64),clockFaceM);
+      fc.position.z=.148;
+      fg.add(fc);
+      const rg=new THREE.Mesh(new THREE.TorusGeometry(CLOCK_R+.055,.085,10,60),goldTrimM);
+      rg.position.z=.125;
+      rg.castShadow=false;
+      fg.add(rg);
+      clockHands.add(fg);
+    }
+    /* 东西两面不开盘（那边被双塔和教堂主体挡死），改成成对的哥特暖窗 ——
+       从教堂两侧的缝隙望过去，看到的不是一大片素墙，而是两扇发着暖光的尖拱窗。 */
+    const clockSlotM=M(0x1d2740,{roughness:.70,metalness:.10,emissive:0x3a2a12,emissiveIntensity:.30});
+    for(const wz of [-.98,.98]){
+      add(ch,makePointedArchGeo(.88,2.45,.16),gothicTrimM,-CLOCK_HW-.01,13.55,CLOCK_Z+wz).rotation.y=-Math.PI/2;
+      add(ch,makePointedArchGeo(.64,2.18,.02),clockSlotM,-CLOCK_HW-.012,13.62,CLOCK_Z+wz).rotation.y=-Math.PI/2;
+      add(ch,makePointedArchGeo(.88,2.45,.16),gothicTrimM,CLOCK_HW+.01,13.55,CLOCK_Z+wz).rotation.y=Math.PI/2;
+      add(ch,makePointedArchGeo(.64,2.18,.02),clockSlotM,CLOCK_HW+.012,13.62,CLOCK_Z+wz).rotation.y=Math.PI/2;
+    }
+    /* 钟盘下方小牌匾：写明这座钟是服务器时间 */
+    {
+      const [cc,xx]=cv(512,160);
+      const gg=xx.createLinearGradient(0,0,0,160);
+      gg.addColorStop(0,'#16233c');gg.addColorStop(1,'#0b1424');
+      xx.fillStyle=gg;xx.fillRect(0,0,512,160);
+      xx.strokeStyle='#e6bb5e';xx.lineWidth=5;xx.strokeRect(6,6,500,148);
+      xx.textAlign='center';xx.textBaseline='middle';
+      xx.fillStyle='#f7e4b0';xx.font='bold 62px "PingFang SC","Microsoft YaHei",sans-serif';
+      xx.fillText('服务器时间',256,64);
+      xx.fillStyle='rgba(240,214,160,.72)';xx.font='600 28px Georgia,serif';
+      xx.fillText('SERVER  TIME',256,120);
+      const sb=add(ch,BX(2.46,.86,.10),gothicTrimM,0,13.66,CLOCK_Z+CLOCK_HD+.05);
+      sb.castShadow=false;
+      const sm=new THREE.Mesh(new THREE.PlaneGeometry(2.30,.72),new THREE.MeshBasicMaterial({map:ctex(cc)}));
+      sm.position.set(0,13.66,CLOCK_Z+CLOCK_HD+.11);
+      ch.add(sm);
+    }
+    /* ── 三根指针 ── */
+    const handDarkM=M(0x1d1710,{roughness:.38,metalness:.42,emissive:0x6b421a,emissiveIntensity:.40});
+    const handRedM =M(0xc93a24,{roughness:.36,metalness:.22,emissive:0x8e2413,emissiveIntensity:.55});
+    bigClock={hands:[]};
+    for(const f of CLOCK_FACES){
+      const hg=new THREE.Group();
+      hg.position.set(f.px,CLOCK_Y,f.pz);
+      hg.rotation.y=f.ry;
+      const mkHand=(len,wid,mat,z,tail)=>{
+        const g=new THREE.Group();
+        const m=new THREE.Mesh(BX(wid,len,wid*.8),mat);
+        m.position.set(0,len/2-.04,z);
+        g.add(m);
+        if(tail){const tl=new THREE.Mesh(BX(wid*1.5,len*.15,wid*.85),mat);tl.position.set(0,-len*.075,z);g.add(tl);}
+        return g;
+      };
+      const hh=mkHand(CLOCK_R*.47,.068,handDarkM,.166,true);  // 时针
+      const mh=mkHand(CLOCK_R*.75,.040,handDarkM,.182,true);  // 分针
+      const sh=mkHand(CLOCK_R*.88,.021,handRedM,.198,true);   // 秒针
+      hg.add(hh,mh,sh);
+      const cap=new THREE.Mesh(new THREE.SphereGeometry(.075,14,10),goldTrimM);
+      cap.position.z=.215;hg.add(cap);
+      clockHands.add(hg);
+      bigClock.hands.push({h:hh,m:mh,s:sh});
+    }
+
     // 中央西立面上半段（y=5.1 以上保留，y=0.6~5.1 正中央完全镂空做敞开大门洞！）
     add(ch,BX(4.6,7.1,3.4),gothicStoneM,0,8.65,7.1);
     add(ch,BX(1.05,4.8,3.4),gothicStoneM,-1.95,2.8,7.1);
@@ -11245,7 +11419,8 @@ function circusClap(){
 function updateCircus(dt,t){
   const c=circus;
   if(!c.g)return;
-  const act=Math.floor(t/8)%4;
+  const act=Math.floor(t/8)%4;   // 节目表按服务器时间切 → 各端看到的是同一幕
+  circus.act=act;
   if(act!==c.act){
     c.act=act;
     if(fp.on&&sfx&&sfx.on){
@@ -11254,8 +11429,8 @@ function updateCircus(dt,t){
     }
   }
   /* 地面扫光 + 追光斑 */
-  if(c.sweep)c.sweep.rotation.y+=dt*(.22+(act===0?.16:0));
-  if(c.sweep2)c.sweep2.rotation.y-=dt*.16;
+  if(c.sweep)c.sweep.rotation.y=phaseOf(28.5599)*.22;      // 恒速扫光，纯相位
+  if(c.sweep2)c.sweep2.rotation.y=-phaseOf(39.2699)*.16;
   if(c.sweepMat)c.sweepMat.opacity=.13+.05*Math.sin(t*1.6);
   if(c.pool){
     const a=t*.42;
@@ -12680,8 +12855,18 @@ window.diorama={cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.t
   shadows:(on)=>{renderer.shadowMap.enabled=on;scene.traverse(o=>{if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.needsUpdate=true);else o.material.needsUpdate=true;}});return on;},
   hideRide:(i)=>{if(amusement.dyn[i])amusement.dyn[i].visible=false;return i;},
   showRide:(i)=>{if(amusement.dyn[i])amusement.dyn[i].visible=true;return i;},
-  /* 调试：集市钢琴广场状态（键发光 / 扫光 / 灯强） */
-  piano:()=>({x:pianoPlaza.x,z:pianoPlaza.z,px:pianoPlaza.px,pz:pianoPlaza.pz,
+  /* 调试：显隐大本钟（做 A/B 性能对照用）*/
+  clockShow:(on)=>{ if(clockGroupRef) clockGroupRef.visible=!!on; return !!on; },
+  /* 调试：改视场角（拍定点画面用）*/
+  fov:(v)=>{camera.fov=v;camera.updateProjectionMatrix();return v;},
+  /* 调试：全服统一时间状态（校准是否生效、相位基准、各表演的当前进度） */
+  time:()=>({t:+t.toFixed(3),srvNow:srvNow(),calib:srvCalib,
+    off:Math.round(srvOff),offTarget:Math.round(srvOffTarget),
+    bestRtt:Math.round(srvBestRtt),samples:srvSamples.length,epoch:TIME_EPOCH,
+    carousel:amusement.carousel?+amusement.carousel.rotation.y.toFixed(4):null,
+    circusAct:(typeof circus!=='undefined'&&circus)?(circus.act|0):null,
+    clock:(bigClock&&bigClock.hands&&bigClock.hands.length)?{h:+bigClock.hands[0].h.rotation.z.toFixed(5),m:+bigClock.hands[0].m.rotation.z.toFixed(5),s:+bigClock.hands[0].s.rotation.z.toFixed(5)}:null}),
+  /* 调试：集市钢琴广场状态（键发光 / 扫光 / 灯强） */  piano:()=>({x:pianoPlaza.x,z:pianoPlaza.z,px:pianoPlaza.px,pz:pianoPlaza.pz,
     wglow:Array.from(pianoPlaza.wglow).map(v=>+v.toFixed(2)),
     bglow:Array.from(pianoPlaza.bglow).map(v=>+v.toFixed(2)),
     flash:+pianoPlaza.flash.toFixed(3),
@@ -13030,6 +13215,102 @@ document.addEventListener('pointerlockchange',()=>{
 renderer.info.autoReset=false;          // composer 有多个 pass，关掉自动重置才能统计整帧
 const clock=new THREE.Clock();
 let t=0,flash=0,flashNext=6;
+/* 本地累加时间：只给 shader 用（雪/星光/水面噪声是连续噪声，跨端一致没意义，
+   而且 float32 装不下 2.8e7 秒，会被量化成每 2 秒一跳）。
+   所有「看得出来的表演」动画一律走服务器权威的 t。 */
+let tLocal=0;
+
+/* ══════════════════════════════════════════════════════════════════════
+   全局时间基准 —— 服务器权威
+   ──────────────────────────────────────────────────────────────────────
+   以前全局 t 是 t += dt 累加出来的，每个客户端各转各的：
+   同一部旋转木马，在甲的手机上转了两圈，在乙的手机上才转一圈半；
+   马戏团四幕的进度也对不上，灯串扫光更是各闪各的。
+
+   现在改成纯函数：t = (服务器时间 - TIME_EPOCH) / 1000
+   服务器时间用 NTP 方式校准（ping 带 c1，服务端回 s2/s3，
+   offset = ((s2-c1)+(s3-t4))/2，误差只剩路径不对称那一半）。
+   只要两端时钟对齐，同一物理时刻看到的就是同一帧 —— 教堂塔上
+   那个大钟就是这套时间的可视化。
+
+   TIME_EPOCH 是固定纪元，不是服务器启动时刻：服务器重启时
+   所有人的相位不会整体跳一次。
+   ══════════════════════════════════════════════════════════════════════ */
+let TIME_EPOCH = Date.UTC(2026, 0, 1, 0, 0, 0);
+let srvOff = 0;            // 正在用的偏移：服务器时间 − 本地时间(ms)
+let srvOffTarget = 0;       // 校准算出来的目标偏移
+let srvCalib = false;       // 有没有校准成功过
+let srvBestRtt = 9999;     // 历史最小往返，用于诊断
+const srvSamples = [];      // {rtt, off} 采样池
+
+/* 收一个采样，更新目标偏移。
+   多个采样里挑 RTT 最小的那条 —— 抖动最小的一次最接近真值。 */
+function srvPush(rtt, off) {
+  if (!(rtt >= 0) || rtt > 6000) return;
+  srvSamples.push({ rtt: rtt, off: off });
+  if (srvSamples.length > 8) srvSamples.shift();
+  let best = srvSamples[0];
+  for (const s of srvSamples) if (s.rtt < best.rtt) best = s;
+  srvOffTarget = best.off;
+  srvBestRtt = Math.min(srvBestRtt, best.rtt);
+  srvCalib = true;
+}
+/* HTTP 校准：t0 发出、t4 收到、serverNow 是服务端生成响应的时刻。
+   服务端生成响应时，本地时钟对应 (t0 + rtt/2)（路径对称假设）。 */
+function srvSyncHttp(t0, t4, serverNow) {
+  const rtt = t4 - t0;
+  srvPush(rtt, serverNow - (t0 + rtt * 0.5));
+}
+/* NTP 校准：c1 客户端发出 / s2 服务端收到 / s3 服务端发出 / t4 客户端收到 */
+function srvSyncNtp(c1, s2, s3, t4) {
+  const rtt = (t4 - c1) - (s3 - s2);
+  const off = ((s2 - c1) + (s3 - t4)) / 2;
+  srvPush(rtt, off);
+}
+/* ── 纯相位 ──
+   服务器时间 t 是「秒」，数值很大（2026 年已经 2.8e7 秒）。
+   直接 t*ω 当角度会超出 float32 的有效精度（2.8e7 那一档的步长是 2 rad），
+   转到 GPU 上会变成「一步一卡」。所以先把时间折进一个周期里：
+   角度 = (t % 周期) * ω。折叠点在 2π 的整数倍上，跳过去看不出来。 */
+function phaseOf(period){ return t - Math.floor(t/period)*period; }
+/* 服务器权威时刻 */
+function srvNow() { return Date.now() + srvOff; }
+
+/* 大本钟的指针组（教堂块里赋值）——指针必须脱离合批才能转 */
+var bigClock;   /* 注意：不能写 =null，var 声明若带初始化会把教堂块里已赋的值覆盖掉 */
+var clockGroupRef;   /* 钟楼指针组引用（显隐开关用） */
+/* 大本钟走「服务器权威时间」：和旋转木马、马戏团四幕同一个 t。
+   秒针每秒跳一格（机械钟的跳法），分针时针连续走。
+   指针角度全部是时间的纯函数，没有任何本地累加 ——
+   所以甲的手机和乙的电脑上，同一秒看到的是同一个指向。 */
+function updateBigClock(){
+  if(!bigClock||!bigClock.hands.length) return;
+  const d=new Date(srvNow());
+  const sec=d.getSeconds();                    // 整数秒 → 跳秒
+  const min=d.getMinutes()+sec/60;
+  const hr=(d.getHours()%12)+min/60;
+  const A=Math.PI*2;
+  for(const h of bigClock.hands){
+    h.s.rotation.z=-(sec/60)*A;
+    h.m.rotation.z=-(min/60)*A;
+    h.h.rotation.z=-(hr/12)*A;
+  }
+}
+/* 页面一加载就对时（不需要登录），这样玩家还没进世界时动画就已对齐 */
+(function srvSyncBoot(){
+  try {
+    const t0 = Date.now();
+    fetch('/alex-garage/ws/time?_=' + t0, { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => {
+        if (!j || !j.now) return;
+        if (j.epoch) TIME_EPOCH = j.epoch;
+        srvSyncHttp(t0, Date.now(), j.now);
+      })
+      .catch(() => { });
+  } catch (e) { }
+})();
+
 const fpsEl=document.getElementById('fps');
 const _rMat=new THREE.Matrix4(),_rCol=new THREE.Color(),_rScale=new THREE.Vector3();
 const _shopFan=(()=>{const f=shop.children.find(c=>c.userData&&c.userData.fan);return f?f.userData.fan:null;})();
@@ -13453,7 +13734,7 @@ function updateAerialHaze(dt,t){
       if (now - MP._lastPing > 8000) {
         MP._lastPing = now;
         MP._deadline = now + 12000;
-        MP.send({ t: 'ping' });
+        MP.send({ t: 'ping', c1: Date.now() });
       }
     }, 2000);
   }
@@ -13508,6 +13789,10 @@ function updateAerialHaze(dt,t){
          退避永远停在 0.8 秒，会把服务端打爆 */
       setTimeout(() => { if (gen === MP.gen && MP.connected) MP.tries = 0; }, 8000);
       ws.send(JSON.stringify({ t: 'login', account, pass, name: MP.savedName() }));
+      /* 连上就立刻对一次时（不等 8 秒心跳）：pong 带 s2/s3，
+         客户端按 NTP 算出自己跟服务器的时钟偏移，
+         这样动画相位从第一秒起就是全服统一的。 */
+      try { ws.send(JSON.stringify({ t: 'ping', c1: Date.now() })); } catch (e) { }
     };
     ws.onmessage = ev => {
       if (gen !== MP.gen) return;      // 旧连接迟到的消息一律忽略
@@ -13726,6 +14011,8 @@ function updateAerialHaze(dt,t){
         /* 显示 ID 存档：服务端记住的那份为准，本地也存一份，下次进去还是它 */
         if (MP.display && MP.display !== MP.account) MP.saveName(MP.display);
         if (m.build) checkBuild(m.build);
+        /* 服务端下发的纪元（时间基准），用它覆盖本地默认值 */
+        if (m.epoch) TIME_EPOCH = m.epoch;
         MP.clearPeers();
         (m.players || []).forEach(pl => {
           if (pl.account !== MP.account) MP.addPeer(pl);
@@ -13827,6 +14114,13 @@ function updateAerialHaze(dt,t){
       }
       case 'pong': {
         MP._deadline = 0;         // 心跳有回音 → 连接是活的
+        /* 顺便对时：pong 里带 s2(服务端收到时刻) / s3(服务端发出时刻)，
+           加上客户端的 c1(发出) 和现在的 t4(收到)，按 NTP 算偏移。
+           每 8 秒一次，采样池里挑 RTT 最小的那条当准。 */
+        if (m.c1 && m.s2 && m.s3) {
+          if (m.epoch) TIME_EPOCH = m.epoch;
+          srvSyncNtp(m.c1, m.s2, m.s3, Date.now());
+        }
         break;
       }
       case 'err': {
@@ -14841,14 +15135,14 @@ function updateAerialHaze(dt,t){
         /* 回到前台先探一下：6 秒内没有回音就当连接已死 */
         MP._lastPing = 0;
         MP._deadline = performance.now() + 6000;
-        MP.send({ t: 'ping' });
+        MP.send({ t: 'ping', c1: Date.now() });
       } else if (MP.account) {
         MP.tries = 0;
         MP.connect(MP.account, MP._pass, true);
       }
     });
     window.addEventListener('online', () => {
-      if (MP.connected) { MP.send({ t: 'ping' }); return; }
+      if (MP.connected) { MP.send({ t: 'ping', c1: Date.now() }); return; }
       if (!MP.account) return;
       MP.tries = 0;
       MP.connect(MP.account, MP._pass, true);
@@ -14875,7 +15169,19 @@ function animate(){
   /* 开场 1.6 秒的运动侦测 + 静态合批（分帧做完就停，不再有额外开销） */
   if(_autoMerge.phase<3)_autoMergeTick();
   const dt=Math.min(clock.getDelta(),.05);
-  t+=dt;
+  /* ── 全局时间：服务器权威 ──
+     以前这里是 t += dt（本地累加），每个客户端各转各的；
+     现在 t 是服务器时间的纯函数，所以旋转木马 / 马戏团四幕 /
+     灯串扫光在任何设备上都是同一个进度。
+     偏移小偏差慢慢逼近（免得相位突然跳一下），大偏差直接跳
+     （页面刚加载时的首次校准，这时玩家还没看清画面）。 */
+  {
+    const _d=srvOffTarget-srvOff;
+    if(Math.abs(_d)>2500) srvOff=srvOffTarget;
+    else srvOff+=_d*Math.min(1,dt*1.5);
+  }
+  tLocal+=dt;
+  t=(srvNow()-TIME_EPOCH)/1000;
 
   /* 环城车流物理模拟（安全跟车制动 / 行人礼让鸣笛 / 过弯离心侧倾 / 刹车点头悬架 / 车轮滚转与轮胎扬雪） */
   for(const tr of traffic){
@@ -14987,7 +15293,7 @@ function animate(){
     snowFar.geometry.attributes.position.needsUpdate=true;
   }
   /* 持续绚丽流星雨（夜幕 / 晓暮均流畅绽放） */
-  starMat.uniforms.uTime.value=t;
+  starMat.uniforms.uTime.value=tLocal;
   const nightNow=Math.sin(((state.hour-6)/12)*Math.PI)<=0.03;
   const twilight=!nightNow&&(state.hour>=16.8||state.hour<=7.2);
   const starOn=(nightNow||twilight)&&state.stars;
@@ -15066,7 +15372,7 @@ function animate(){
     fr.material.opacity=(1-u)*.55;
   }
   if(fireflyMat){
-    fireflyMat.uniforms.uTime.value=t;
+    fireflyMat.uniforms.uTime.value=tLocal;
     const dusk=(state.hour>=16.8||state.hour<=7.2);
     fireflyMat.uniforms.uOpacity.value=dusk?1:0;
   }
@@ -15198,7 +15504,7 @@ function animate(){
   cloudArt.position.y=D.f1top+2.15+Math.sin(t*.6)*.09;
   cloudArt.rotation.y=t*.12;
   if(cloudArt.userData.core)cloudArt.userData.core.material.opacity=.32+.22*Math.sin(t*1.6);
-  if(_shopFan)_shopFan.rotation.y+=dt*7;
+  if(_shopFan)_shopFan.rotation.y=phaseOf(.8976)*7;
   // 绿植轻摆
   plants.forEach(p=>{p.leaf.rotation.z=Math.sin(t*.7+p.ph)*.05;});
   // 店内吊灯摇曳
@@ -15394,7 +15700,7 @@ function animate(){
 
   /* 草浪风场 + 雪地干燥材质参数 */
   sharedStyle.uWindTime.value=t;
-  wetShared.uTime.value=t;
+  wetShared.uTime.value=tLocal;
   wetShared.uRain.value=0;
   wetShared.uReflOn.value=0;
 
@@ -15408,7 +15714,7 @@ function animate(){
     });
   }
   /* 木马转速：原来 0.45 rad/s（14 秒一圈），远看几乎像静止 → 提到 0.72（约 8.7 秒一圈）*/
-  if(amusement.carousel)amusement.carousel.rotation.y+=dt*.72;
+  if(amusement.carousel)amusement.carousel.rotation.y=phaseOf(8.7266)*.72;   // 0.72 rad/s → 8.73 秒一圈，纯相位=全服同进度
   if(amusement.horses){for(const h of amusement.horses)h.g.position.y=h.baseY+Math.sin(t*2.8+h.ph)*.26;}
   if(amusement.skaters){
     for(const sk of amusement.skaters){
@@ -15636,6 +15942,8 @@ function animate(){
   updateLaunchRide(dt);
   updatePianoPlaza(dt,t);
   updateCircus(dt,t);
+  /* 大本钟：指针走服务器权威时间（纯函数，无本地累加）*/
+  updateBigClock();
   updateHelis(dt);
   updateFireworks(dt);
   updateAerialHaze(dt,t);
@@ -16626,7 +16934,7 @@ document.getElementById('gift-close-btn').onclick=()=>{giftModal.classList.remov
 giftModal.addEventListener('pointerdown',e=>{if(e.target===giftModal){giftModal.classList.remove('show');giftModal.setAttribute('aria-hidden','true');}});
 
 function updateGiftMountain(dt){
-  if(giftMount.userData.topStar)giftMount.userData.topStar.rotation.y+=dt*1.4;
+  if(giftMount.userData.topStar)giftMount.userData.topStar.rotation.y=phaseOf(4.488)*1.4;
   for(const b of giftBoxes){
     if(!b.alive){
       b.respawn-=dt;
@@ -16635,7 +16943,7 @@ function updateGiftMountain(dt){
       b.g.position.y=b.baseY+Math.sin(t*2.4+b.ph)*.025;
     }
   }
-  for(const d of museumDisplays)d.m.rotation.y+=dt*.55;
+  for(const d of museumDisplays)d.m.rotation.y=phaseOf(11.42)*.55;
 }
 
 /* ══ 圣诞露天观光小火车（外环大圈铁轨：加长5节豪华车厢 + 巨型重联蒸汽机车头 + 迎风向后翻滚浓密蒸汽拖尾 + 全程不停车巡航） ══ */
@@ -18040,7 +18348,7 @@ function updateHelis(dt){
     h.g.position.set(nx,ny,nz);
     h.g.rotation.y=Math.atan2(vx,vz);
     h.g.rotation.x=.09; // 前倾巡航姿态
-    h.rotor.rotation.y+=dt*22;
+    h.rotor.rotation.y=phaseOf(.2856)*22;
     if(h.beamCone){
       /* 光锥始终从灯口打到地面：按当前飞行高度动态拉伸锥长
          （原来长度固定，飞机一浮沉，光锥就悬空或插进地里） */
@@ -18055,7 +18363,7 @@ function updateHelis(dt){
         h.beamPool.position.set(h.g.position.x+_bdV.x*len,.04,h.g.position.z+_bdV.z*len);
       }
     }
-    h.tRotor.rotation.x+=dt*26;
+    h.tRotor.rotation.x=phaseOf(.2417)*26;
     // 探照灯来回摆动扫射地面
     h.spot.rotation.z=Math.sin(t*1.6+i*2.1)*.26;
     h.spot.rotation.x=.18+Math.cos(t*1.1+i)*.14;
