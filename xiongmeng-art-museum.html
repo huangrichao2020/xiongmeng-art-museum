@@ -7256,8 +7256,12 @@ function buildHotAirBalloon(x,z){
     vertexColors:true,roughness:.82,metalness:0,side:THREE.DoubleSide,
     emissive:0xffffff,emissiveIntensity:.42,envMapIntensity:.18
   });
-  /* ── 光遇风格：每片瓜瓣一个高饱和主色，褶皱压暗、顶部透暖光、接缝压成载重带 ── */
-  const GORE_PALETTE=[0xff2f28,0xff7a12,0xffd400,0x24e86a,0x1f8fff,0xa44dff,0xff2f95,0x12dcd6];
+  /* ── 配色：复古节日气球（深番茄红 / 暖橙 / 陈金 / 米白 / 玫红 / 湖蓝 / 松绿 / 焦橙）──
+     早先用的是荧光红黄绿蓝紫粉青，在冷蓝夜景 + 暖金窗光里跳得不像这家景的东西，
+     整体偏「霓虹」。这版保留多彩分块（还是 16 片 8 色交替），但把色相拉回
+     复古暖调，并让接缝变成鎏金腰带，跟场景里的鎏金门楼 / 剧院灯牌呼应。 */
+  const GORE_PALETTE=[0xd8443a,0xe2803a,0xf0c04a,0xf4e0bb,0xb04a5e,0x2f7d9e,0x3d8a63,0xd98a33];
+  const cGold=new THREE.Color(0xd9a441);
   const cB=new THREE.Color(),cMain=new THREE.Color(),cWarm=new THREE.Color(0xfff3d8);
   const cHsl={h:0,s:0,l:0};
   const US=10,VS=20;
@@ -7280,9 +7284,9 @@ function buildHotAirBalloon(x,z){
         /* 夜景全局光照 + ACES 会把彩度洗掉，这里在 sRGB 空间把饱和度硬拉回来。
            注意必须显式指定 SRGBColorSpace：默认是线性工作空间，在线性空间算 HSL 等于没提。 */
         cB.getHSL(cHsl,THREE.SRGBColorSpace);
-        cB.setHSL(cHsl.h,Math.min(1,cHsl.s*1.55),cHsl.l,THREE.SRGBColorSpace);
+        cB.setHSL(cHsl.h,Math.min(1,cHsl.s*1.28),cHsl.l,THREE.SRGBColorSpace);
         const edge=Math.min(uu,1-uu);
-        if(edge<.05)cB.multiplyScalar(.60);                     // 瓜瓣接缝 = 载重带
+        if(edge<.05)cB.lerp(cGold,.55).multiplyScalar(.78);     // 瓜瓣接缝 = 鎏金载重带
         cs[p]=cB.r;cs[p+1]=cB.g;cs[p+2]=cB.b;
         p+=3;
       }
@@ -7299,8 +7303,8 @@ function buildHotAirBalloon(x,z){
       vertexColors:true,roughness:.82,metalness:0,side:THREE.DoubleSide,
       /* 夜景补光是冷蓝月光，红瓜瓣乘上蓝光会被洗成灰蓝（实测饱和度只剩 0.25）。
          让自发光主导颜色：emissive 用本片主色高强度，色彩才立得住。 */
-      color:0x6a6a6a,
-      emissive:cMain.clone().multiplyScalar(.92),emissiveIntensity:.95,envMapIntensity:.18
+      color:0x8a8a8a,
+      emissive:cMain.clone().multiplyScalar(.78),emissiveIntensity:.82,envMapIntensity:.18
     });
     fabricMs.push(gm);
     const m=new THREE.Mesh(geo,gm);
@@ -7311,10 +7315,20 @@ function buildHotAirBalloon(x,z){
   const skirt=new THREE.Mesh(new THREE.CylinderGeometry(2.05,1.78,1.35,20,1,true),
     new THREE.MeshStandardMaterial({color:0x8f4a3c,roughness:.92,side:THREE.DoubleSide,emissive:0xff8a30,emissiveIntensity:.18}));
   skirt.position.y=4.35;skirt.userData.noReflect=true;g.add(skirt);
-  const crown=new THREE.Mesh(new THREE.TorusGeometry(1.02,.09,8,24),M(0x8a6b4c,{roughness:.7,metalness:.3}));
+  const crown=new THREE.Mesh(new THREE.TorusGeometry(1.02,.09,8,24),M(0xd9a441,{roughness:.42,metalness:.62,envMapIntensity:.55,emissive:0x4a3410,emissiveIntensity:.30}));
   crown.position.y=BASE+HGT;crown.rotation.x=Math.PI/2;crown.userData.noReflect=true;g.add(crown);
   const capDisc=new THREE.Mesh(new THREE.CircleGeometry(1.0,22),M(0xe8d3b4,{roughness:.85}));
   capDisc.rotation.x=-Math.PI/2;capDisc.position.y=BASE+HGT+.02;capDisc.userData.noReflect=true;g.add(capDisc);
+  /* 鎏金腰带：复古热气球的中段环带，跟场景里的鎏金门楼 / 剧院灯牌呼应，
+     把「一大坨彩色」压成「彩色 + 束腰」，夜景里就不再跳。 */
+  {
+    const band=new THREE.Mesh(new THREE.TorusGeometry(prof(.50),.30,10,64),
+      M(0xd9a441,{roughness:.40,metalness:.60,envMapIntensity:.55,emissive:0x513a12,emissiveIntensity:.38}));
+    band.position.y=BASE+HGT*.50;band.rotation.x=Math.PI/2;band.userData.noReflect=true;g.add(band);
+    const band2=new THREE.Mesh(new THREE.TorusGeometry(prof(.30),.28,8,56),
+      M(0xd9a441,{roughness:.44,metalness:.58,envMapIntensity:.5,emissive:0x402d0e,emissiveIntensity:.30}));
+    band2.position.y=BASE+HGT*.30;band2.rotation.x=Math.PI/2;band2.userData.noReflect=true;g.add(band2);
+  }
   /* 载重带 + 吊索（单条 LineSegments） */
   const lp=[];
   for(let k=0;k<GORES;k++){
@@ -7370,6 +7384,14 @@ function buildHotAirBalloon(x,z){
   for(const seg of [[BW+.14,.14,0,BD/2],[BW+.14,.14,0,-BD/2],[.14,BD,BW/2,0],[.14,BD,-BW/2,0]]){
     const r=new THREE.Mesh(new THREE.BoxGeometry(seg[0],.17,seg[1]),leatherM);
     r.position.set(seg[2],BH-.07,seg[3]);g.add(r);
+  }
+  /* 篮口鎏金压条：和伞体腰带同一套金，栅栏依旧镂空，视线不被挡 */
+  {
+    const goldTrimM=M(0xd9a441,{roughness:.40,metalness:.60,envMapIntensity:.5,emissive:0x3d2b0d,emissiveIntensity:.26});
+    for(const seg of [[BW+.20,.07,0,BD/2+.015],[BW+.20,.07,0,-BD/2-.015],[.07,BD,BW/2+.015,0],[.07,BD,-BW/2-.015,0]]){
+      const r=new THREE.Mesh(new THREE.BoxGeometry(seg[0],.055,seg[1]),goldTrimM);
+      r.position.set(seg[2],BH+.02,seg[3]);g.add(r);
+    }
   }
   for(const cx of [-BW/2+.09,BW/2-.09])for(const cz of [-BD/2+.09,BD/2-.09]){
     const pst=new THREE.Mesh(new THREE.BoxGeometry(.17,BH,.17),leatherM);
@@ -7427,11 +7449,13 @@ function buildHotAirBalloon(x,z){
   return b;
 }
 /* 教堂后场西侧 / 剧院后场东侧，各一朵；都落在空地正中，升起后四周无遮挡 */
-/* 落点定在教堂 / 剧院后场最北的空旷带（z=66）：
-   伞体半径 5.9m、伞底离地 5.95m，后场中央那几棵 21m 高的圣诞树正好会穿进伞体，
-   往北让开 15m 后净空 9m 以上，伞体与树、建筑都不再打架。 */
-buildHotAirBalloon(-35.0,66.0);   // 教堂后场西北：避开教堂主体与圣诞树阵
-buildHotAirBalloon(44.0,66.0);    // 剧院后场东北：避开剧院主体与圣诞树阵
+/* 落点：教堂 / 剧院正后方的空地（z=51）：
+   之前落在 z=66，结果紧贴观光铁路的北段轨道（z≈62~64，最近处只差 2.6m），
+   看上去就像「气球杵在铁路上」；而且那一排 21.5m 巨圣诞树正好在 z=67~70，
+   伞体是夹在两棵树之间放的。挪到 z=51 后：
+   离铁路 11~13m、离教堂/剧院与树阵 10m 以上，既不压轨道，又回到场景主体里。 */
+buildHotAirBalloon(-49.0,51.0);   // 教堂后场西侧空地
+buildHotAirBalloon(49.0,51.0);    // 剧院后场东侧空地
 
 function balloonNearPlayer(){
   if(!fp.on||balloonSys.riding)return -1;
@@ -8999,6 +9023,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       driver.userData.legL.rotation.x=-1.15;driver.userData.legR.rotation.x=-1.15;
       driver.userData.armL.rotation.x=-.78;driver.userData.armR.rotation.x=-.78;
       car.add(driver);
+      car.userData.driver=driver;          // 玩家上车时把这只小熊收起来，由玩家顶上
       // 经典碰碰车导电尾杆 + 顶部发光集电环
       add(car,new THREE.CylinderGeometry(.026,.036,1.85,8),chromeM,.42,1.62,-.96);
       addNS(car,new THREE.SphereGeometry(.085,8,6),getBulbMat(0xffe078,i),.42,2.56,-.96);
@@ -9012,7 +9037,9 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
         rx:outer?9.2:6.2,
         rz:outer?5.6:3.6,
         spd:(outer?.52:.68)*(outer?1:-1),
-        ph:i*1.3
+        spd0:(outer?.52:.68)*(outer?1:-1),
+        ph:i*1.3,
+        kx:0,kz:0,vx:0,vz:0
       };
       car.position.set(Math.cos(ang)*car.userData.st.rx,.12,Math.sin(ang)*car.userData.st.rz);
       g.add(car);
@@ -10926,8 +10953,15 @@ renderer.domElement.addEventListener('pointermove',e=>{
   const dx=e.clientX-p.x,dy=e.clientY-p.y;
   p.x=e.clientX;p.y=e.clientY;
   if(lookPts.size===1){
-    fp.yaw-=dx*.0045;fp.pitch-=dy*.0045;
-    fp.pitch=Math.max(-1.4,Math.min(1.4,fp.pitch));
+    const _bd=wheelSys.bump;
+    if(_bd&&wheelSys.riding&&wheelSys.kind==='bumper'){
+      /* 开车时单指拖动 = 相对车头环顾，转向交给左手摇杆 */
+      _bd.look-=dx*.0045;
+      fp.pitch=Math.max(-1.4,Math.min(1.4,fp.pitch-dy*.0045));
+    }else{
+      fp.yaw-=dx*.0045;fp.pitch-=dy*.0045;
+      fp.pitch=Math.max(-1.4,Math.min(1.4,fp.pitch));
+    }
     // 触屏沙盒：沉浸之外，单指拖动改为绕沙盘 target 转镜头
     if(!fp.on&&IS_TOUCH_DEV){
       touchCam.yaw-=dx*.0045;
@@ -11030,6 +11064,15 @@ addEventListener('keyup',e=>{
 addEventListener('blur',()=>{fp.keys={};});
 document.addEventListener('mousemove',e=>{
   if(!fp.on)return;
+  /* 碰碰车驾驶中：左右拖动改成「相对车头环顾」，不跟转向键打架 */
+  const _bd=wheelSys.bump;
+  if(_bd&&wheelSys.riding&&wheelSys.kind==='bumper'){
+    if(!fp.locked&&!(e.buttons&1||e.buttons&2))return;
+    const _k=fp.locked?.0022:.0032;
+    _bd.look-=e.movementX*_k;
+    fp.pitch=Math.max(-1.42,Math.min(1.42,fp.pitch-e.movementY*_k));
+    return;
+  }
   // 指针锁定被浏览器拒绝时，退化成按住左键或右键拖拽转视角
   // （左键/右键都能转，就不用把某只手固定在鼠标上，配合 WASD 边走边看）
   if(!fp.locked){
@@ -11959,14 +12002,24 @@ function animate(){
   }
   for(const car of amusement.bumper){
     const st=car.userData.st;
+    if(st.driven)continue;                  // 玩家接管的这辆由驾驶逻辑管
     st.ang+=st.spd*dt;
     const wob=Math.sin(t*1.6+st.ph)*.38;
     const rx=st.rx+wob, rz=st.rz+wob*.6;
     const nx=Math.cos(st.ang)*rx, nz=Math.sin(st.ang)*rz;
     const vx=-Math.sin(st.ang)*rx*st.spd, vz=Math.cos(st.ang)*rz*st.spd;
-    car.position.set(nx,.12,nz);
+    /* 被玩家撞开后残留的位移，撞开的一瞬间推开，慢慢滑回原轨道 */
+    if(st.kx||st.kz){
+      const kf=Math.exp(-2.4*dt);
+      st.kx*=kf;st.kz*=kf;
+      if(Math.abs(st.kx)<.01)st.kx=0;
+      if(Math.abs(st.kz)<.01)st.kz=0;
+    }
+    st.vx=vx+(st.kx||0);st.vz=vz+(st.kz||0);
+    car.position.set(nx+(st.kx||0),.12,nz+(st.kz||0));
     car.rotation.y=Math.atan2(vx,vz);
   }
+  updateBumperDrive(dt);
   /* 镜头飞行 */
   if(camTween){
     camTween.t+=dt;
@@ -12100,8 +12153,8 @@ const XM_SHOTS=[
   {id:'fountain-garden',name:'喷泉花园',    kind:'static',pos:[-15,3.4,8],  look:[-24.4,1.4,0.2],fov:56,move:'orbit',desc:'巨树、喷泉与驯鹿广场'},
   {id:'tree-avenue',  name:'雪松大道',     kind:'static',pos:[30,3.0,15],  look:[-14,4.2,9.5],fov:60,move:'drift',desc:'一排覆雪圣诞松与串灯'},
   {id:'meteor-sky',   name:'流星雨天空',   kind:'static',pos:[14,2.6,16],  look:[0,32,-8],   fov:74,move:'sway', desc:'平行星尘划过冬夜'},
-  {id:'balloon-ground',name:'热气球仰拍',  kind:'static',pos:[-27,1.9,57], look:[-35,11,66], fov:62,move:'sway', desc:'多彩瓜瓣与火焰口'},
-  {id:'balloon-above',name:'热气球高空俯瞰',kind:'static',pos:[-33,42,63], look:[-4,1,22],   fov:66,move:'drift',desc:'从伞口俯瞰全城'},
+  {id:'balloon-ground',name:'热气球仰拍',  kind:'static',pos:[-39,1.9,42], look:[-49,11,51], fov:62,move:'sway', desc:'多彩瓜瓣与火焰口'},
+  {id:'balloon-above',name:'热气球高空俯瞰',kind:'static',pos:[-45,40,48], look:[-4,1,22],   fov:66,move:'drift',desc:'从伞口俯瞰全城'},
   /* ── 动态跟拍机位 ── */
   {id:'coaster-chase', name:'云霄飞车跟拍', kind:'chase',ride:'coaster',fov:60,desc:'车后近水平第三人称跟拍，不随轨道翻滚，视线看向轨道前方'},
   {id:'fpv-chase',     name:'穿越机机头',   kind:'chase',ride:'fpv',    fov:76,desc:'机头视角沿航线俯冲，画面不歪'},
@@ -13170,13 +13223,24 @@ function toggleRideTrain(){
     sfx.blip(880,.12,.08);
   }
 }
-const wheelSys={riding:false,cab:null,kind:null,car:null,label:''};
+const wheelSys={riding:false,cab:null,kind:null,car:null,label:'',bump:null};
 const RIDE_EXITS={
   wheel:[27,41.2],carousel:[4.0,35.5],ship:[39.5,36.5],coaster:[-7.5,20.5],bumper:[-6.5,45.0],sleigh:[0,10.2],heli:[0,10.2]
 };
 function stopFacilityRide(){
   if(wheelSys.cab&&wheelSys.cab.userData.rods)wheelSys.cab.userData.rods.forEach(r=>r.visible=true);
   if(wheelSys.kind==='coaster'){camera.up.set(0,1,0);applyDpr(HI_DPR);}
+  if(wheelSys.kind==='bumper'&&wheelSys.bump){
+    const c=wheelSys.bump.car,st=c.userData.st;
+    if(c.userData.driver)c.userData.driver.visible=true;      // 小熊驾驶员回到车上
+    st.driven=false;
+    /* 把车的当前位置换算回椭圆轨道相位，接回自动环绕时不会瞬移 */
+    const nx=st.rx?c.position.x/st.rx:0,nz=st.rz?c.position.z/st.rz:0;
+    st.ang=Math.atan2(nz,nx);
+    st.spd=st.spd0||st.spd||.52;
+    st.kx=0;st.kz=0;
+  }
+  wheelSys.bump=null;
   const ex=RIDE_EXITS[wheelSys.kind]||[4,24];
   wheelSys.riding=false;wheelSys.cab=null;wheelSys.kind=null;wheelSys.car=null;
   fp.x=ex[0];fp.z=ex[1];fp.y=0;fp.vx=fp.vz=0;
@@ -13188,6 +13252,15 @@ function toggleRideFacility(info){
   if(!fp.on)enterWalk();
   wheelSys.kind=info.kind;wheelSys.car=info.car||null;wheelSys.heli=info.heli||null;wheelSys.label=info.label||'游乐设施';
   wheelSys.riding=true;
+  if(info.kind==='bumper'&&info.car){
+    /* 坐上碰碰车 = 玩家接管：车上那只小熊驾驶员先收起来，换成玩家自己开。 */
+    const c=info.car;
+    if(c.userData.driver)c.userData.driver.visible=false;
+    c.userData.st.driven=true;
+    wheelSys.bump={car:c,ang:c.rotation.y,vx:0,vz:0,speed:0,look:0,hit:0,hitCd:0,thr:0,steer:0};
+    fp.yaw=c.rotation.y+Math.PI;fp.pitch=-.06;
+    fp.vx=fp.vz=0;
+  }
   if(info.kind==='coaster'){applyDpr(LO_DPR);}
   if(info.kind==='sleigh'){fp.yaw=flyingSleigh.rotation.y+Math.PI;fp.pitch=-.16;}
   if(info.kind==='heli'&&info.heli){fp.yaw=info.heli.g.rotation.y+Math.PI;fp.pitch=-.42;}
@@ -13598,6 +13671,101 @@ function updateFpvDrone(dt){
   });
 }
 
+/* ══ 碰碰车：玩家接管驾驶（冰面 Arcade 物理） ══
+   W/↑ 油门 · S/↓ 刹车倒车 · A/← D/→ 转向 · 拖动鼠标环顾 · E 下车
+   横向抓地力弱 → 转向会甩尾；撞到别的车会被弹开并把它撞出轨道。 */
+const BUMPER={maxV:8.0,acc:9.6,rev:5.6,drag:1.10,lat:2.70,turn:1.85,minTurnV:1.25,steerLag:5.2,
+              edgeX:11.15,edgeZ:7.15,carR:.76,push:.42};
+function updateBumperDrive(dt){
+  const b=wheelSys.bump;
+  if(!b||!wheelSys.riding||wheelSys.kind!=='bumper'||!b.car)return;
+  const car=b.car;
+  /* ── 输入 ── */
+  let thr=0,str=0;
+  if(fp.keys['KeyW']||fp.keys['ArrowUp'])thr+=1;
+  if(fp.keys['KeyS']||fp.keys['ArrowDown'])thr-=1;
+  if(fp.keys['KeyA']||fp.keys['ArrowLeft'])str-=1;
+  if(fp.keys['KeyD']||fp.keys['ArrowRight'])str+=1;
+  if(joy.mag>0.02){thr+=-joy.dy*1.25;str+=joy.dx*1.35;}
+  thr=Math.max(-1,Math.min(1,thr));
+  str=Math.max(-1,Math.min(1,str));
+  /* 油门/方向盘做一点平滑：不会一按就猛打，也保留推背感 */
+  const _t0=b.thr||0,_s0=b.steer||0;
+  b.thr=_t0+(thr-_t0)*Math.min(1,BUMPER.steerLag*dt);
+  b.steer=_s0+(str-_s0)*Math.min(1,BUMPER.steerLag*dt);
+  thr=b.thr;str=b.steer;
+  /* ── 车速分解：纵向（沿车头）+ 横向（甩尾） ── */
+  let ang=b.ang,vx=b.vx,vz=b.vz;
+  const fx=Math.sin(ang),fz=Math.cos(ang);
+  let vf=vx*fx+vz*fz;
+  const lxv=vx-fx*vf, lzv=vz-fz*vf;
+  /* 油门 / 刹车倒车 */
+  if(thr>0)vf+=BUMPER.acc*thr*dt;
+  else if(thr<0){
+    if(vf>.5)vf-=BUMPER.rev*1.7*dt;      // 先刹住
+    else vf+=BUMPER.rev*thr*dt;          // 停住后倒车
+  }
+  /* 冰面滑行阻力 + 横向抓地衰减 */
+  vf-=vf*Math.min(1,BUMPER.drag*dt);
+  const kf=Math.exp(-BUMPER.lat*dt);
+  const nlx=lxv*kf,nlz=lzv*kf;
+  /* 转向：车速不够转不动（有抓地感，不是原地转圈） */
+  const grip=Math.min(1,Math.abs(vf)/BUMPER.minTurnV);
+  ang-=str*BUMPER.turn*grip*dt;
+  const nfx=Math.sin(ang),nfz=Math.cos(ang);
+  vx=nfx*vf+nlx; vz=nfz*vf+nlz;
+  /* 限速 */
+  const spd=Math.hypot(vx,vz);
+  if(spd>BUMPER.maxV){vx*=BUMPER.maxV/spd;vz*=BUMPER.maxV/spd;}
+  /* ── 位移 ── */
+  let px=car.position.x+vx*dt, pz=car.position.z+vz*dt;
+  /* ── 撞围栏 ── */
+  let hitWall=0;
+  if(px> BUMPER.edgeX){px= BUMPER.edgeX;vx=-vx*.45;hitWall=1;}
+  if(px<-BUMPER.edgeX){px=-BUMPER.edgeX;vx=-vx*.45;hitWall=1;}
+  if(pz> BUMPER.edgeZ){pz= BUMPER.edgeZ;vz=-vz*.45;hitWall=1;}
+  if(pz<-BUMPER.edgeZ){pz=-BUMPER.edgeZ;vz=-vz*.45;hitWall=1;}
+  car.position.x=px;car.position.z=pz;
+  /* ── 撞其他车：互相弹开 + 把对方撞出轨道 ── */
+  let hitCar=0;
+  for(const o of amusement.bumper){
+    if(o===car)continue;
+    const dx=px-o.position.x, dz=pz-o.position.z;
+    const d=Math.hypot(dx,dz);
+    const rr=BUMPER.carR*2;
+    if(d>=rr||d<1e-4)continue;
+    const nx=dx/d, nz=dz/d;
+    const push=rr-d;
+    px+=nx*push; pz+=nz*push;
+    const ovx=o.userData.st.vx||0, ovz=o.userData.st.vz||0;
+    const rel=(vx-ovx)*nx+(vz-ovz)*nz;          // 接近速度（负=正在撞上）
+    if(rel<0){
+      const imp=-(1+BUMPER.push)*rel*.5;
+      vx+=nx*imp; vz+=nz*imp;
+      const ost=o.userData.st;
+      ost.kx=(ost.kx||0)-nx*imp*1.15;
+      ost.kz=(ost.kz||0)-nz*imp*1.15;
+      hitCar=1;
+    }
+  }
+  car.position.x=px;car.position.z=pz;
+  car.rotation.y=ang;
+  b.ang=ang;b.vx=vx;b.vz=vz;b.speed=Math.hypot(vx,vz);
+  /* ── 撞击反馈：闷响 + 车身挤一下 ── */
+  if((hitCar||hitWall)&&b.hitCd<=0){
+    b.hitCd=.22;b.hit=1;
+    sfx.blip(hitCar?132:104,.17,hitCar?.11:.09);
+    if(hitCar)sfx.blip(880,.06,.05);
+  }
+  if(b.hitCd>0)b.hitCd-=dt;
+  if(b.hit>0){
+    b.hit=Math.max(0,b.hit-dt*4.2);
+    const h=b.hit;
+    car.scale.set(.62*(1+h*.05),.62*(1-h*.06),.62*(1+h*.06));
+  }
+  car.updateMatrixWorld(true);
+}
+
 function updateWheelRide(dt){
   if(wheelSys.riding&&fp.on){
     const wp=new THREE.Vector3();
@@ -13631,7 +13799,19 @@ function updateWheelRide(dt){
       return;
     }else if(wheelSys.kind==='bumper'&&(wheelSys.car||amusement.bumper.length)){
       const car=wheelSys.car||amusement.bumper[0];
-      wp.set(0,1.55,-.15).applyMatrix4(car.matrixWorld);
+      const b=wheelSys.bump;
+      /* 坐在原来那只小熊的位置上：视点落在驾驶员头部高度 */
+      wp.set(0,1.26,-.10).applyMatrix4(car.matrixWorld);
+      fp.x=wp.x;fp.z=wp.z;fp.y=wp.y-FP_EYE;
+      camera.position.copy(wp);
+      const ang=(b&&b.ang!==undefined)?b.ang:car.rotation.y;
+      const look=(b&&b.look)||0;
+      camera.rotation.set(fp.pitch,ang+Math.PI+look,0,'YXZ');
+      trainHud.classList.add('show');
+      trainMsgEl.textContent='冰面碰碰车 · W/↑ 油门 S/↓ 刹车倒车 A/← D/→ 转向 · 拖动鼠标环顾 · 速度 '+((b&&b.speed)||0).toFixed(1)+' m/s';
+      trainBtnEl.textContent='下车 (E)';
+      trainBtnEl.onclick=stopFacilityRide;
+      return;
     }else if(wheelSys.kind==='sleigh'){
       // 坐在圣诞老人后面的高处礼物堆上：居高临下俯瞰圣诞老人背影、三只驯鹿与雪夜全城
       wp.set(0,2.05,-2.65).applyMatrix4(flyingSleigh.matrixWorld);
