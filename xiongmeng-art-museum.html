@@ -525,8 +525,84 @@
   }
   .fpv-btn:hover{background:rgba(60,210,255,.42)}
   .fpv-btn.exit{background:rgba(235,85,85,.25);border-color:rgba(255,120,120,.55);color:#ffd6d6}
-    #fphint{bottom:200px;max-width:calc(100vw - 24px);text-align:center;
-      font-size:9.5px;line-height:1.8;padding:7px 12px}
+  /* ⚠ 这里原来有一段重复的 #fphint 规则和一个多余的 } —— 那对多余的括号会让
+     后面所有 CSS 规则被浏览器当成「嵌套在非法块里」整段丢弃（多人 UI 的样式
+     就是这么消失的）。#fphint 在本文件前部已有完整定义，重复的那份已删除。 */
+
+  /* ══ 多人联机 UI ══ */
+  #mp-login{
+    position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(120% 90% at 50% 30%,rgba(18,30,50,.42) 0%,rgba(6,10,18,.74) 78%);
+    backdrop-filter:blur(2px);transition:opacity .35s;
+  }
+  #mp-login.hide{opacity:0;pointer-events:none}
+  .mp-card{
+    width:min(340px,calc(100vw - 32px));padding:26px 24px 22px;border-radius:18px;
+    background:rgba(14,20,32,.9);border:1px solid rgba(140,190,255,.22);
+    box-shadow:0 18px 60px rgba(0,0,0,.6);
+    color:#e8f0fb;font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  .mp-title{font-size:21px;font-weight:800;letter-spacing:2px;text-align:center}
+  .mp-sub{font-size:11px;opacity:.55;text-align:center;margin:6px 0 20px}
+  .mp-row{display:flex;align-items:center;gap:10px;margin-bottom:11px;font-size:12px}
+  .mp-row span{width:34px;opacity:.65;flex:none}
+  .mp-row input{
+    flex:1;min-width:0;padding:9px 11px;border-radius:9px;font-size:13px;
+    background:rgba(255,255,255,.07);border:1px solid rgba(150,190,240,.24);color:#eaf2ff;outline:none;
+  }
+  .mp-row input:focus{border-color:rgba(120,210,255,.6);background:rgba(255,255,255,.1)}
+  .mp-quick{display:flex;gap:8px;margin:14px 0 16px}
+  .mp-quick button{
+    flex:1;padding:7px 0;border-radius:8px;font-size:11px;cursor:pointer;
+    background:rgba(90,150,220,.2);border:1px solid rgba(130,190,255,.3);color:#d6e8ff;
+  }
+  .mp-quick button:hover{background:rgba(90,150,220,.4)}
+  .mp-go{
+    width:100%;padding:11px 0;border-radius:10px;border:none;cursor:pointer;
+    font-size:14px;font-weight:700;letter-spacing:2px;
+    background:linear-gradient(180deg,#3f9ae0,#2a6fb5);color:#fff;
+    box-shadow:0 6px 18px rgba(50,140,220,.35);
+  }
+  .mp-go:hover{filter:brightness(1.12)}
+  .mp-skip{
+    width:100%;margin-top:9px;padding:7px 0;border-radius:8px;font-size:11px;cursor:pointer;
+    background:transparent;border:1px solid rgba(150,190,240,.22);color:#a9c2de;
+  }
+  .mp-skip:hover{background:rgba(255,255,255,.06);color:#d6e8ff}
+  .mp-msg{margin-top:11px;font-size:11px;min-height:15px;text-align:center;opacity:.8}
+  .mp-msg.err{color:#ff9a9a;opacity:1}
+
+  #mp-panel{
+    position:fixed;z-index:8800;left:14px;top:14px;width:172px;padding:11px 12px;border-radius:12px;
+    background:rgba(12,18,28,.78);border:1px solid rgba(140,190,255,.2);
+    color:#e6eefb;font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:11px;
+    backdrop-filter:blur(8px);user-select:none;
+  }
+  .mp-ph{display:flex;align-items:center;gap:7px;font-weight:700;margin-bottom:8px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mp-dot{width:7px;height:7px;border-radius:50%;background:#4be08a;flex:none;
+    box-shadow:0 0 7px #4be08a}
+  .mp-peers{margin-bottom:9px;max-height:132px;overflow:auto}
+  .mp-pr{display:flex;align-items:center;gap:6px;padding:2.5px 0;opacity:.9}
+  .mp-pr b{flex:none;font-weight:400}
+  .mp-pr span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mp-edit{display:flex;gap:5px;margin-bottom:7px}
+  .mp-edit input{
+    flex:1;min-width:0;padding:6px 8px;border-radius:7px;font-size:11px;
+    background:rgba(255,255,255,.07);border:1px solid rgba(150,190,240,.22);color:#eaf2ff;outline:none;
+  }
+  .mp-edit button{
+    padding:0 10px;border-radius:7px;font-size:11px;cursor:pointer;flex:none;
+    background:rgba(90,150,220,.28);border:1px solid rgba(130,190,255,.3);color:#d6e8ff;
+  }
+  .mp-btn{
+    display:block;width:100%;margin-top:5px;padding:7px 0;border-radius:8px;font-size:11px;cursor:pointer;
+    background:rgba(255,255,255,.07);border:1px solid rgba(150,190,240,.22);color:#dbe7f7;
+  }
+  .mp-btn.on{background:rgba(70,190,140,.3);border-color:rgba(110,235,180,.5);color:#d6ffe9}
+  .mp-btn2{background:rgba(200,90,90,.18);border-color:rgba(235,120,120,.3);color:#f2d2d2}
+  @media(max-width:700px){
+    #mp-panel{width:142px;left:10px;top:10px;padding:9px 10px;font-size:10px}
   }
 </style>
 </head>
@@ -8819,17 +8895,26 @@ SK.awning=(parent,x,y,z,w,d,cell,valance=true)=>{
   slab.position.set(x,y,z+d/2+.02);slab.rotation.x=-.16;
   slab.castShadow=false;slab.receiveShadow=true;parent.add(slab);
   if(valance){
-    const vg=new THREE.BoxGeometry(w,.26,.05);
+    /* 波浪垂帘：整块带扇贝边的布片
+       ⚠ 原来用一排 SphereGeometry 做垂帘球 —— 球从雨篷边缘鼓出来，
+         自身背光又接不到点光源，远看就是一串黑疙瘩（正是「看不懂的纯色块」）。
+         现在改成单块扇贝边布片：边缘是布的波浪，不凸出、不发黑，还省 draw call。 */
+    const n=Math.max(5,Math.round(w/.24));
+    const HH=.30;                     // 垂帘总高（米）
+    const sh=new THREE.Shape();
+    sh.moveTo(0,1);sh.lineTo(1,1);sh.lineTo(1,1-.72);
+    for(let i=n-1;i>=0;i--){
+      const x0=i/n,x1=(i+1)/n;
+      sh.lineTo((x0+x1)/2,1-.72-.28);
+      sh.lineTo(x0,1-.72);
+    }
+    sh.lineTo(0,1);
+    const vg=new THREE.ExtrudeGeometry(sh,{depth:.05,bevelEnabled:false});
+    vg.scale(w,HH,1);
     SK.uvCell(vg,cell%4,(cell/4)|0,4,4);
     const v=new THREE.Mesh(vg,SK.M.fabric);
-    v.position.set(x,y-.16,z+d+.05);v.castShadow=false;parent.add(v);
-    const n=Math.max(5,Math.round(w/.24));
-    for(let i=0;i<n;i++){
-      const s=new THREE.Mesh(new THREE.SphereGeometry(w/n*.52,10,7),SK.M.fabric);
-      SK.uvCell(s.geometry,cell%4,(cell/4)|0,4,4);
-      s.position.set(x-w/2+(i+.5)*(w/n),y-.28,z+d+.05);
-      s.scale.set(1,.62,1);s.castShadow=false;parent.add(s);
-    }
+    v.position.set(x-w/2,y-HH,z+d+.05);
+    v.castShadow=false;v.receiveShadow=true;parent.add(v);
   }
   for(const s of [-1,1]){
     const br=add(parent,BX(.05,.05,.42),SK.M.iron,x+s*(w/2-.16),y-.14,z+d*.5+.02);
@@ -8952,11 +9037,15 @@ SK.shopHouse=(parent,o)=>{
       map:glowTex,color:0xffc98a,transparent:true,opacity:.34,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
     halo.position.set(X,1.96,face+.36);halo.castShadow=false;g.add(halo);
   }
-  /* 门口的暖光带 */
+  /* 门口的暖光带
+     ⚠ 原来挂在 face+.12，正好等于门板木雕内板的前表面（门扇 z+.05 厚 .10，
+       内板 z+.10 厚 .04 → 前表面 z+.12）——两个面深度完全相同，抢深度缓冲
+       表现为「门在闪」。这里挪到 face+.17 并加 polygonOffset 彻底错开。 */
   {
     const dg=new THREE.Mesh(new THREE.PlaneGeometry(1.5,2.2),new THREE.MeshBasicMaterial({
-      map:glowTex,color:0xffbe7a,transparent:true,opacity:.26,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
-    dg.position.set(0,1.30,face+.12);dg.castShadow=false;g.add(dg);
+      map:glowTex,color:0xffbe7a,transparent:true,opacity:.26,blending:THREE.AdditiveBlending,depthWrite:false,fog:false,
+      polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4}));
+    dg.position.set(0,1.30,face+.17);dg.castShadow=false;g.add(dg);
   }
   /* 门前石槽花箱 */
   {
@@ -11629,8 +11718,12 @@ function fpUpdate(dt){
     fpStep(fx*d,fz*d);
   }
   const headBob=(fpSpd>0.5&&fp.jumpY<=0.01)?Math.sin(t*fpSpd*2.3)*.032*Math.min(1,fpSpd/4):0;
-  camera.position.set(fp.x,fp.y+FP_EYE+fp.jumpY+headBob,fp.z);
-  camera.rotation.set(fp.pitch,fp.yaw,0,'YXZ');
+  /* 第三人称时相机由 MP.update 接管（它把相机放在角色背后），
+     这里只更新角色坐标，不写 camera —— 否则两者每帧互相覆盖 */
+  if(!(window.MP&&MP.third)){
+    camera.position.set(fp.x,fp.y+FP_EYE+fp.jumpY+headBob,fp.z);
+    camera.rotation.set(fp.pitch,fp.yaw,0,'YXZ');
+  }
 }
 function fpStep(dx,dz){
   const nx=fp.x+dx,nz=fp.z+dz;
@@ -11891,6 +11984,8 @@ addEventListener('keydown',e=>{
   if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'))return;
   const code=keyToCode(e);
   if(code==='KeyQ'&&fp.on){exitWalk();return;}
+  /* V 键切换第三人称（多人联机模式） */
+  if(code==='KeyV'&&window.MP){MP.toggleThird();return;}
   if(code)fp.keys[code]=true;
   if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].indexOf(code)>=0)e.preventDefault();
 });
@@ -12134,6 +12229,607 @@ function updateAerialHaze(dt,t){
   }
 }
 
+/* ══ 多人联机 · 前端模块 ══ */
+/* ════════════════════════════════════════════════════════════
+   多人联机 · 前端模块（熊萌艺术馆）
+   —— 账号登录 / 同号踢出 / 可改显示 ID / 远端玩家同步
+   —— 第三人称模式（角色模型 + 弹簧跟随相机）
+   依赖全局：THREE / scene / camera / fp / XM / sfx
+   ════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  const MP = {
+    ws: null, account: '', display: '', connected: false,
+    peers: new Map(),          // account -> {display, target:{x,y,z,yaw}, cur:{...}, group, tag}
+    self: null,                // 本地第三人称角色
+    third: false,              // 是否第三人称
+    camDist: 5.6, camHeight: 2.35, camSide: 0.55,
+    lastSend: 0, sendHz: 15,
+    reconnectAt: 0, tries: 0,
+    onKicked: null,
+  };
+  window.MP = MP;
+
+  /* ── WebSocket URL：同源 wss ── */
+  function wsURL() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return proto + '//' + location.host + '/alex-garage/ws/';
+  }
+
+  /* ══════════════════════════════════════════════════════
+     登录界面
+     ══════════════════════════════════════════════════════ */
+  function buildLoginUI() {
+    if (document.getElementById('mp-login')) return;
+    const wrap = document.createElement('div');
+    wrap.id = 'mp-login';
+    wrap.innerHTML = `
+      <div class="mp-card">
+        <div class="mp-title">熊萌艺术馆</div>
+        <div class="mp-sub">圣诞冰雪特展 · 联机入口</div>
+        <label class="mp-row"><span>账号</span>
+          <input id="mp-acc" type="text" autocomplete="username" placeholder="test01" maxlength="20">
+        </label>
+        <label class="mp-row"><span>密码</span>
+          <input id="mp-pass" type="password" autocomplete="current-password" placeholder="123456" maxlength="20">
+        </label>
+        <div class="mp-quick">
+          <button data-a="test01" data-p="123456">test01</button>
+          <button data-a="test02" data-p="123456">test02</button>
+        </div>
+        <button id="mp-go" class="mp-go">进入展厅</button>
+        <button id="mp-skip" class="mp-skip">先逛逛（不联机）</button>
+        <div class="mp-msg" id="mp-msg"></div>
+      </div>`;
+    document.body.appendChild(wrap);
+    const msg = wrap.querySelector('#mp-msg');
+    const acc = wrap.querySelector('#mp-acc');
+    const pass = wrap.querySelector('#mp-pass');
+
+    wrap.querySelectorAll('.mp-quick button').forEach(b => {
+      b.onclick = () => { acc.value = b.dataset.a; pass.value = b.dataset.p; msg.textContent = ''; };
+    });
+    wrap.querySelector('#mp-skip').onclick = () => {
+      hideLogin();
+      if (window.MP) MP.setSkipped(true);
+    };
+    wrap.querySelector('#mp-go').onclick = () => {
+      const a = acc.value.trim(), p = pass.value;
+      if (!a || !p) { msg.textContent = '请填写账号和密码'; return; }
+      msg.textContent = '连接中…';
+      msg.className = 'mp-msg';
+      MP.connect(a, p);
+    };
+    [acc, pass].forEach(el => {
+      el.addEventListener('keydown', e => { if (e.key === 'Enter') wrap.querySelector('#mp-go').click(); });
+    });
+    MP._ui = { wrap, msg, acc, pass };
+  }
+
+  function setMsg(txt, kind) {
+    if (!MP._ui) return;
+    MP._ui.msg.textContent = txt;
+    MP._ui.msg.className = 'mp-msg' + (kind ? ' ' + kind : '');
+  }
+
+  function hideLogin() {
+    if (MP._ui) MP._ui.wrap.classList.add('hide');
+  }
+  function showLogin() {
+    if (MP._ui) { MP._ui.wrap.classList.remove('hide'); setMsg(''); }
+  }
+
+  /* ══════════════════════════════════════════════════════
+     连接
+     ══════════════════════════════════════════════════════ */
+  MP.connect = function (account, pass) {
+    MP.account = account; MP._pass = pass;
+    if (MP.ws) { try { MP.ws.close(); } catch (e) { } }
+    let ws;
+    try { ws = new WebSocket(wsURL()); }
+    catch (e) { setMsg('无法建立连接：' + e.message, 'err'); return; }
+    MP.ws = ws;
+
+    ws.onopen = () => {
+      MP.tries = 0;
+      ws.send(JSON.stringify({ t: 'login', account, pass }));
+    };
+    ws.onmessage = ev => {
+      let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      MP.onMsg(m);
+    };
+    ws.onclose = () => {
+      MP.connected = false;
+      MP.clearPeers();
+      if (MP.onKicked) { MP.onKicked(); return; }
+      if (MP._kicked) {          // 被顶号：不再自动重连（否则会反过来把新登录踢掉）
+        MP._kicked = false;
+        return;
+      }
+      MP.tries++;
+      const wait = Math.min(8000, 1200 * MP.tries);
+      setMsg('连接断开，' + Math.round(wait / 1000) + ' 秒后重连…', 'err');
+      clearTimeout(MP._rt);
+      MP._rt = setTimeout(() => { MP.connect(MP.account, MP._pass); }, wait);
+    };
+    ws.onerror = () => { };
+  };
+
+  MP.send = function (o) {
+    if (MP.ws && MP.ws.readyState === 1) {
+      try { MP.ws.send(JSON.stringify(o)); } catch (e) { }
+    }
+  };
+
+  MP.onMsg = function (m) {
+    switch (m.t) {
+      case 'welcome': {
+        MP.connected = true;
+        MP.display = m.you.display || MP.account;
+        setMsg('');
+        hideLogin();
+        MP.clearPeers();
+        (m.players || []).forEach(pl => {
+          if (pl.account !== MP.account) MP.addPeer(pl);
+        });
+        MP.syncPeersUI();
+        MP.startThirdPersonBody();
+        if (window.MP_UI) MP_UI.onLogin(m.you);
+        break;
+      }
+      case 'players': {
+        (m.players || []).forEach(pl => {
+          if (pl.account === MP.account) return;
+          const ex = MP.peers.get(pl.account);
+          if (ex) { ex.display = pl.display; ex.target = pl.p; ex.mode = pl.mode; }
+          else MP.addPeer(pl);
+        });
+        // 移除已下线的
+        const alive = new Set((m.players || []).map(x => x.account));
+        for (const acc of [...MP.peers.keys()]) {
+          if (!alive.has(acc)) MP.removePeer(acc);
+        }
+        MP.syncPeersUI();
+        break;
+      }
+      case 'move': {
+        const p = MP.peers.get(m.account);
+        if (p) {
+          p.display = m.display || p.display;
+          p.target = m.p;
+          p.mode = m.mode || 'fp';
+          p.lastSeen = performance.now();
+        }
+        break;
+      }
+      case 'rename': {
+        const p = MP.peers.get(m.account);
+        if (p) { p.display = m.display; refreshTag(p); }
+        MP.syncPeersUI();
+        break;
+      }
+      case 'kicked': {
+        MP._kicked = true;        // 标记被顶号，禁止自动重连
+        try { localStorage.removeItem('xm_mp_acc'); localStorage.removeItem('xm_mp_pass'); } catch (e) { }
+        MP.onKicked = function () {
+          MP.onKicked = null;
+          MP.connected = false;
+          MP.clearPeers();
+          showLogin();
+          setMsg('该账号在别处登录，已被踢下线', 'err');
+        };
+        MP.onKicked();
+        break;
+      }
+      case 'err': {
+        setMsg(m.msg || '登录失败', 'err');
+        MP.onKicked = null;   // 防止 close 时反复重连
+        try { MP.ws.close(); } catch (e) { }
+        MP.ws = null;
+        break;
+      }
+      case 'chat': {
+        if (window.MP_UI) MP_UI.pushChat(m);
+        break;
+      }
+    }
+  };
+
+  /* ══════════════════════════════════════════════════════
+     远端玩家
+     ══════════════════════════════════════════════════════ */
+  function makeTagSprite(text, color) {
+    const c = document.createElement('canvas');
+    const w = 256, h = 64;
+    c.width = w; c.height = h;
+    const x = c.getContext('2d');
+    x.clearRect(0, 0, w, h);
+    x.font = '600 30px system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+    x.textAlign = 'center'; x.textBaseline = 'middle';
+    const tw = Math.min(w - 12, x.measureText(text).width + 34);
+    const bx = (w - tw) / 2;
+    x.fillStyle = 'rgba(12,16,22,.72)';
+    roundRect(x, bx, 12, tw, 40, 10); x.fill();
+    x.strokeStyle = color; x.lineWidth = 2;
+    roundRect(x, bx, 12, tw, 40, 10); x.stroke();
+    x.fillStyle = '#f2f7ff';
+    x.fillText(text, w / 2, 33, w - 24);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true });
+    const sp = new THREE.Sprite(mat);
+    sp.scale.set(1.5, 0.375, 1);
+    sp.renderOrder = 999;
+    return sp;
+  }
+  function roundRect(x, px, py, w, h, r) {
+    x.beginPath();
+    x.moveTo(px + r, py);
+    x.arcTo(px + w, py, px + w, py + h, r);
+    x.arcTo(px + w, py + h, px, py + h, r);
+    x.arcTo(px, py + h, px, py, r);
+    x.arcTo(px, py, px + w, py, r);
+    x.closePath();
+  }
+
+  const PEER_COLORS = [0x6fd3ff, 0xffb35c, 0x8be28f, 0xff8fb0, 0xc9a2ff];
+  let peerColorIdx = 0;
+
+  MP.addPeer = function (pl) {
+    if (MP.peers.has(pl.account)) return;
+    const color = PEER_COLORS[peerColorIdx++ % PEER_COLORS.length];
+    const group = buildAvatar(color);
+    scene.add(group);
+    const tag = makeTagSprite(pl.display || pl.account, '#' + color.toString(16).padStart(6, '0'));
+    tag.position.y = 2.05;
+    group.add(tag);
+    const peer = {
+      account: pl.account, display: pl.display || pl.account,
+      target: pl.p || { x: 0, y: 0, z: 0, yaw: 0 },
+      cur: { x: pl.p ? pl.p.x : 0, y: pl.p ? pl.p.y : 0, z: pl.p ? pl.p.z : 0, yaw: 0 },
+      group, tag, color, lastSeen: performance.now()
+    };
+    MP.peers.set(pl.account, peer);
+    return peer;
+  };
+
+  MP.removePeer = function (account) {
+    const p = MP.peers.get(account);
+    if (!p) return;
+    scene.remove(p.group);
+    p.group.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) {
+        if (o.material.map) o.material.map.dispose();
+        o.material.dispose();
+      }
+    });
+    MP.peers.delete(account);
+  };
+
+  MP.clearPeers = function () {
+    for (const acc of [...MP.peers.keys()]) MP.removePeer(acc);
+  };
+
+  function refreshTag(peer) {
+    if (peer.tag && peer.tag.material && peer.tag.material.map) {
+      peer.tag.material.map.dispose();
+    }
+    const s = makeTagSprite(peer.display, '#' + peer.color.toString(16).padStart(6, '0'));
+    peer.tag.material.map = s.material.map;
+    peer.tag.material.needsUpdate = true;
+  }
+
+  /* ── 远端玩家模型：矮胖雪人熊（跟场景风格一致，不抢戏）── */
+  function buildAvatar(colorHex) {
+    const g = new THREE.Group();
+    const bodyM = new THREE.MeshStandardMaterial({
+      color: colorHex, roughness: .78, metalness: .04,
+      emissive: new THREE.Color(colorHex).multiplyScalar(.28), emissiveIntensity: .55
+    });
+    const snowM = new THREE.MeshStandardMaterial({ color: 0xf4f9ff, roughness: .9, metalness: 0 });
+    const darkM = new THREE.MeshStandardMaterial({ color: 0x232a33, roughness: .6 });
+
+    const body = new THREE.Mesh(new THREE.SphereGeometry(.42, 18, 14), bodyM);
+    body.position.y = .82; body.scale.set(1, .92, .92);
+    body.castShadow = true;
+    g.add(body);
+
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(.30, 16, 12), snowM);
+    belly.position.set(0, .78, .22); belly.scale.set(1, 1, .55);
+    g.add(belly);
+
+    const head = new THREE.Mesh(new THREE.SphereGeometry(.30, 18, 14), bodyM);
+    head.position.y = 1.40; head.castShadow = true;
+    g.add(head);
+
+    // 耳朵
+    for (const s of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(.115, 12, 10), bodyM);
+      ear.position.set(s * .21, 1.60, 0);
+      g.add(ear);
+    }
+    // 眼睛
+    for (const s of [-1, 1]) {
+      const e = new THREE.Mesh(new THREE.SphereGeometry(.038, 8, 8), darkM);
+      e.position.set(s * .10, 1.44, .27);
+      g.add(e);
+    }
+    // 鼻子
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(.05, 8, 8), darkM);
+    nose.position.set(0, 1.35, .29);
+    g.add(nose);
+    // 围巾
+    const scarf = new THREE.Mesh(new THREE.TorusGeometry(.24, .075, 8, 20), new THREE.MeshStandardMaterial({ color: 0xd23b32, roughness: .85 }));
+    scarf.position.y = 1.16; scarf.rotation.x = Math.PI / 2;
+    g.add(scarf);
+    // 脚
+    for (const s of [-1, 1]) {
+      const ft = new THREE.Mesh(new THREE.SphereGeometry(.16, 10, 8), darkM);
+      ft.position.set(s * .17, .16, .05); ft.scale.set(1, .7, 1.3);
+      g.add(ft);
+    }
+    // 手臂
+    for (const s of [-1, 1]) {
+      const arm = new THREE.Mesh(new THREE.SphereGeometry(.12, 10, 8), bodyM);
+      arm.position.set(s * .44, .86, .02); arm.scale.set(1, 1.5, 1);
+      g.add(arm);
+    }
+    g.userData.keep = true;   // 不参与静态合批
+    return g;
+  }
+
+  /* ══════════════════════════════════════════════════════
+     本地第三人称角色
+     ══════════════════════════════════════════════════════ */
+  MP.startThirdPersonBody = function () {
+    if (MP.self) return;
+    const g = buildAvatar(0xffd9a0);
+    g.visible = false;
+    scene.add(g);
+    MP.self = g;
+    MP.selfTag = makeTagSprite(MP.display || MP.account, '#ffd9a0');
+    MP.selfTag.position.y = 2.05;
+    g.add(MP.selfTag);
+  };
+
+  /* ══════════════════════════════════════════════════════
+     第三人称相机
+     ══════════════════════════════════════════════════════ */
+  MP.toggleThird = function () {
+    MP.third = !MP.third;
+    if (MP.self) MP.self.visible = MP.third;
+    if (MP._panel) MP._panel.third.classList.toggle('on', MP.third);
+    if (MP.third && fp.on) {
+      // 从第一人称切到第三人称：先把相机放到角色后方
+      const back = new THREE.Vector3(Math.sin(fp.yaw) * MP.camDist, FP_EYE + .35, Math.cos(fp.yaw) * MP.camDist);
+      camera.position.set(fp.x + back.x, fp.y + back.y, fp.z + back.z);
+    }
+    if (window.sfx) sfx.blip(660, .08, .05);
+  };
+
+  /* 手动设置本地位置（调试 / 自动化测试用；正常走动由 fpUpdate 驱动） */
+  MP.setLocalPos = function (x, y, z, yaw) {
+    MP._manual = true;
+    MP._lastX = x; MP._lastY = y || 0; MP._lastZ = z; MP._lastYaw = yaw || 0;
+  };
+
+  /* 诊断接口：给自动化测试读状态用 */
+  MP.debug = function () {
+    const peers = {};
+    for (const p of MP.peers.values()) {
+      peers[p.account] = {
+        display: p.display,
+        target: { x: p.target.x, y: p.target.y, z: p.target.z, yaw: p.target.yaw },
+        cur: { x: p.cur.x, y: p.cur.y, z: p.cur.z, yaw: p.cur.yaw },
+        groupPos: [+p.group.position.x.toFixed(3), +p.group.position.y.toFixed(3), +p.group.position.z.toFixed(3)],
+        tagOpacity: +p.tag.material.opacity.toFixed(3),
+        screen: (() => {
+          const v = p.group.position.clone(); v.y += 1.2; v.project(camera);
+          return [Math.round((v.x * .5 + .5) * window.innerWidth), Math.round((-v.y * .5 + .5) * window.innerHeight)];
+        })(),
+        distToCam: +camera.position.distanceTo(p.group.position).toFixed(3)
+      };
+    }
+    return {
+      connected: MP.connected, account: MP.account, display: MP.display,
+      third: MP.third,
+      selfVisible: MP.self ? MP.self.visible : null,
+      selfPos: MP.self ? [+MP.self.position.x.toFixed(3), +MP.self.position.y.toFixed(3), +MP.self.position.z.toFixed(3)] : null,
+      camPos: [+camera.position.x.toFixed(3), +camera.position.y.toFixed(3), +camera.position.z.toFixed(3)],
+      peers
+    };
+  };
+
+  /* ══════════════════════════════════════════════════════
+     每帧更新（插值远端玩家 + 推本地位置 + 第三人称相机）
+     ══════════════════════════════════════════════════════ */
+  MP.update = function (dt) {
+    if (!MP.connected) return;
+
+    /* 远端玩家：位置/朝向插值 */
+    const now = performance.now();
+    for (const p of MP.peers.values()) {
+      const k = 1 - Math.pow(.0016, dt);      // 指数平滑
+      const tx = p.target.x, ty = p.target.y, tz = p.target.z;
+      p.cur.x += (tx - p.cur.x) * k;
+      p.cur.y += (ty - p.cur.y) * k;
+      p.cur.z += (tz - p.cur.z) * k;
+      // 朝向：走最短弧
+      let dy = p.target.yaw - p.cur.yaw;
+      while (dy > Math.PI) dy -= Math.PI * 2;
+      while (dy < -Math.PI) dy += Math.PI * 2;
+      p.cur.yaw += dy * k;
+      p.group.position.set(p.cur.x, p.cur.y, p.cur.z);
+      p.group.rotation.y = p.cur.yaw;
+      // 标签始终朝向相机（Sprite 自带）
+      // 远距离时淡出标签，避免糊屏
+      const d = camera.position.distanceTo(p.group.position);
+      p.tag.material.opacity = d > 42 ? 0 : (d > 26 ? (42 - d) / 16 : 1);
+    }
+
+    /* 推本地位置 */
+    const now2 = performance.now();
+    if (now2 - MP.lastSend > 1000 / MP.sendHz) {
+      MP.lastSend = now2;
+      const px = MP._manual ? MP._lastX : (fp.on ? fp.x : (MP._lastX || 0));
+      const py = MP._manual ? MP._lastY : (fp.on ? fp.y : (MP._lastY || 0));
+      const pz = MP._manual ? MP._lastZ : (fp.on ? fp.z : (MP._lastZ || 0));
+      const pyaw = MP._manual ? MP._lastYaw : (fp.on ? fp.yaw : (MP._lastYaw || 0));
+      if (!MP._manual) { MP._lastX = px; MP._lastY = py; MP._lastZ = pz; MP._lastYaw = pyaw; }
+      MP.send({
+        t: 'pos', mode: MP.third ? 'tp' : 'fp',
+        p: { x: px, y: py, z: pz, yaw: pyaw }
+      });
+    }
+    /* 本地第三人称角色跟随 */
+    if (MP.third && fp.on && MP.self) {
+      MP.self.position.set(fp.x, fp.y, fp.z);
+      MP.self.rotation.y = fp.yaw;
+      // 走路时上下轻晃 + 手臂摆动（简化）
+      const spd = Math.hypot(fp.vx, fp.vz);
+      const bob = spd > .4 ? Math.sin(now2 * .012 * (1 + spd * .3)) * .045 * Math.min(1, spd / 4) : 0;
+      MP.self.position.y = fp.y + bob;
+      MP.self.children.forEach((c, i) => {
+        if (c.geometry && c.geometry.type === 'SphereGeometry' && Math.abs(c.position.x) > .3 && Math.abs(c.position.x) < .5) {
+          c.rotation.x = spd > .4 ? Math.sin(now2 * .012 * (1 + spd * .3)) * .5 : 0;
+        }
+      });
+
+      /* 相机：弹簧跟随角色背后 */
+      const yaw = fp.yaw;
+      const pitch = Math.max(-.5, Math.min(.6, fp.pitch));
+      const dist = MP.camDist;
+      const hgt = FP_EYE + .35 + Math.sin(pitch) * dist;
+      const back = new THREE.Vector3(
+        Math.sin(yaw) * Math.cos(pitch) * dist,
+        hgt,
+        Math.cos(yaw) * Math.cos(pitch) * dist
+      );
+      const want = new THREE.Vector3(fp.x, fp.y, fp.z).add(back);
+      const kk = 1 - Math.pow(.0009, dt);
+      camera.position.lerp(want, kk);
+      // 朝向角色胸口偏上
+      const look = new THREE.Vector3(fp.x, fp.y + 1.02, fp.z);
+      const dir = look.clone().sub(camera.position);
+      if (dir.lengthSq() > 1e-6) {
+        const targetQ = new THREE.Quaternion().setFromRotationMatrix(
+          new THREE.Matrix4().lookAt(camera.position, look, camera.up)
+        );
+        camera.quaternion.slerp(targetQ, 1 - Math.pow(.0004, dt));
+      }
+      camera.position.copy(camera.position);  // 保持
+    }
+  };
+
+  /* ══════════════════════════════════════════════════════
+     HUD：在线玩家列表 + 改 ID + 视角按钮
+     ══════════════════════════════════════════════════════ */
+  function buildPanel() {
+    if (document.getElementById('mp-panel')) return;
+    const p = document.createElement('div');
+    p.id = 'mp-panel';
+    p.innerHTML = `
+      <div class="mp-ph">
+        <span class="mp-dot"></span>
+        <span id="mp-me">未登录</span>
+      </div>
+      <div class="mp-peers" id="mp-peers"></div>
+      <div class="mp-edit">
+        <input id="mp-name" type="text" maxlength="16" placeholder="你的ID">
+        <button id="mp-save">改</button>
+      </div>
+      <button id="mp-third" class="mp-btn">第三人称</button>
+      <button id="mp-logout" class="mp-btn mp-btn2">退出</button>`;
+    document.body.appendChild(p);
+    const self = p.querySelector('#mp-me');
+    const peers = p.querySelector('#mp-peers');
+    const nameI = p.querySelector('#mp-name');
+    p.querySelector('#mp-save').onclick = () => {
+      const v = nameI.value.trim();
+      if (!v) return;
+      MP.send({ t: 'name', name: v });
+      MP.display = v;
+      if (MP.selfTag) {
+        const s2 = makeTagSprite(v, '#ffd9a0');
+        MP.selfTag.material.map.dispose();
+        MP.selfTag.material.map = s2.material.map;
+        MP.selfTag.material.needsUpdate = true;
+      }
+      self.textContent = v + '（' + MP.account + '）';
+      nameI.value = '';
+    };
+    nameI.addEventListener('keydown', e => { if (e.key === 'Enter') p.querySelector('#mp-save').click(); });
+    p.querySelector('#mp-third').onclick = () => MP.toggleThird();
+    p.querySelector('#mp-logout').onclick = () => {
+      try { MP.ws && MP.ws.close(); } catch (e) { }
+      MP.ws = null; MP.connected = false; MP.onKicked = null; MP._kicked = true;
+      MP.clearPeers();
+      try { localStorage.removeItem('xm_mp_acc'); localStorage.removeItem('xm_mp_pass'); } catch (e) { }
+      if (MP._panel) MP._panel.p.style.display = 'none';
+      showLogin();
+    };
+    MP._panel = { p, self, peers, nameI, third: p.querySelector('#mp-third') };
+  }
+
+  MP.syncPeersUI = function () {
+    if (!MP._panel) return;
+    const { self, peers } = MP._panel;
+    self.textContent = MP.display + '（' + MP.account + '）';
+    const list = ['<div class="mp-pr"><b>我</b><span>' + MP.display + '</span></div>'];
+    for (const p of MP.peers.values()) {
+      list.push('<div class="mp-pr"><b style="color:#' + p.color.toString(16).padStart(6, '0') + '">●</b><span>' + escapeHtml(p.display) + '</span></div>');
+    }
+    peers.innerHTML = list.join('');
+  };
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  /* ══════════════════════════════════════════════════════
+     初始化
+     ══════════════════════════════════════════════════════ */
+  MP.init = function () {
+    buildLoginUI();
+    buildPanel();
+    // 自动登录：查 localStorage
+    const saved = localStorage.getItem('xm_mp_acc');
+    const savedP = localStorage.getItem('xm_mp_pass');
+    if (saved && savedP) {
+      MP._ui.acc.value = saved;
+      MP._ui.pass.value = savedP;
+      setMsg('正在恢复上次登录…');
+      MP.connect(saved, savedP);
+    }
+    // 记住登录信息
+    const origLogin = MP.onMsg;
+    MP.onMsg = function (m) {
+      if (m.t === 'welcome') {
+        localStorage.setItem('xm_mp_acc', MP.account);
+        localStorage.setItem('xm_mp_pass', MP._pass || '');
+      }
+      origLogin(m);
+    };
+  };
+
+  /* 「先逛逛」：不登录也能进场景，多人面板收起 */
+  MP.setSkipped = function (v) {
+    MP.skipped = !!v;
+    if (MP._panel) MP._panel.p.style.display = v ? 'none' : '';
+  };
+
+  MP.setThird = function (v) {
+    if (MP._panel) MP._panel.third.classList.toggle('on', v);
+  };
+
+  document.addEventListener('DOMContentLoaded', () => MP.init());
+  if (document.readyState !== 'loading') MP.init();
+
+})();
+
+
 function animate(){
   requestAnimationFrame(animate);
   renderer.info.reset();
@@ -12293,13 +12989,15 @@ function animate(){
       sleighDustMesh.instanceMatrix.needsUpdate=true;
     }
   }
-  /* 共享圣诞彩灯材质池高速律动 + 树顶金星自转 */
+  /* 共享圣诞彩灯材质池高速律动 + 树顶金星自转
+     ⚠ 原来幅度 .64~1.0、频率 3.2rad/s（约 0.5Hz 全幅摆动），
+       门楣上那一排灯看起来就是在「闪」。改成慢半拍 + 幅度收窄的呼吸感。 */
   {
     const lOn=state.lights?1.0:0.12;
     const glowScale=(nightNow?1.0:(state.timeKey==='dusk'||state.timeKey==='dawn'?.78:.44))*lOn;
     for(let i=0;i<xmasBulbPool.length;i++){
       const p=xmasBulbPool[i];
-      const pulse=(.64+.36*Math.sin(t*3.2+p.phase))*glowScale;
+      const pulse=(.84+.16*Math.sin(t*1.5+p.phase))*glowScale;
       p.mat.color.copy(p.base).multiplyScalar(pulse);
     }
     for(let i=0;i<xmasStars.length;i++){
@@ -12913,6 +13611,10 @@ function animate(){
     if(IS_TOUCH_DEV){ if(!fp.on)touchCamApply(); }
     else controls.update();
   }
+  /* 多人联机：远端玩家插值 + 推本地位置 + 第三人称相机
+     —— 必须放在 fpUpdate 之后：fpUpdate 每帧把 camera 写回第一人称位姿，
+        第三人称要在它后面把相机挪到角色背后 */
+  if(window.MP)MP.update(dt);
   updateTrain(dt);
   updateWheelRide(dt);
   updateBalloonRide(dt);
