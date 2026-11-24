@@ -482,6 +482,11 @@
     box-shadow:0 8px 24px rgba(0,0,0,.45);
   }
   #train-hud.show{display:flex}
+  /* 乘坐中：按用户要求不显示任何说明文案，提示条里只留一个下车按钮 */
+  #train-hud.bare #train-msg{display:none}
+  #train-hud.bare{padding:5px 7px;gap:0}
+  /* 文案去掉后按钮就是唯一的下车入口（手机上没有 E 键），按钮放大一档好点 */
+  #train-hud.bare #train-btn{padding:9px 22px;font-size:14px;border-radius:16px}
   #train-btn{
     padding:4px 11px;border-radius:12px;border:none;background:#e8b653;color:#1a1104;
     font-weight:700;font-size:12px;cursor:pointer;
@@ -7753,7 +7758,7 @@ function stopBalloonRide(){
   balloonSys.riding=false;balloonSys.idx=-1;balloonSys.vy=0;
   if(b){fp.x=b.x;fp.z=b.z;fp.y=groundY(b.x,b.z);}
   fp.vx=fp.vz=0;
-  trainHud.classList.remove('show');
+  hudHide();
   sfx.blip(392,.12,.06);
 }
 function updateBalloonRide(dt){
@@ -7784,10 +7789,7 @@ function updateBalloonRide(dt){
       fp.x=b.x;fp.z=b.z;fp.y=b.y;
       camera.position.set(b.x,b.y+2.45,b.z);   // 站进篮口上方，视线越过篮沿直接看出去
       camera.rotation.set(fp.pitch,fp.yaw,0,'YXZ');
-      trainHud.classList.add('show');
-      trainMsgEl.textContent='正在乘坐大号热气球（高度 '+b.y.toFixed(1)+'m · W/↑ 上升 S/↓ 下降 · 拖动鼠标环顾 · E 下气球）';
-      trainBtnEl.textContent='下热气球 (E)';
-      trainBtnEl.onclick=stopBalloonRide;
+      hudShow('','下车 (E)',stopBalloonRide,true);
       b.hud=true;
     }else{
       /* 没人乘坐时：缓缓回到微微悬浮的状态 */
@@ -7795,7 +7797,7 @@ function updateBalloonRide(dt){
       const hover=1.05+Math.sin(t*.55+i*1.3)*.10+Math.sin(t*.87+i*2.1)*.05;
       b.y+=(hover-b.y)*Math.min(1,dt*.9);
       b.burn+=(.08-b.burn)*Math.min(1,dt*3);
-      if(b.hud){b.hud=false;trainHud.classList.remove('show');}
+      if(b.hud){b.hud=false;hudHide();}
     }
     /* 姿态：升时前倾、缓缓摇摆 */
     b.g.position.set(b.x,b.y,b.z);
@@ -7820,10 +7822,7 @@ function updateBalloonRide(dt){
   if(!balloonSys.riding&&fp.on&&!wheelSys.riding&&!trainSys.riding&&!launchSys.active){
     const i=balloonNearPlayer();
     if(i>=0){
-      trainHud.classList.add('show');
-      trainMsgEl.textContent='大号热气球 · 按 E 或点击登上吊篮（升空后 W/↑ 上升、S/↓ 下降）';
-      trainBtnEl.textContent='上热气球 (E)';
-      trainBtnEl.onclick=()=>toggleBalloonRide(i);
+      hudShow('大号热气球 · 按 E 或点击登上吊篮（升空后 W/↑ 上升、S/↓ 下降）','上热气球 (E)',()=>toggleBalloonRide(i));
       balloons[i].hud=true;
     }
   }
@@ -11018,12 +11017,10 @@ function fpUpdate(dt){
   if(onIce!==!!fp._wasOnIce){
     fp._wasOnIce=onIce;
     if(onIce&&!trainSys.riding&&!wheelSys.riding&&!launchSys.active){
-      trainHud.classList.add('show');
-      trainMsgEl.textContent='⛸️ 已进入星夜溜冰场 · 溜冰模式开启（冰面惯性滑行 · 空格键 360° 花样旋转跳 · Shift 极速冲刺）';
-      trainBtnEl.textContent='花样旋转跳 (Space)';
-      trainBtnEl.onclick=()=>{if(fp.jumpY<=0.001){fp.jumpVy=5.8;fp.skateSpin=Math.PI*2;}};
+      hudShow('⛸️ 已进入星夜溜冰场 · 溜冰模式开启（冰面惯性滑行 · 空格键 360° 花样旋转跳 · Shift 极速冲刺）',
+        '花样旋转跳 (Space)',()=>{if(fp.jumpY<=0.001){fp.jumpVy=5.8;fp.skateSpin=Math.PI*2;}});
     }else if(!onIce&&!trainSys.riding&&!wheelSys.riding&&!launchSys.active){
-      trainHud.classList.remove('show');
+      hudHide();
     }
   }
   // 第一人称轻跳跃物理（冰面起跳触发 360° 阿克塞尔花样旋转跳！）
@@ -13590,6 +13587,17 @@ let trainSteamCursor=0;
 const trainHud=document.getElementById('train-hud');
 const trainMsgEl=document.getElementById('train-msg');
 const trainBtnEl=document.getElementById('train-btn');
+/* 提示条统一入口：riding=true 表示「正在乘坐」，
+   此时不显示任何说明文案，条子里只留一个下车按钮；
+   靠近设施、还没上车的提示文案照旧。 */
+function hudShow(msg,btn,fn,riding){
+  trainHud.classList.add('show');
+  trainHud.classList.toggle('bare',!!riding);
+  if(msg)trainMsgEl.textContent=msg;
+  trainBtnEl.textContent=btn;
+  trainBtnEl.onclick=fn;
+}
+function hudHide(){trainHud.classList.remove('show','bare');}
 
 function toggleRideTrain(){
   if(trainSys.riding){
@@ -13717,7 +13725,7 @@ function stopLaunchRide(){
   fp.z=Math.max(-38,Math.min(68,launchSys.z));
   fp.y=Math.max(0,groundY(fp.x,fp.z));
   fp.vx=0;fp.vz=0;
-  trainHud.classList.remove('show');
+  hudHide();
 }
 function updateLaunchRide(dt){
   if(!launchSys.active)return;
@@ -13727,10 +13735,7 @@ function updateLaunchRide(dt){
     const shk=Math.sin(t*55)*.035;
     camera.position.set(launchSys.x+shk,launchSys.y+FP_EYE+shk*.5,launchSys.z);
     camera.rotation.set(fp.pitch,fp.yaw,0,'YXZ');
-    trainHud.classList.add('show');
-    trainMsgEl.textContent='蓄力准备弹射升空…（'+Math.max(0,launchSys.timer).toFixed(1)+'s）';
-    trainBtnEl.textContent='取消';
-    trainBtnEl.onclick=stopLaunchRide;
+    hudShow('蓄力准备弹射升空…（'+Math.max(0,launchSys.timer).toFixed(1)+'s）','取消',stopLaunchRide);
     if(launchSys.timer<=0){
       launchSys.stage='launch';
       launchSys.vy=32.5; // 直冲 ~51m 高空，稳稳高于 21.5~25m 巡逻直升机
@@ -13743,10 +13748,7 @@ function updateLaunchRide(dt){
     launchSys.y+=launchSys.vy*dt;
     camera.position.set(launchSys.x,launchSys.y+FP_EYE,launchSys.z);
     camera.rotation.set(fp.pitch,fp.yaw,0,'YXZ');
-    trainHud.classList.add('show');
-    trainMsgEl.textContent='🚀 高空弹射升空中！（高度 '+launchSys.y.toFixed(1)+'m · 即将开伞）';
-    trainBtnEl.textContent='直接落地';
-    trainBtnEl.onclick=stopLaunchRide;
+    hudShow('','直接落地',stopLaunchRide,true);
     if(launchSys.vy<=0.5){
       launchSys.stage='chute';
       launchSys.vy=-1.2;
@@ -13789,10 +13791,7 @@ function updateLaunchRide(dt){
   camera.position.set(launchSys.x,launchSys.y+FP_EYE,launchSys.z);
   camera.rotation.set(fp.pitch,fp.yaw,0,'YXZ');
 
-  trainHud.classList.add('show');
-  trainMsgEl.textContent='🪂 降落伞滑翔中（高度 '+launchSys.y.toFixed(1)+'m · WASD 控制飞行方向 · 拖动环顾全城）';
-  trainBtnEl.textContent='收伞落地';
-  trainBtnEl.onclick=stopLaunchRide;
+  hudShow('','收伞落地',stopLaunchRide,true);
 
   const floorY=groundY(launchSys.x,launchSys.z);
   if(launchSys.y<=floorY+0.05){
@@ -13907,7 +13906,7 @@ function toggleFpvMode(force){
     const b1=document.getElementById('t-fpv'), b2=document.getElementById('w-fpv');
     if(b1)b1.classList.add('on');
     if(b2)b2.classList.add('on');
-    trainHud.classList.remove('show');
+    hudHide();
     sfx.blip(880,.12,.06);
   }else{
     fpvSys.active=false;
@@ -14179,10 +14178,7 @@ function updateWheelRide(dt){
       co.sampleTrackUp(co.t%1,co._camU);
       camera.up.copy(co._camU);
       camera.lookAt(co._camL.copy(wp).addScaledVector(co._camDirS,8));
-      trainHud.classList.add('show');
-      trainMsgEl.textContent='正在乘坐 '+wheelSys.label+'（车头锁定第一视角 · 高度 '+wp.y.toFixed(1)+'m）';
-      trainBtnEl.textContent='下来 (E)';
-      trainBtnEl.onclick=stopFacilityRide;
+      hudShow('','下车 (E)',stopFacilityRide,true);
       return;
     }else if(wheelSys.kind==='bumper'&&(wheelSys.car||amusement.bumper.length)){
       const car=wheelSys.car||amusement.bumper[0];
@@ -14194,12 +14190,7 @@ function updateWheelRide(dt){
       const ang=(b&&b.ang!==undefined)?b.ang:car.rotation.y;
       const look=(b&&b.look)||0;
       camera.rotation.set(fp.pitch,ang+Math.PI+look,0,'YXZ');
-      trainHud.classList.add('show');
-      trainMsgEl.textContent=IS_TOUCH_DEV
-        ? '冰面碰碰车 · 左手摇杆上下=油门 / 左右=转向 · 单指拖动环顾 · 速度 '+((b&&b.speed)||0).toFixed(1)+' m/s'
-        : '冰面碰碰车 · W/↑ 油门 S/↓ 刹车倒车 A/← D/→ 转向 · 拖动鼠标环顾 · 速度 '+((b&&b.speed)||0).toFixed(1)+' m/s';
-      trainBtnEl.textContent='下车 (E)';
-      trainBtnEl.onclick=stopFacilityRide;
+      hudShow('','下车 (E)',stopFacilityRide,true);
       return;
     }else if(wheelSys.kind==='sleigh'){
       // 坐在圣诞老人后面的高处礼物堆上：居高临下俯瞰圣诞老人背影、三只驯鹿与雪夜全城
@@ -14210,20 +14201,14 @@ function updateWheelRide(dt){
     fp.x=wp.x;fp.z=wp.z;fp.y=wp.y-FP_EYE;
     camera.position.copy(wp);
     camera.rotation.set(fp.pitch,fp.yaw,0,'YXZ');
-    trainHud.classList.add('show');
-    trainMsgEl.textContent='正在体验 '+wheelSys.label+'（高度 '+wp.y.toFixed(1)+'m · 拖动鼠标 360° 看风景）';
-    trainBtnEl.textContent='下来 (E)';
-    trainBtnEl.onclick=stopFacilityRide;
+    hudShow('','下车 (E)',stopFacilityRide,true);
     return;
   }
   trainBtnEl.onclick=()=>toggleRideTrain(null);
   if(!trainSys.riding&&!launchSys.active&&fp.on){
     const dw=Math.hypot(fp.x-27,fp.z-36);
     if(dw<10.5){
-      trainHud.classList.add('show');
-      trainMsgEl.textContent='敞篷观景摩天轮 · 按 E 或点击坐上吊篮';
-      trainBtnEl.textContent='坐摩天轮 (E)';
-      trainBtnEl.onclick=()=>toggleRideWheel(null);
+      hudShow('敞篷观景摩天轮 · 按 E 或点击坐上吊篮','坐摩天轮 (E)',()=>toggleRideWheel(null));
     }
   }
 }
@@ -14334,20 +14319,16 @@ function updateTrain(dt){
     camera.position.copy(seat);
     camera.up.set(0,1,0);
     camera.lookAt(lookBack);
-    trainHud.classList.add('show');
-    trainMsgEl.textContent='🚂 皇家冬夜加长特快巡航中 · 6节重型编组尾车观景（按 E 随时下车）';
-    trainBtnEl.textContent='下车 (E)';
+    hudShow('','下车 (E)',()=>toggleRideTrain(),true);
   }else if(fp.on){
     const nearCar=trainCars.some(c=>Math.hypot(fp.x-c.position.x,fp.z-c.position.z)<9.5);
     if(nearCar){
-      trainHud.classList.add('show');
-      trainMsgEl.textContent='🚂 皇家冬夜加长特快经过身旁 · 点击车厢或按 E 随时上车';
-      trainBtnEl.textContent='上车 (E)';
+      hudShow('🚂 皇家冬夜加长特快经过身旁 · 点击车厢或按 E 随时上车','上车 (E)',()=>toggleRideTrain());
     }else{
-      trainHud.classList.remove('show');
+      hudHide();
     }
   }else{
-    trainHud.classList.remove('show');
+    hudHide();
   }
 }
 
