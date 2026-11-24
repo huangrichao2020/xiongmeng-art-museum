@@ -7378,6 +7378,117 @@ function balloonRadialTex(){
   x.fillStyle=gr;x.fillRect(0,0,128,128);
   return ctex(c);
 }
+/* 火焰贴图：底白热 → 中橙 → 尖部透空。
+   纯几何锥体远看是一根实心光柱，边缘硬得像塑料；
+   贴一张竖向渐变后，火苗尖端化开，底下白热，上面烧成透明，才像火。 */
+function flameTex(){
+  const [c,x]=cv(32,128);
+  const g=x.createLinearGradient(0,128,0,0);   // 画布底 = 火焰根部
+  g.addColorStop(0,'rgba(255,240,205,1)');
+  g.addColorStop(.30,'rgba(255,176,66,.82)');
+  g.addColorStop(.70,'rgba(255,104,22,.26)');
+  g.addColorStop(1,'rgba(255,64,0,0)');
+  x.fillStyle=g;x.fillRect(0,0,32,128);
+  const t=ctex(c);
+  t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;
+  return t;
+}
+
+/* ── 迪士尼乐园风格瓜瓣贴图 ──
+   迪士尼乐园那排气球长这样：竖条高饱和彩色瓜瓣，每瓣印一个角色图案，
+   顶部一顶金皇冠，底下一圈奶油色扇贝裙边。
+   贴图画成 128×1024 的窄长条（对上瓜瓣约 2.0m 宽 × 15.5m 高的比例，图案才不会被拉扁），
+   每片瓜瓣一张，同时当 map 和 emissiveMap 用 ——
+   夜里只有图案本身会发光，黑色米奇剪影仍然是黑的，不会被整片自发光冲成灰影。 */
+const DISNEY_PALETTE=[0xd93a2c,0xe8a81a,0x2f6fbe,0x3f8f4a,0xd9701f,0x76449f,0xd9446f,0x1a93a4];
+const DISNEY_MOTIFS=['mickey','castle','text','star'];
+function disneyGoreTex(hex,motif){
+  const W=128,H=1024;
+  const [c,x]=cv(W,H);
+  x.fillStyle='#'+hex.toString(16).padStart(6,'0');
+  x.fillRect(0,0,W,H);
+  /* 竖向布纹 */
+  for(let i=0;i<W;i+=4){x.fillStyle='rgba(255,255,255,.055)';x.fillRect(i,0,2,H);}
+  /* 顶部受暖光提亮、火焰口方向压暗（画布顶端 = 伞顶） */
+  const g=x.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'rgba(255,255,255,.16)');
+  g.addColorStop(.34,'rgba(255,255,255,.02)');
+  g.addColorStop(.68,'rgba(0,0,0,.05)');
+  g.addColorStop(1,'rgba(0,0,0,.28)');
+  x.fillStyle=g;x.fillRect(0,0,W,H);
+  /* ── 印刷图案 ──
+     位置定在画布 70% 处 = 伞高 30% 处 —— 正好是伞身最宽的那一圈
+     （prof 在 t≈0.3 取到最大半径 5.6m），图案画在这里既贴在最宽处，
+     仰拍机位下又落在画面中部；之前放在画布 44%（伞高 56%），
+     那半截被透视压扁，图案挤在伞顶一小撮里，远看只有一小条。 */
+  const cx=W/2, cy=H*.70, R=W*.45;
+  if(motif==='mickey'){
+    x.fillStyle='#16161b';
+    x.beginPath();x.arc(cx,cy,R*.86,0,Math.PI*2);x.fill();
+    x.beginPath();x.arc(cx-R*.62,cy-R*.60,R*.38,0,Math.PI*2);x.fill();
+    x.beginPath();x.arc(cx+R*.62,cy-R*.60,R*.38,0,Math.PI*2);x.fill();
+    x.fillStyle='#fdf7ea';
+    x.beginPath();x.ellipse(cx,cy+R*.13,R*.60,R*.53,0,0,Math.PI*2);x.fill();
+    x.fillStyle='#16161b';
+    x.beginPath();x.ellipse(cx-R*.24,cy+R*.05,R*.105,R*.145,0,0,Math.PI*2);x.fill();
+    x.beginPath();x.ellipse(cx+R*.24,cy+R*.05,R*.105,R*.145,0,0,Math.PI*2);x.fill();
+    x.beginPath();x.ellipse(cx,cy+R*.28,R*.125,R*.095,0,0,Math.PI*2);x.fill();
+  }else if(motif==='castle'){
+    x.fillStyle='#fdf6e4';
+    const tower=(tx,ty,w,h)=>{
+      x.fillRect(tx-w/2,ty-h,w,h);
+      x.beginPath();x.moveTo(tx-w*.62,ty-h);x.lineTo(tx,ty-h-w*1.5);x.lineTo(tx+w*.62,ty-h);x.closePath();x.fill();
+      return ty-h-w*1.5;
+    };
+    const a1=tower(cx,cy+R*.85,R*.46,R*1.55);
+    const a2=tower(cx-R*.62,cy+R*.85,R*.32,R*1.05);
+    const a3=tower(cx+R*.62,cy+R*.85,R*.32,R*1.05);
+    x.fillStyle='#3a2a1c';
+    x.beginPath();x.moveTo(cx-R*.15,cy+R*.85);x.lineTo(cx-R*.15,cy+R*.42);
+    x.arc(cx,cy+R*.42,R*.15,Math.PI,0);x.lineTo(cx+R*.15,cy+R*.85);x.closePath();x.fill();
+    x.fillStyle='#f0c64a';
+    for(const fx of [[cx,a1],[cx-R*.62,a2],[cx+R*.62,a3]]){
+      x.fillRect(fx[0]-1.5,fx[1]-R*.26,3,R*.26);
+      x.beginPath();x.moveTo(fx[0],fx[1]-R*.26);x.lineTo(fx[0]+R*.22,fx[1]-R*.18);
+      x.lineTo(fx[0],fx[1]-R*.10);x.closePath();x.fill();
+    }
+  }else if(motif==='text'){
+    /* 沿弧线排字在这张 128px 宽的窄贴图里排不开（11 个字挤 100px 弧长，
+       全叠在一起还容易被裁掉），改成上下两行横排的 logo 写法。
+       瓜瓣的 u 方向从外面看是反的，所以画布上先把字左右镜像一次，贴到伞上才是正的
+       （城堡/米奇/星星本身左右对称，看不出来，只有字会露馅）。 */
+    x.save();x.translate(W,0);x.scale(-1,1);
+    x.fillStyle='#fdf6e4';
+    x.textAlign='center';x.textBaseline='middle';
+    x.font='italic 700 28px Georgia,"Times New Roman",serif';
+    x.fillText('Disney',cx,cy-17);
+    x.font='italic 700 21px Georgia,"Times New Roman",serif';
+    x.fillText('Parks',cx,cy+13);
+    x.strokeStyle='rgba(240,198,74,.85)';x.lineWidth=2;
+    x.beginPath();x.moveTo(cx-32,cy+28);x.lineTo(cx+32,cy+28);x.stroke();
+    x.restore();
+  }else{
+    x.fillStyle='#fdf6e4';
+    x.beginPath();
+    for(let i=0;i<10;i++){
+      const rr2=i%2?R*.42:R*.92,a=-Math.PI/2+i*Math.PI/5;
+      const px=cx+Math.cos(a)*rr2,py=cy+Math.sin(a)*rr2;
+      i?x.lineTo(px,py):x.moveTo(px,py);
+    }
+    x.closePath();x.fill();
+    x.fillStyle='#f0c64a';
+    x.beginPath();x.arc(cx,cy,R*.22,0,Math.PI*2);x.fill();
+  }
+  /* ── 两侧鎏金接缝：瓜瓣之间的载重压条 ── */
+  const sg=x.createLinearGradient(0,0,10,0);
+  sg.addColorStop(0,'#d9a441');sg.addColorStop(1,'rgba(217,164,65,0)');
+  x.fillStyle=sg;x.fillRect(0,0,10,H);
+  const sg2=x.createLinearGradient(W-10,0,W,0);
+  sg2.addColorStop(0,'rgba(217,164,65,0)');sg2.addColorStop(1,'#d9a441');
+  x.fillStyle=sg2;x.fillRect(W-10,0,10,H);
+  x.fillStyle='rgba(120,80,20,.5)';x.fillRect(0,0,2,H);x.fillRect(W-2,0,2,H);
+  return ctex(c);
+}
 function buildHotAirBalloon(x,z){
   const g=new THREE.Group();
   /* ── 尺寸按真实热气球比例重做 ──
@@ -7386,27 +7497,18 @@ function buildHotAirBalloon(x,z){
   const GORES=16,RAD=5.6,HGT=15.5,BASE=4.9;
   const BW=2.4,BH=1.3,BD=1.9;                     // 吊篮 宽/高/深
   const prof=t=>RAD*(.34+.66*Math.pow(Math.sin(Math.PI*Math.pow(t,.56)),.78))*(1-.46*Math.pow(t,7));
-  /* 每片瓜瓣一套自己的材质：自发光直接用该片主色，
-     红色瓜瓣自己发红光、绿色发绿光，不会被统一暖白打成粉/灰。
+  /* 每片瓜瓣一套自己的材质：贴图里既有本片主色，也有印刷图案。
      材质变多不增加 draw call（本来就是一片一个 mesh）。 */
   const fabricMs=[];
-  const fabricM=new THREE.MeshStandardMaterial({
-    vertexColors:true,roughness:.82,metalness:0,side:THREE.DoubleSide,
-    emissive:0xffffff,emissiveIntensity:.42,envMapIntensity:.18
-  });
-  /* ── 配色：复古节日气球（深番茄红 / 暖橙 / 陈金 / 米白 / 玫红 / 湖蓝 / 松绿 / 焦橙）──
-     早先用的是荧光红黄绿蓝紫粉青，在冷蓝夜景 + 暖金窗光里跳得不像这家景的东西，
-     整体偏「霓虹」。这版保留多彩分块（还是 16 片 8 色交替），但把色相拉回
-     复古暖调，并让接缝变成鎏金腰带，跟场景里的鎏金门楼 / 剧院灯牌呼应。 */
-  const GORE_PALETTE=[0xd8443a,0xe2803a,0xf0c04a,0xf4e0bb,0xb04a5e,0x2f7d9e,0x3d8a63,0xd98a33];
-  const cGold=new THREE.Color(0xd9a441);
-  const cB=new THREE.Color(),cMain=new THREE.Color(),cWarm=new THREE.Color(0xfff3d8);
-  const cHsl={h:0,s:0,l:0};
   const US=10,VS=20;
   for(let gi=0;gi<GORES;gi++){
     const a0=gi/GORES*Math.PI*2,a1=(gi+1)/GORES*Math.PI*2;
-    cMain.setHex(GORE_PALETTE[gi%GORE_PALETTE.length]);
-    const pos=new Float32Array((US+1)*(VS+1)*3),cs=new Float32Array((US+1)*(VS+1)*3),idx=[];
+    /* ── 配色改成迪士尼乐园那排气球 ──
+       乐园气球是竖条高饱和彩色 + 每瓣一个角色印刷 + 顶部金皇冠 + 底部奶油扇贝裙边。
+       之前这版是复古节日色（番茄红/暖橙/陈金/米白…），偏怀旧不偏乐园。
+       竖条色直接来自贴图，饱和度不再靠顶点色硬拉 —— 顶点色改成灰度也省掉了每片一次的 HSL 计算。 */
+    const tex=disneyGoreTex(DISNEY_PALETTE[gi%DISNEY_PALETTE.length],DISNEY_MOTIFS[gi%DISNEY_MOTIFS.length]);
+    const pos=new Float32Array((US+1)*(VS+1)*3),uvs=new Float32Array((US+1)*(VS+1)*2),idx=[];
     let p=0;
     for(let v=0;v<=VS;v++){
       const t=v/VS,r0=prof(t);
@@ -7415,17 +7517,7 @@ function buildHotAirBalloon(x,z){
         pos[p]=Math.cos(a)*r;
         pos[p+1]=BASE+HGT*t-.16*Math.sin(Math.PI*uu)*Math.sin(Math.PI*Math.min(1,t*.92));
         pos[p+2]=Math.sin(a)*r;
-        cB.copy(cMain);
-        cB.multiplyScalar(.88+.16*Math.sin(Math.PI*uu));        // 横向褶皱明暗
-        cB.lerp(cWarm,Math.pow(t,3.2)*.12);                     // 顶部受暖光
-        cB.multiplyScalar(.78+.22*Math.min(1,t*3.4));          // 火焰口附近压暗
-        /* 夜景全局光照 + ACES 会把彩度洗掉，这里在 sRGB 空间把饱和度硬拉回来。
-           注意必须显式指定 SRGBColorSpace：默认是线性工作空间，在线性空间算 HSL 等于没提。 */
-        cB.getHSL(cHsl,THREE.SRGBColorSpace);
-        cB.setHSL(cHsl.h,Math.min(1,cHsl.s*1.28),cHsl.l,THREE.SRGBColorSpace);
-        const edge=Math.min(uu,1-uu);
-        if(edge<.05)cB.lerp(cGold,.55).multiplyScalar(.78);     // 瓜瓣接缝 = 鎏金载重带
-        cs[p]=cB.r;cs[p+1]=cB.g;cs[p+2]=cB.b;
+        uvs[(p/3)*2]=uu;uvs[(p/3)*2+1]=t;   // u 横跨瓜瓣、v 沿伞高（贴图是窄长条，图案才不变形）
         p+=3;
       }
     }
@@ -7434,38 +7526,58 @@ function buildHotAirBalloon(x,z){
     }
     const geo=new THREE.BufferGeometry();
     geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
-    geo.setAttribute('color',new THREE.BufferAttribute(cs,3));
+    geo.setAttribute('uv',new THREE.BufferAttribute(uvs,2));
     geo.setIndex(idx);geo.computeVertexNormals();
-    /* 该片瓜瓣的专属材质：自发光 = 本片主色 */
+    /* 同一张贴图当 map 和 emissiveMap：
+       夜景补光是冷蓝月光，红瓜瓣乘上蓝光会被洗成灰蓝（实测饱和度只剩 0.25），
+       让 emissive 跟着贴图走，色彩才立得住；
+       黑色图案在 emissiveMap 里也是黑的 —— 米奇剪影不会被整片自发光冲成灰影。 */
     const gm=new THREE.MeshStandardMaterial({
-      vertexColors:true,roughness:.82,metalness:0,side:THREE.DoubleSide,
-      /* 夜景补光是冷蓝月光，红瓜瓣乘上蓝光会被洗成灰蓝（实测饱和度只剩 0.25）。
-         让自发光主导颜色：emissive 用本片主色高强度，色彩才立得住。 */
-      color:0x8a8a8a,
-      emissive:cMain.clone().multiplyScalar(.78),emissiveIntensity:.82,envMapIntensity:.18
+      map:tex,emissiveMap:tex,emissive:0xffffff,emissiveIntensity:.42,
+      roughness:.82,metalness:0,side:THREE.DoubleSide,envMapIntensity:.18
     });
     fabricMs.push(gm);
     const m=new THREE.Mesh(geo,gm);
     m.castShadow=false;m.userData.noReflect=true;
     g.add(m);
   }
-  /* 火焰口裙边（敞口能看见里面烧火）+ 冠环 + 顶盖 */
-  const skirt=new THREE.Mesh(new THREE.CylinderGeometry(2.05,1.78,1.35,20,1,true),
-    new THREE.MeshStandardMaterial({color:0x8f4a3c,roughness:.92,side:THREE.DoubleSide,emissive:0xff8a30,emissiveIntensity:.18}));
-  skirt.position.y=4.35;skirt.userData.noReflect=true;g.add(skirt);
+  /* ── 底部奶油色扇贝裙边 + 顶部金皇冠 ──
+     迪士尼乐园气球的裙边是奶油白带波浪花边，顶部是个金色皇冠状通风盖。
+     裙边原来垂到 3.675，把燃烧器和火焰整个盖住，只在底下漏出一截火苗，
+     看着像「火从裙子里漏出来」；现在收到 4.075，火焰口露出来，
+     火苗从燃烧器往上舔进伞口，才是热气球该有的样子。 */
+  const skirt=new THREE.Mesh(new THREE.CylinderGeometry(2.05,1.78,0.95,20,1,true),
+    new THREE.MeshStandardMaterial({color:0xf7ddb0,roughness:.88,side:THREE.DoubleSide,emissive:0xffa050,emissiveIntensity:.30}));
+  skirt.position.y=4.55;skirt.userData.noReflect=true;g.add(skirt);
+  /* 裙边下摆的扇贝花边（22 个小圆瓣，InstancedMesh 一个 draw call） */
+  {
+    const sg=new THREE.InstancedMesh(new THREE.SphereGeometry(.17,10,8),M(0xf7ddb0,{roughness:.9,emissive:0xffa050,emissiveIntensity:.26}),22);
+    const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),v3=new THREE.Vector3(),s3=new THREE.Vector3(1,.62,1);
+    for(let i=0;i<22;i++){
+      const a=i/22*Math.PI*2;
+      v3.set(Math.cos(a)*1.79,4.02,Math.sin(a)*1.79);
+      q.setFromEuler(new THREE.Euler(0,-a,0));
+      m4.compose(v3,q,s3);sg.setMatrixAt(i,m4);
+    }
+    sg.instanceMatrix.needsUpdate=true;sg.castShadow=false;sg.userData.noReflect=true;g.add(sg);
+  }
+  /* 裙边下摆鎏金压条 */
+  {
+    const trim=new THREE.Mesh(new THREE.TorusGeometry(1.80,.075,8,44),
+      M(0xd9a441,{roughness:.40,metalness:.60,envMapIntensity:.55,emissive:0x4a3410,emissiveIntensity:.30}));
+    trim.position.y=4.12;trim.rotation.x=Math.PI/2;trim.userData.noReflect=true;g.add(trim);
+  }
+  /* 顶部金皇冠：环 + 尖顶盖（乐园气球顶上那个金色皇冠状通风盖） */
   const crown=new THREE.Mesh(new THREE.TorusGeometry(1.02,.09,8,24),M(0xd9a441,{roughness:.42,metalness:.62,envMapIntensity:.55,emissive:0x4a3410,emissiveIntensity:.30}));
   crown.position.y=BASE+HGT;crown.rotation.x=Math.PI/2;crown.userData.noReflect=true;g.add(crown);
-  const capDisc=new THREE.Mesh(new THREE.CircleGeometry(1.0,22),M(0xe8d3b4,{roughness:.85}));
-  capDisc.rotation.x=-Math.PI/2;capDisc.position.y=BASE+HGT+.02;capDisc.userData.noReflect=true;g.add(capDisc);
-  /* 鎏金腰带：复古热气球的中段环带，跟场景里的鎏金门楼 / 剧院灯牌呼应，
-     把「一大坨彩色」压成「彩色 + 束腰」，夜景里就不再跳。 */
+  const crownCap=new THREE.Mesh(new THREE.ConeGeometry(1.03,.92,16),
+    M(0xd9a441,{roughness:.40,metalness:.62,envMapIntensity:.6,emissive:0x4a3410,emissiveIntensity:.32}));
+  crownCap.position.y=BASE+HGT+.52;crownCap.userData.noReflect=true;g.add(crownCap);
+  /* 皇冠下面一道细金环（乐园气球在顶部有一圈 logo 束带） */
   {
-    const band=new THREE.Mesh(new THREE.TorusGeometry(prof(.50),.30,10,64),
-      M(0xd9a441,{roughness:.40,metalness:.60,envMapIntensity:.55,emissive:0x513a12,emissiveIntensity:.38}));
-    band.position.y=BASE+HGT*.50;band.rotation.x=Math.PI/2;band.userData.noReflect=true;g.add(band);
-    const band2=new THREE.Mesh(new THREE.TorusGeometry(prof(.30),.28,8,56),
-      M(0xd9a441,{roughness:.44,metalness:.58,envMapIntensity:.5,emissive:0x402d0e,emissiveIntensity:.30}));
-    band2.position.y=BASE+HGT*.30;band2.rotation.x=Math.PI/2;band2.userData.noReflect=true;g.add(band2);
+    const band=new THREE.Mesh(new THREE.TorusGeometry(prof(.86),.22,8,48),
+      M(0xd9a441,{roughness:.42,metalness:.60,envMapIntensity:.55,emissive:0x513a12,emissiveIntensity:.34}));
+    band.position.y=BASE+HGT*.86;band.rotation.x=Math.PI/2;band.userData.noReflect=true;g.add(band);
   }
   /* 载重带 + 吊索（单条 LineSegments） */
   const lp=[];
@@ -7564,15 +7676,32 @@ function buildHotAirBalloon(x,z){
     const tank=new THREE.Mesh(new THREE.CylinderGeometry(.19,.19,.58,12),M(0x9c3a34,{roughness:.44,metalness:.3}));
     tank.position.set(c2[0],.40,c2[1]);g.add(tank);
   }
-  /* 火焰：外套橙、内芯白黄（锥尖朝上） */
-  const flame=new THREE.Mesh(new THREE.ConeGeometry(.46,1.60,12,1,true),
-    new THREE.MeshBasicMaterial({color:0xffb347,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false,fog:false,side:THREE.DoubleSide}));
-  flame.position.y=3.62;flame.userData.noReflect=true;g.add(flame);
-  const flameIn=new THREE.Mesh(new THREE.ConeGeometry(.20,1.05,10,1,true),
-    new THREE.MeshBasicMaterial({color:0xfff2cc,transparent:true,opacity:.92,blending:THREE.AdditiveBlending,depthWrite:false,fog:false,side:THREE.DoubleSide}));
-  flameIn.position.y=3.42;flameIn.userData.noReflect=true;g.add(flameIn);
+  /* ── 火焰：锚死在燃烧器口，只往上长 ──
+     之前是尖朝上的圆锥，几何体中心放在 y=3.62，缩放绕中心进行：
+     满油门时 y 缩放 1.5 倍 → 锥底被拉到 y≈2.4，比燃烧器横梁(2.98)还低 0.6m，
+     一路灌到篮口上方，看上去就是「火焰往下漏」。
+     现在把锥体几何体平移成「底在原点、尖朝上」，网格原点钉在燃烧器口(3.08)，
+     缩放只会把火苗往上顶，底永远压在燃烧器上，升空时也不会漏下来。 */
+  const BURN_Y=3.08;
+  const fTex=flameTex();
+  const flameGeo=new THREE.ConeGeometry(.24,1.45,12,1,true);
+  flameGeo.translate(0,.725,0);
+  const flame=new THREE.Mesh(flameGeo,
+    new THREE.MeshBasicMaterial({map:fTex,color:0xffffff,transparent:true,opacity:.6,blending:THREE.AdditiveBlending,depthWrite:false,fog:false,side:THREE.DoubleSide}));
+  flame.position.y=BURN_Y;flame.userData.noReflect=true;g.add(flame);
+  const flameInGeo=new THREE.ConeGeometry(.11,.95,10,1,true);
+  flameInGeo.translate(0,.475,0);
+  const flameIn=new THREE.Mesh(flameInGeo,
+    new THREE.MeshBasicMaterial({map:fTex,color:0xfff2d2,transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false,fog:false,side:THREE.DoubleSide}));
+  flameIn.position.y=BURN_Y+.02;flameIn.userData.noReflect=true;g.add(flameIn);
+  /* 燃烧器口的暖辉光：横向一片，加法混合，把火苗根部糊柔和 */
+  const burnerGlow=new THREE.Mesh(new THREE.PlaneGeometry(1.35,1.35),
+    new THREE.MeshBasicMaterial({map:balloonRadialTex(),color:0xffa04a,transparent:true,opacity:.2,
+      blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+  burnerGlow.rotation.x=-Math.PI/2;burnerGlow.position.y=BURN_Y-.04;
+  burnerGlow.userData.noReflect=true;g.add(burnerGlow);
   const burnerLight=new THREE.PointLight(0xffa64d,22,30,1.7);
-  burnerLight.position.y=3.0;g.add(burnerLight);
+  burnerLight.position.y=3.16;g.add(burnerLight);
   shopLights.push({l:burnerLight,base:22,street:false,delay:1.2});
   /* 地面光池（单独挂 scene，高度越高越大越淡） */
   const pool=new THREE.Mesh(new THREE.CircleGeometry(1,48),
@@ -7581,7 +7710,7 @@ function buildHotAirBalloon(x,z){
   pool.rotation.x=-Math.PI/2;pool.position.set(x,.03,z);pool.renderOrder=2;pool.userData.noReflect=true;
   scene.add(pool);
   scene.add(g);
-  const b={g,fabricMs,flame,flameIn,burnerLight,pool,x,z,y:1.05,vy:0,burn:.22,hover:1.05,hud:false};
+  const b={g,fabricMs,flame,flameIn,burnerGlow,burnerLight,pool,x,z,y:1.05,vy:0,burn:.08,hover:1.05,hud:false};
   g.userData.physObj={type:'balloon',ref:balloons.length};
   balloons.push(b);
   return b;
@@ -7665,7 +7794,7 @@ function updateBalloonRide(dt){
       b.vy*=Math.max(0,1-dt*1.8);
       const hover=1.05+Math.sin(t*.55+i*1.3)*.10+Math.sin(t*.87+i*2.1)*.05;
       b.y+=(hover-b.y)*Math.min(1,dt*.9);
-      b.burn+=(.22-b.burn)*Math.min(1,dt*3);
+      b.burn+=(.08-b.burn)*Math.min(1,dt*3);
       if(b.hud){b.hud=false;trainHud.classList.remove('show');}
     }
     /* 姿态：升时前倾、缓缓摇摆 */
@@ -7675,9 +7804,12 @@ function updateBalloonRide(dt){
     b.g.rotation.y=Math.sin(t*.23+i*1.7)*.055;
     const fl=.55+b.burn*.85+Math.sin(t*17+i)*.06;
     b.flame.scale.set(.80+b.burn*.50,fl,.80+b.burn*.50);
-    b.flame.material.opacity=.30+b.burn*.58;
+    b.flame.material.opacity=.22+b.burn*.66;
+    b.flameIn.material.opacity=.04+b.burn*.56;
+    b.burnerGlow.material.opacity=.06+b.burn*.42;
+    b.burnerGlow.scale.setScalar(.7+b.burn*.5);
     b.flameIn.scale.set(.70+b.burn*.40,fl*.82,.70+b.burn*.40);
-    for(let gi2=0;gi2<b.fabricMs.length;gi2++)b.fabricMs[gi2].emissiveIntensity=.95+b.burn*.30;
+    for(let gi2=0;gi2<b.fabricMs.length;gi2++)b.fabricMs[gi2].emissiveIntensity=.40+b.burn*.14;
     b.burnerLight.intensity=(14+b.burn*30)*(1+Math.sin(t*23+i)*.05);
     const h=Math.max(0,b.y-1.05),pr=7.0+h*1.05;
     b.pool.position.set(b.x,.03,b.z);
