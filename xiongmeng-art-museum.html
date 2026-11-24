@@ -12872,7 +12872,7 @@ function updateAerialHaze(dt,t){
     }
     if (MP.third && fp.on) {
       // 从第一人称切到第三人称：先把相机摆到角色背后（同一套 orbit 构图）
-      const p0 = Math.max(-.55, Math.min(.6, fp.pitch));
+      const p0 = Math.max(-1.05, Math.min(1.05, fp.pitch));
       const pivot = new THREE.Vector3(fp.x, fp.y + 1.90, fp.z);
       const f0 = new THREE.Vector3(
         -Math.sin(fp.yaw) * Math.cos(p0),
@@ -12969,7 +12969,12 @@ function updateAerialHaze(dt,t){
          角色因此自然沉到画面下半部，不会横挡正前方视线；
          抬头时视线跟着抬，角色在下半部越沉越低 */
       const yaw = fp.yaw;
-      const pitch = Math.max(-.55, Math.min(.6, fp.pitch));
+      /* 手机端拖动抬头能到 ±1.4，之前的 ±0.6 硬限幅会把视角「卡住」。
+         这里放宽到 ±1.05 并做指数平滑，抬头/低头都是连续的 */
+      const pTarget = Math.max(-1.05, Math.min(1.05, fp.pitch));
+      if (MP._cp === undefined) MP._cp = pTarget;
+      MP._cp += (pTarget - MP._cp) * (1 - Math.pow(.0006, dt));
+      const pitch = MP._cp;
       const dist = MP.camDist;
       /* pivot = 角色头顶略上方 */
       const pivot = new THREE.Vector3(fp.x, fp.y + 1.90, fp.z);
