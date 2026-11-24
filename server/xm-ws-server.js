@@ -242,10 +242,36 @@ function handleConn(socket) {
     const s = session; session = null;
     if (sessions.get(s.account) === s) sessions.delete(s.account);
     bySocket.delete(socket);
+    breakPair(s, 'offline');
     broadcastRoom(s.room);
     const idle = Math.round((Date.now() - (s.lastSeen || Date.now())) / 1000);
     const dur = Math.round((Date.now() - s.joinedAt) / 1000);
     log('offline', s.account, '在线' + dur + 's', '静默' + idle + 's', 'online=' + sessions.size);
+  }
+
+  /* ── 牵手：解掉配对 / 撤掉挂起的请求 ──
+     任何一方掉线或松手，另一边必须马上收到 hand_end，
+     否则会出现「客户端以为还牵着、实际对方已经走了」的鬼状态。 */
+  function breakPair(s, why) {
+    if (!s) return;
+    /* 挂起的请求：对方等不到回应，直接判成拒绝 */
+    if (s.handReq) {
+      const other = sessions.get(s.handReq.to);
+      if (other) {
+        other.handReq = null;
+        other.send({ t: 'hand_rej', from: s.account, display: s.display });
+      }
+      s.handReq = null;
+    }
+    if (!s.hand) return;
+    const pid = s.hand;
+    s.hand = null;
+    const partner = sessions.get(pid);
+    if (partner) {
+      partner.hand = null;
+      broadcastRoom(s.room, { t: 'hand_end', a: s.account, b: pid });
+    }
+    log('hand-end', s.account, 'x', pid, why || '');
   }
 
   function onMessage(msg) {
@@ -303,6 +329,9 @@ function handleConn(socket) {
         room: 'main',
         socket, send,
         pos: { x: 0, y: 0, z: 0, yaw: 0 },
+        /* 牵手：hand=对方账号（已配对）；handReq=待处理的请求 {to,from} */
+        hand: null,
+        handReq: null,
         alive: true,
         lastSeen: Date.now(),
         joinedAt: Date.now(),
@@ -345,6 +374,51 @@ function handleConn(socket) {
           t: 'move', account: session.account, display: session.display,
           p: session.pos, mode: msg.mode || 'fp'
         }, session);
+        break;
+      }
+      case 'hand_req': {        // A 向 B 发起牵手
+        const to = String(msg.to || '').trim().toLowerCase();
+        const target = sessions.get(to);
+        if (!target || target === session) break;
+        if (session.hand || target.hand) {
+          send({ t: 'err', code: 'handbusy', msg: '你或对方已经在牵别人了' });
+          break;
+        }
+        if (target.handReq) {
+          send({ t: 'err', code: 'handbusy', msg: '对方正忙着处理另一个牵手请求' });
+          break;
+        }
+        session.handReq = { to, from: session.account };
+        target.handReq = { to: session.account, from: session.account };
+        target.send({ t: 'hand_in', from: session.account, display: session.display });
+        send({ t: 'hand_wait', to, display: target.display });
+        log('hand-req', session.account, '->', to);
+        break;
+      }
+      case 'hand_res': {        // B 回应 A 的牵手请求
+        const to = String(msg.to || '').trim().toLowerCase();
+        const req = session.handReq;
+        const other = sessions.get(to);
+        if (!req || !other || req.to !== to) break;
+        session.handReq = null;
+        other.handReq = null;
+        if (msg.accept) {
+          const a = to, b = session.account;      // a=发起方=领队，b=回应方=跟随者
+          const sa = sessions.get(a), sb = sessions.get(b);
+          if (!sa || !sb) break;
+          sa.hand = b; sb.hand = a;
+          broadcastRoom(session.room, {
+            t: 'hand_pair', a, b, aDisplay: sa.display, bDisplay: sb.display
+          });
+          log('hand-pair', a, '<->', b);
+        } else {
+          other.send({ t: 'hand_rej', from: session.account, display: session.display });
+          log('hand-rej', to, 'x', session.account);
+        }
+        break;
+      }
+      case 'hand_end': {        // 任何一方松手
+        breakPair(session, 'release');
         break;
       }
       case 'ping':

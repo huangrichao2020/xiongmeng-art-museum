@@ -294,6 +294,10 @@
   /* 触屏：右下「跳」按钮更靠边、更好按 */
   body.touch #w-run{right:max(18px,env(safe-area-inset-right));bottom:max(28px,env(safe-area-inset-bottom));width:72px;height:72px}
   body.touch #joystick{left:max(14px,env(safe-area-inset-left));bottom:max(20px,env(safe-area-inset-bottom));width:134px;height:134px}
+  /* 牵手条抬到摇杆上方，别跟左下角的虚拟摇杆叠在一起 */
+  body.touch #hand-hud{bottom:max(168px,calc(env(safe-area-inset-bottom) + 156px))}
+  /* 手机上按钮做大一档，方便拇指点（36px 高 → 46px 高）*/
+  body.touch #hand-hud button{padding:12px 22px;font-size:14px;border-radius:18px}
   #cross{
     position:fixed;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;z-index:26;
     pointer-events:none;opacity:0;transition:opacity .2s;
@@ -494,6 +498,28 @@
     font-weight:700;font-size:12px;cursor:pointer;
   }
   #train-btn:hover{background:#ffd275}
+  /* ---------- 牵手 HUD（蛋仔派对的糖果圆润风） ---------- */
+  #hand-hud{
+    position:fixed;bottom:132px;left:50%;transform:translateX(-50%);z-index:29;
+    display:none;align-items:center;gap:10px;padding:8px 13px;border-radius:22px;
+    background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(238,244,255,.93));
+    border:3px solid #fff;color:#2b3242;font-size:13px;font-weight:800;
+    font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    box-shadow:0 10px 26px rgba(20,40,80,.30),0 3px 0 rgba(255,255,255,.9) inset;
+    user-select:none;max-width:90vw;
+  }
+  #hand-hud.show{display:flex}
+  #hand-msg{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #hand-btns{display:inline-flex;gap:8px}
+  #hand-hud button{
+    border:none;border-radius:16px;padding:9px 18px;font-size:13px;font-weight:800;
+    cursor:pointer;color:#fff;flex:none;
+    font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  #hand-hud button:active{transform:translateY(1.5px)}
+  #hand-yes{background:linear-gradient(180deg,#8ee8b4,#43c47c);box-shadow:0 3px 0 #2e9a5f}
+  #hand-no{background:linear-gradient(180deg,#ff9db4,#f2708f);box-shadow:0 3px 0 #cf5271}
+  #hand-act{background:linear-gradient(180deg,#ffb35c,#f09230);box-shadow:0 3px 0 #c96f1c}
   /* ---------- FPV 穿越机特技模式 OSD 抬头显示 ---------- */
   #fpv-osd{
     position:fixed;inset:0;z-index:26;pointer-events:none;display:none;
@@ -756,6 +782,7 @@
   </div>
 </div>
 <div id="train-hud"><span id="train-msg">圣诞观光小火车运行中</span><button id="train-btn">上车</button></div>
+<div id="hand-hud"><span id="hand-msg"></span><span id="hand-btns" style="display:none"><button id="hand-yes">同意</button><button id="hand-no">拒绝</button></span><button id="hand-act" style="display:none">牵手</button></div>
 <div id="gift-modal" aria-hidden="true">
   <div id="gift-card">
     <div id="gift-rarity" class="SSR">SSR</div>
@@ -10892,25 +10919,12 @@ const sfx={
       this.playBufSample(this.pianoBuf,this.PIANO_MAP[m],1,t+k*step,.09,vel*(k%2?.60:1),pan);
     }
   },
-  // 极轻柔圣诞雪橇铃（每八拍温柔点缀一次）
-  /* 原来频率 3150/4180 Hz、每 4 拍一次、全曲不停 —— 3~4kHz 的金属高频
-     在加色混合下穿透力极强，听着就是"有人一直在敲三角铁"，是 BGM 里最吵的一层。
-     现在：频率降到 2350/3050 Hz，音量砍掉近一半，每 8 拍才响一次。 */
-  playSleighBell(t,accent){
-    const c=this.ctx;
-    const freqs=accent?[2350,3050]:[2600];
-    const amp=accent?.0042:.0022;
-    for(const fr of freqs){
-      const o=c.createOscillator();o.type='sine';o.frequency.setValueAtTime(fr,t);
-      const g=c.createGain();
-      g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(amp,t+.012);
-      g.gain.exponentialRampToValueAtTime(.0001,t+.16);
-      o.connect(g);g.connect(this.musicBus);
-      o.start(t);o.stop(t+.18);
-    }
-  },
+  /* 雪橇铃（playSleighBell）已整段删除 ——
+     2350/3050 Hz 的金属高频听着就是"嘎嘎嘎哒"，穿透力比主奏钢琴还强，
+     玩家直接点名"圣诞老人那个车的声音"要去掉。留个空位，以后真要加回
+     蹄声/铃铛，从这里重新写。 */
   /* ══ 合成圣诞乐器 BGM 调度器
-     这套乐器（暖钢琴 + 原声贝斯 + 弦乐长音 + 竖琴琶音 + 雪橇铃 + 圣诞大厅混响）
+     这套乐器（暖钢琴 + 原声贝斯 + 弦乐长音 + 竖琴琶音 + 圣诞大厅混响）
      早就写好了，但之前只有 schedNote/playLead 这些"发声函数"，没有任何定时器去驱动它们，
      所以页面一直在播那三条 mp3。现在把它接上，做成真正的主 BGM：
      音色是合成出来的，音量、节奏、混响都能精确控制，不会像成品 mp3 那样又满又吵。 */
@@ -10959,7 +10973,7 @@ const sfx={
     if(this.synth.beatAcc>=8){
       this.synth.beatAcc-=8;
       this.synth.barIdx=(this.synth.barIdx+1)%this.CHORDS.length;
-      if(this.synth.barIdx%2===0)this.playSleighBell(t,this.synth.barIdx%4===0);
+      /* 雪橇铃已停用（见 playSleighBell 位置） */
     }
   },
   bgmTracks:null,
@@ -11727,6 +11741,8 @@ function inIceRink(x,z){
   return (nx*nx+nz*nz)<=1.02;
 }
 function fpUpdate(dt){
+  /* 牵手跟随中：跟随者不能自己走，位置由领队决定（MP.update 里锁）*/
+  if(window.MP&&MP.hand&&MP.hand.role==='follower'){fp.vx=0;fp.vz=0;return;}
   const onIce=inIceRink(fp.x,fp.z);
   let sp=onIce
     ?((fp.keys['ShiftLeft']||fp.keys['ShiftRight'])?9.2:5.8)
@@ -12130,6 +12146,8 @@ addEventListener('keydown',e=>{
   if(code==='KeyQ'&&fp.on){exitWalk();return;}
   /* V 键切换第三人称（多人联机模式） */
   if(code==='KeyV'&&window.MP){MP.toggleThird();return;}
+  /* H 键：靠近别人时发起牵手，牵着时松手（手机上是 HUD 上的按钮）*/
+  if(code==='KeyH'&&window.MP){MP.handAction();return;}
   if(code)fp.keys[code]=true;
   if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].indexOf(code)>=0)e.preventDefault();
 });
@@ -12599,6 +12617,8 @@ function updateAerialHaze(dt,t){
       if (gen !== MP.gen) return;      // 已被新连接取代，忽略
       MP.connected = false;
       MP.clearPeers();
+      MP.handReset();
+      handHudHide();
       stopBeat();
       if (MP.onKicked) { MP.onKicked(); return; }
       if (MP._kicked) { MP._kicked = false; return; }   // 被顶号：不自动重连
@@ -12612,6 +12632,142 @@ function updateAerialHaze(dt,t){
     if (MP.ws && MP.ws.readyState === 1) {
       try { MP.ws.send(JSON.stringify(o)); } catch (e) { }
     }
+  };
+
+  /* ══════════════════════════════════════════════════════
+     牵手：A 主动发起 → B 同意 → B 完全跟着 A 走
+     ── 协议 ──
+       上行：{t:'hand_req',to}        A 向 B 发起
+             {t:'hand_res',to,accept} B 回应
+             {t:'hand_end'}           任何一方松手
+       下行：{t:'hand_in',from,display}   B 收到请求（弹同意/拒绝）
+             {t:'hand_wait',to,display}  A 看到「已发出，等回应」
+             {t:'hand_rej',from,display} B 拒绝了
+             {t:'hand_pair',a,b,aDisplay,bDisplay} 配对成功（a=牵人的，b=跟人的）
+             {t:'hand_end',a,b}        配对解除
+     ══════════════════════════════════════════════════════ */
+  const HAND_D = .62;          // 两人中心间距（世界米；角色整体缩放 0.74 之后）
+  MP.hand = { role: '', partner: '', partnerName: '', pendingTo: '', pendingToName: '', pendingFrom: '', pendingName: '' };
+
+  function buildHandUI() {
+    /* HTML 里已经放好了这个条子，这里只负责把按钮绑上 ——
+       之前写成「元素已存在就直接 return」，结果 MP._handUI 永远是 undefined，
+       handHud() 里读 u.msg 直接抛错，整个 MP.update 每 0.12 秒崩一次，
+       连带位置广播都断了（多人同步直接死掉）。 */
+    let h = document.getElementById('hand-hud');
+    if (!h) {
+      h = document.createElement('div');
+      h.id = 'hand-hud';
+      h.innerHTML = '<span id="hand-msg"></span>' +
+        '<span id="hand-btns" style="display:none"><button id="hand-yes">同意</button><button id="hand-no">拒绝</button></span>' +
+        '<button id="hand-act" style="display:none">牵手</button>';
+      document.body.appendChild(h);
+    }
+    if (MP._handUI) return;
+    MP._handUI = { el: h, msg: h.querySelector('#hand-msg'), btns: h.querySelector('#hand-btns'), act: h.querySelector('#hand-act') };
+    h.querySelector('#hand-yes').onclick = function () { MP.handRespond(true); };
+    h.querySelector('#hand-no').onclick = function () { MP.handRespond(false); };
+    h.querySelector('#hand-act').onclick = function () { MP.handAction(); };
+  }
+  /* mode: 'ask'=同意/拒绝  'act'=单按钮  'none'=只显示一行字 */
+  function handHud(msg, mode, actLabel) {
+    buildHandUI();
+    const u = MP._handUI;
+    /* 兜底：UI 绑定失败时直接跳过，绝不能让一个提示条把 MP.update 整段打断
+       （MP.update 里还负责推位置广播，一崩整个多人同步就死了）*/
+    if (!u || !u.msg) return;
+    u.msg.textContent = msg || '';
+    u.btns.style.display = (mode === 'ask') ? 'inline-flex' : 'none';
+    u.act.style.display = (mode === 'act') ? 'inline-block' : 'none';
+    if (actLabel) u.act.textContent = actLabel;
+    u.el.classList.add('show');
+  }
+  function handHudHide() { if (MP._handUI) MP._handUI.el.classList.remove('show'); }
+
+  MP.handReset = function () {
+    MP.hand = { role: '', partner: '', partnerName: '', pendingTo: '', pendingToName: '', pendingFrom: '', pendingName: '' };
+  };
+  /* 最近的别人（用来发起牵手） */
+  MP.nearestPeer = function () {
+    if (!fp.on) return null;
+    let best = null, bd = 2.8;
+    for (const p of MP.peers.values()) {
+      const d = Math.hypot(p.cur.x - fp.x, p.cur.z - fp.z);
+      if (d < bd) { bd = d; best = p; }
+    }
+    return best;
+  };
+  /* 一个键/一个按钮干两件事：没牵→发起；牵了→松手 */
+  MP.handAction = function () {
+    if (!MP.connected) return;
+    if (MP.hand.role) { MP.handEnd(); return; }
+    if (MP.hand.pendingFrom || MP.hand.pendingTo) return;
+    const near = MP.nearestPeer();
+    if (!near) { handHud('附近没有别的玩家', 'none'); setTimeout(handHudHide, 1700); return; }
+    MP.send({ t: 'hand_req', to: near.account });
+    MP.hand.pendingTo = near.account;
+    MP.hand.pendingToName = near.display || near.account;
+    handHud('已向 ' + MP.hand.pendingToName + ' 发出牵手请求', 'none');
+  };
+  MP.handRespond = function (accept) {
+    const from = MP.hand.pendingFrom;
+    MP.hand.pendingFrom = ''; MP.hand.pendingName = '';
+    if (from) MP.send({ t: 'hand_res', to: from, accept: !!accept });
+    handHudHide();
+  };
+  MP.handEnd = function () {
+    if (!MP.hand.role) return;
+    MP.send({ t: 'hand_end' });
+    MP.handReset();
+    handHudHide();
+  };
+  /* HUD 刷新：牵手中 / 等待回应 / 收到请求 / 旁边有人 */
+  MP.updateHandHud = function () {
+    if (!MP.connected || !fp.on) { handHudHide(); return; }
+    if (MP.hand.role) {
+      handHud('牵着 ' + (MP.hand.partnerName || MP.hand.partner) + ' 的手', 'act', '松手');
+      return;
+    }
+    if (MP.hand.pendingFrom) {
+      handHud(MP.hand.pendingName + ' 想和你牵手', 'ask');
+      return;
+    }
+    if (MP.hand.pendingTo) {
+      handHud('等 ' + MP.hand.pendingToName + ' 回应…', 'none');
+      return;
+    }
+    const near = MP.nearestPeer();
+    if (near) handHud('和 ' + (near.display || near.account) + ' 牵手', 'act', '牵手');
+    else handHudHide();
+  };
+  /* 两只手牵在一起的那一小团（把两个人的手接上）*/
+  function handLinkMesh() {
+    if (MP._handLink) return MP._handLink;
+    const m = new THREE.Mesh(new THREE.SphereGeometry(.13, 14, 10),
+      new THREE.MeshStandardMaterial({ color: 0xfff0d8, roughness: .9 }));
+    m.visible = false;
+    scene.add(m);
+    MP._handLink = m;
+    return m;
+  }
+  /* 领队的位置 + 朝向：两个人的中间点、谁在前面，都以它为准 */
+  MP.handAnchor = function () {
+    if (!MP.hand.role) return null;
+    if (MP.hand.role === 'leader') {
+      if (!MP.self) return null;
+      return { x: MP.self.position.x, y: fp.y, z: MP.self.position.z, th: MP.self.rotation.y, spd: Math.hypot(fp.vx, fp.vz) };
+    }
+    const ld = MP.peers.get(MP.hand.partner);
+    if (!ld) return null;
+    return { x: ld.group.position.x, y: ld.group.position.y, z: ld.group.position.z, th: ld.group.rotation.y, spd: ld.rawSpeed || 0 };
+  };
+  window.diorama.hand = function () {
+    return {
+      role: MP.hand.role, partner: MP.hand.partner, partnerName: MP.hand.partnerName,
+      pendingTo: MP.hand.pendingTo, pendingFrom: MP.hand.pendingFrom,
+      peers: [...MP.peers.keys()],
+      link: MP._handLink ? [+MP._handLink.position.x.toFixed(3), +MP._handLink.position.y.toFixed(3), +MP._handLink.position.z.toFixed(3)] : null
+    };
   };
 
   MP.onMsg = function (m) {
@@ -12700,6 +12856,8 @@ function updateAerialHaze(dt,t){
           MP.onKicked = null;
           MP.connected = false;
           MP.clearPeers();
+          MP.handReset();
+          handHudHide();
           stopBeat();
           /* 被顶号 = 联机结束，第三人称一并关掉（否则相机没人写，画面冻住）*/
           MP.third = false;
@@ -12723,6 +12881,13 @@ function updateAerialHaze(dt,t){
       }
       case 'err': {
         const code = m.code || '';
+        if (code === 'handbusy') {
+          /* 对方正在牵别人 / 正在被别人牵：只是这次牵手没成，不是登录问题 */
+          MP.hand.pendingTo = ''; MP.hand.pendingToName = '';
+          handHud(m.msg || '对方现在不方便牵手', 'none');
+          setTimeout(handHudHide, 2300);
+          return;
+        }
         if (code === 'retry') {
           /* 服务端说「这个号刚被顶过，过会儿再试」→ 账号没错，保留登录信息稍后重试 */
           MP._noReconnect = true;
@@ -12747,6 +12912,41 @@ function updateAerialHaze(dt,t){
         setMsg(m.msg || '登录失败', 'err');
         showLogin();
         return;
+      }
+      /* ── 牵手 ── */
+      case 'hand_in': {          // 有人向我发起牵手 → 弹同意/拒绝
+        MP.hand.pendingFrom = m.from || '';
+        MP.hand.pendingName = m.display || m.from || '';
+        handHud(MP.hand.pendingName + ' 想和你牵手', 'ask');
+        break;
+      }
+      case 'hand_wait': {        // 我的请求已发出，等对方回应
+        MP.hand.pendingTo = m.to || '';
+        MP.hand.pendingToName = m.display || m.to || '';
+        handHud('已向 ' + MP.hand.pendingToName + ' 发出牵手请求，等 TA 回应', 'none');
+        break;
+      }
+      case 'hand_rej': {        // 被拒绝了
+        MP.hand.pendingTo = ''; MP.hand.pendingToName = '';
+        handHud((m.display || '对方') + ' 拒绝了牵手请求', 'none');
+        setTimeout(handHudHide, 2300);
+        break;
+      }
+      case 'hand_pair': {        // 配对成功：a=牵人的（领队），b=跟人的（跟随者）
+        if (m.a === MP.account) {
+          MP.hand = { role: 'leader', partner: m.b, partnerName: m.bDisplay || m.b, pendingTo: '', pendingToName: '', pendingFrom: '', pendingName: '' };
+        } else if (m.b === MP.account) {
+          MP.hand = { role: 'follower', partner: m.a, partnerName: m.aDisplay || m.a, pendingTo: '', pendingToName: '', pendingFrom: '', pendingName: '' };
+        } else {
+          MP.handReset();
+        }
+        handHudHide();
+        break;
+      }
+      case 'hand_end': {         // 配对解除（有人松手或掉线）
+        if (MP.hand.role && (m.a === MP.account || m.b === MP.account)) MP.handReset();
+        handHudHide();
+        break;
       }
       case 'chat': {
         if (window.MP_UI) MP_UI.pushChat(m);
@@ -13057,6 +13257,9 @@ function updateAerialHaze(dt,t){
         const rb2 = new THREE.Mesh(new THREE.BoxGeometry(.135, .03, .135), ribM);
         rb2.position.copy(box.position); rb2.rotation.copy(box.rotation);
         shoulder.add(rb2);
+        /* 礼物盒挂在肩组里：牵手时这条手臂要伸出去，
+           盒子得先收起来（不然手伸出去还抱着盒子，像端着一盘苹果去跳舞）*/
+        shoulder.userData.gift = [box, rb1, rb2];
       }
     }
     /* 身体组：跑动时整体前后倾 + 上下弹（蛋仔的「软」重心）*/
@@ -13108,7 +13311,9 @@ function updateAerialHaze(dt,t){
      —— 跳跃分三段：起跳蹬地拉伸 → 滞空手臂上举、脚收起 → 落地压扁回弹
      —— 全部压缩/拉伸都作用在 bodyGrp（以脚底为轴），脚单独放在外面不参与形变 */
   const LAND_T = .22;          // 落地缓冲时长（秒）
-  function animateAvatar(avatar, dt, speed, jumpY, jumpVy, st) {
+  /* handSide：0=不牵手；-1=用右手牵（模型 local -X 那一侧）；+1=用左手牵
+     注意模型朝向：正面是 +Z，那么 local +X 是角色的左手、local -X 是右手。*/
+  function animateAvatar(avatar, dt, speed, jumpY, jumpVy, st, handSide) {
     const body = avatar.userData.bodyGrp;
     const shoulders = avatar.userData.shoulders || [];
     const feet = avatar.userData.feet || [];
@@ -13186,6 +13391,19 @@ function updateAerialHaze(dt,t){
       shoulders[1].rotation.x = armR;
       shoulders[0].rotation.z = -armZ;
       shoulders[1].rotation.z = armZ;
+      /* 牵手：用来牵人的那条手臂改成「前伸 + 向外」，
+         另一条手臂继续正常摆动；这条手臂上的礼物盒先收起来 */
+      for (let i = 0; i < 2; i++) {
+        const g = shoulders[i].userData.gift;
+        if (!g) continue;
+        const holding = (handSide < 0 && i === 0) || (handSide > 0 && i === 1);
+        for (const m of g) m.visible = !holding;
+      }
+      if (handSide) {
+        const sh = shoulders[handSide < 0 ? 0 : 1];
+        sh.rotation.x = -.85;                       // 前伸
+        sh.rotation.z = handSide < 0 ? -1.0 : 1.0;  // 向外（朝对方）
+      }
     }
     for (let i = 0; i < feet.length; i++) {
       const f = feet[i];
@@ -13343,16 +13561,42 @@ function updateAerialHaze(dt,t){
      每帧更新（插值远端玩家 + 推本地位置 + 第三人称相机）
      ══════════════════════════════════════════════════════ */
   MP.update = function (dt) {
+    /* ── 牵手：跟随者的位置/朝向整个锁到领队右手边 ──
+       跟随者不走自己的路：位置由领队的角色朝向算出来（右手边 HAND_D 处），
+       所以两个人永远并排，不会出现「一个往前一个往后」这种拧巴姿势。 */
+    if (MP.hand.role === 'follower' && MP.connected) {
+      const ld = MP.peers.get(MP.hand.partner);
+      if (ld) {
+        const th = ld.group.rotation.y;
+        fp.x = ld.group.position.x - Math.cos(th) * HAND_D;
+        fp.z = ld.group.position.z + Math.sin(th) * HAND_D;
+        fp.y = ld.group.position.y;
+        fp.jumpY = ld.curJy || 0;
+        fp.jumpVy = 0;
+        fp.vx = 0; fp.vz = 0;
+      }
+    }
     /* ── 本地第三人称角色 + 相机（不依赖联机：没登录也能切第三人称）── */
     /* 本地第三人称角色跟随 */
     if (MP.third && fp.on && MP.self) {
       /* 角色根节点跟着离地高度抬起来 —— 少了这一步，人只是原地拉伸，不会跳起来 */
       MP.self.position.set(fp.x, fp.y + fp.jumpY, fp.z);
-      const spd = Math.hypot(fp.vx, fp.vz);
+      /* 牵手跟随中：步速和朝向都跟领队，自己没有输入 */
+      const _ld = (MP.hand.role === 'follower' && MP.connected) ? MP.peers.get(MP.hand.partner) : null;
+      const spd = _ld ? (_ld.rawSpeed || 0) : Math.hypot(fp.vx, fp.vz);
       /* 面朝移动方向（不是镜头方向）—— 侧着走就侧着走，不会扭头看镜头 */
-      faceByMove(MP.self, dt, fp.vx, fp.vz, fp.yaw);
+      if (_ld) {
+        /* 跟随者：朝向锁死成领队的朝向（最短弧插值，转向柔和）*/
+        let d = _ld.group.rotation.y - MP.self.rotation.y;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        MP.self.rotation.y += d * (1 - Math.pow(.0004, dt));
+      } else {
+        faceByMove(MP.self, dt, fp.vx, fp.vz, fp.yaw);
+      }
       /* 蛋仔式动画：走路循环 + 跳跃三段（起跳 / 滞空 / 落地）*/
-      animateAvatar(MP.self, dt, spd, fp.jumpY, fp.jumpVy, MP._phase);
+      animateAvatar(MP.self, dt, spd, fp.jumpY, fp.jumpVy, MP._phase,
+        MP.hand.role === 'leader' ? -1 : (MP.hand.role === 'follower' ? 1 : 0));
 
       /* 相机：蛋仔式第三人称构图 ——
          相机挂在角色后上方（orbit），视线沿角色正前方 12m 出去，
@@ -13420,17 +13664,49 @@ function updateAerialHaze(dt,t){
       while (dy > Math.PI) dy -= Math.PI * 2;
       while (dy < -Math.PI) dy += Math.PI * 2;
       p.cur.yaw += dy * k;
+      /* 牵手：我是领队 → 被牵方直接贴在领队右手边，
+         位置/朝向/步速全部跟领队（他自己广播的位置有延迟，不用）*/
+      let handSide = 0;
+      if (MP.hand.role === 'leader' && p.account === MP.hand.partner && MP.self) {
+        const th = MP.self.rotation.y;
+        p.cur.x = MP.self.position.x - Math.cos(th) * HAND_D;
+        p.cur.z = MP.self.position.z + Math.sin(th) * HAND_D;
+        p.cur.y = fp.y;
+        p.cur.yaw = th - Math.PI;
+        p.curJy = fp.jumpY; p.targetJy = fp.jumpY; p.curVy = 0;
+        p.rawDx = fp.vx; p.rawDz = fp.vz;
+        p.rawSpeed = Math.hypot(fp.vx, fp.vz);
+        handSide = 1;                 // 被牵方伸出左手
+      }
       p.group.position.set(p.cur.x, p.cur.y, p.cur.z);
       /* 远端：用服务器下发的真实位移推速度和方向 */
       const mvX = p.rawDx || 0, mvZ = p.rawDz || 0;
       const vNow = p.rawSpeed !== undefined ? p.rawSpeed : 0;
       faceByMove(p.group, dt, mvX, mvZ, p.cur.yaw);
-      animateAvatar(p.group, dt, vNow, p.curJy || 0, p.curVy || 0, p.phase || (p.phase = { v: 0 }));
+      animateAvatar(p.group, dt, vNow, p.curJy || 0, p.curVy || 0, p.phase || (p.phase = { v: 0 }), handSide);
       // 标签始终朝向相机（Sprite 自带）
       // 远距离时淡出标签，避免糊屏
       const d = camera.position.distanceTo(p.group.position);
       p.tag.material.opacity = d > 42 ? 0 : (d > 26 ? (42 - d) / 16 : 1);
     }
+
+    /* 牵着手的那一小团：把两个人的手接上 */
+    const _an = MP.handAnchor();
+    if (_an) {
+      const _lm = handLinkMesh();
+      _lm.visible = true;
+      _lm.position.set(
+        _an.x - Math.cos(_an.th) * (HAND_D * .5),
+        _an.y + .66,
+        _an.z + Math.sin(_an.th) * (HAND_D * .5)
+      );
+    } else if (MP._handLink) {
+      MP._handLink.visible = false;
+    }
+
+    /* 牵手 HUD 刷新（8Hz 够了，别每帧动 DOM）*/
+    MP._hudT = (MP._hudT || 0) - dt;
+    if (MP._hudT <= 0) { MP._hudT = .12; MP.updateHandHud(); }
 
     /* 推本地位置（y 含离地高度，jy 单独给一份让对方能播跳跃动作）*/
     const now2 = performance.now();
