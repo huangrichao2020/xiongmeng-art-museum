@@ -2328,6 +2328,58 @@ step1.userData.tag='street';
    ════════════════════════════════════════════════════════════ */
 const xmasStars=[], xmasBulbPool=[];
 const _xmasBulbCache=new Map();
+/* ── 乘法混合用的光晕贴图 ──
+   加色混合落在白雪上只会把雪地烧得更白，等于什么都看不见；
+   乘法是「暖色 × 白雪 = 暖色」，所以雪地上的光池、扫光一律走这个。 */
+const mulGlowTex=(()=>{
+  const [c,x]=cv(256,256);
+  const g=x.createRadialGradient(128,128,2,128,128,126);
+  g.addColorStop(0,'#ffd9ae');
+  g.addColorStop(.30,'#ffe4c4');
+  g.addColorStop(.58,'#fff0dc');
+  g.addColorStop(.82,'#fffaf1');
+  g.addColorStop(1,'#ffffff');
+  x.fillStyle=g;x.fillRect(0,0,256,256);
+  const t=ctex(c);
+  t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;
+  return t;
+})();
+/* ── 漆面反光贴图 ──
+   亮黑漆在夜里没有环境贴图就是一块死黑剪影。
+   这里手绘两道柔光带贴在掀开的琴盖上，当作夜空与地面的环境反射 ——
+   加色混合落在黑漆上才有效（落在白雪上等于没有，那是我们已经踩过的坑）。 */
+const lacquerSheenTex=(()=>{
+  const [c,x]=cv(512,512);
+  /* 竖向（贴图 v = 琴盖长度方向）的一道柔光带 */
+  const vg=x.createLinearGradient(0,0,0,512);
+  vg.addColorStop(0,'rgba(255,255,255,0)');
+  vg.addColorStop(.10,'rgba(255,255,255,.30)');
+  vg.addColorStop(.26,'rgba(238,247,255,.30)');
+  vg.addColorStop(.52,'rgba(255,255,255,.16)');
+  vg.addColorStop(.84,'rgba(255,255,255,.13)');
+  vg.addColorStop(1,'rgba(255,255,255,0)');
+  x.fillStyle=vg;x.fillRect(0,0,512,512);
+  /* 横向削边：左右淡出，别出现硬边 */
+  x.globalCompositeOperation='destination-in';
+  const hg=x.createLinearGradient(0,0,512,0);
+  hg.addColorStop(0,'rgba(0,0,0,0)');
+  hg.addColorStop(.24,'rgba(0,0,0,1)');
+  hg.addColorStop(.66,'rgba(0,0,0,1)');
+  hg.addColorStop(1,'rgba(0,0,0,0)');
+  x.fillStyle=hg;x.fillRect(0,0,512,512);
+  x.globalCompositeOperation='source-over';
+  /* 一条横向的细高光线：漆面上最像真反射的就是这一条 */
+  const sh=x.createLinearGradient(0,0,512,0);
+  sh.addColorStop(0,'rgba(255,255,255,0)');
+  sh.addColorStop(.22,'rgba(255,255,255,.55)');
+  sh.addColorStop(.50,'rgba(255,255,255,.55)');
+  sh.addColorStop(.78,'rgba(255,255,255,.40)');
+  sh.addColorStop(1,'rgba(255,255,255,0)');
+  x.fillStyle=sh;x.fillRect(0,142,512,16);
+  const t=ctex(c);
+  t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;
+  return t;
+})();
 function getBulbMat(hex,phase=0){
   if(hex===undefined||hex===null)hex=0xffe078;
   const bucket=Math.abs(Math.round(phase))%4;
@@ -6136,7 +6188,7 @@ let fireflyMat=null;
     [4.4,-13.6,1.02,.3,true],[5.6,-13.1,.86,-.2,false],
     [-14.2,-12.8,.98,.2,true],[-22.5,-13.2,1.08,-.15,false],[-32.0,-12.6,.94,.35,true],
     [8.7,-5.8,.92,-1.1,true],[8.7,-1.2,.84,-1.3,false],[8.7,4.2,.96,-1.0,true],
-    [-46.2,-8.2,1.08,.55,true],[-47.2,-7.0,.74,.25,false],[-46.2,5.0,1.00,.8,true],[-47.2,6.0,.70,.4,false],
+    [-46.2,5.0,1.00,.8,true],[-47.2,6.0,.70,.4,false],
     [44.2,-8.2,1.08,-.6,true],[45.3,-7.2,.75,-.35,false],[44.5,4.2,1.00,-.85,true],[45.6,5.2,.72,-.5,false],
     [-19.5,9.35,.82,.1,true],[-18.2,9.35,.76,-.15,false],[11.1,9.35,.84,.2,true],
     [-18.0,-27.2,1.05,.15,true],[6.0,-27.2,1.12,-.1,false],[30.0,-27.2,.98,-.25,true],
@@ -9629,9 +9681,9 @@ addNpc([[-33.1,0,-9.9],[-31.8,0,-10.4],[-29.0,0,-9.8],[-33.1,0,-9.9]],0x7a4a2c,0
    位置：圆心 (-40.4,-10.4) 半径 3.85m；石板路从市集拐角 (-33.9,-13.0) 接进来。
    ══════════════════════════════════════════════════════════════════════ */
 const pianoPlaza={
-  x:-40.4,z:-10.4,px:-39.5,pz:-10.6,
+  x:-40.4,z:-10.4,px:-45.3,pz:-11.3,
   g:null,pg:null,white:null,black:null,wMidi:null,bMidi:null,
-  wglow:null,bglow:null,sweep:null,sweepMat:null,light:null,flash:0
+  wglow:null,bglow:null,sweep:null,sweepMat:null,light:null,upl:null,flash:0
 };
 {
   const PX=pianoPlaza.x,PZ=pianoPlaza.z;
@@ -9647,25 +9699,22 @@ const pianoPlaza={
   const keyM=new THREE.MeshStandardMaterial({color:0xe8e2d4,roughness:.38,metalness:.02});
   const bkeyM=new THREE.MeshStandardMaterial({color:0x0a0b0e,roughness:.26,metalness:.12});
 
-  /* ── 广场铺装：外圈大盘 + 内圈舞台 + 放射石缝 + 描金圈 ── */
-  const disc=add(plaza,new THREE.CylinderGeometry(3.85,3.95,.09,64),paveM,PX,.045,PZ);disc.castShadow=false;
-  const inner=add(plaza,new THREE.CylinderGeometry(2.55,2.55,.05,48),M(0x2b3340,{roughness:.86}),PX,.105,PZ);inner.castShadow=false;
-  addNS(plaza,new THREE.TorusGeometry(3.82,.055,8,72),goldM,PX,.10,PZ).rotation.x=Math.PI/2;
-  addNS(plaza,new THREE.TorusGeometry(2.53,.045,8,56),goldM,PX,.135,PZ).rotation.x=Math.PI/2;
-  for(let i=0;i<12;i++){
-    const a=i/12*Math.PI*2;
-    const s=add(plaza,BX(1.26,.022,.07),paveD,PX+Math.cos(a)*3.20,.115,PZ+Math.sin(a)*3.20);
-    s.rotation.y=-a;s.castShadow=false;
-  }
-  /* ── 石板路：从市集拐角铺装接进来（绕过「姜饼甜点」摊位南侧） ── */
+  /* ── 铺装：圆台整个拆掉了 ──
+     原来这个半径 3.85m 的石板圆盘把钢琴整个托起来，看上去像展台，
+     挤在市集摊位边上，一团乱。现在只留一条从市集拐角接进来的石板路，
+     钢琴自己站在雪地上，两棵树在路两侧 —— 空间一下子松开了。 */
+  /* ── 石板路：从市集拐角 (-33.9,-13.0) 向西，走到两棵树之间就收尾 ──
+     之前还多折了一段往北，结果正好铺在钢琴脚下：一块亮白平板从琴身底下伸出来，
+     钢琴又变成「站在台子上」，跟前面拆掉的石板圆台是一回事。现在路到树前为止，
+     后面整片是干净的雪地，钢琴就站在雪上。 */
   {
-    const road=add(plaza,BX(4.9,.08,1.7),paveM,-36.3,.04,-13.0);road.castShadow=false;
-    const k1=add(plaza,BX(4.9,.10,.12),paveD,-36.3,.045,-13.85);k1.castShadow=false;
-    const k2=add(plaza,BX(4.9,.10,.12),paveD,-36.3,.045,-12.15);k2.castShadow=false;
+    const road=add(plaza,BX(8.7,.08,1.7),paveM,-38.25,.04,-13.0);road.castShadow=false;
+    const k1=add(plaza,BX(8.7,.10,.12),paveD,-38.25,.045,-13.85);k1.castShadow=false;
+    const k2=add(plaza,BX(8.7,.10,.12),paveD,-38.25,.045,-12.15);k2.castShadow=false;
   }
   /* ── 两棵圣诞树（分列广场西北 / 西南角） ── */
   const TREE_SC=[.86,.70];
-  const treePos=[[PX-2.25,PZ+2.15],[PX-1.95,PZ-2.55]];
+  const treePos=[[-42.6,-10.0],[-42.6,-15.4]];   // 分列石板路尽头的南北两侧，像一对门柱
   const treeBulbGrp=[];
   for(let ti=0;ti<2;ti++){
     const t=buildChristmasTree({scale:TREE_SC[ti],layers:6,gifts:true});
@@ -9708,54 +9757,61 @@ const pianoPlaza={
     const pts=[];
     for(let i=0;i<=24;i++){
       const u=i/24, p=new THREE.Vector3().lerpVectors(A,B,u);
-      p.y-=Math.sin(u*Math.PI)*1.55;
+      p.y-=Math.sin(u*Math.PI)*1.15;
       pts.push(p);
     }
     for(let i=1;i<24;i++)
       addNS(plaza,new THREE.SphereGeometry(.052,8,6),
         getBulbMat([0xff4d4d,0xffe078,0x48e58b,0xfff2cc][i%4],i),pts[i].x,pts[i].y,pts[i].z);
     lightCable(pts);
-    /* 小径上的灯柱 + 灯串：从小径拐进广场这段路也有光 */
+    /* 小径两侧也用地埋灯。原来是两根 2.9m 高的纯黑杆子，顶上顶个小球，
+       俯视就是两个黑点，夜里既不照路也认不出是什么。现在统一成钢琴那一圈的做法。 */
     const posts=[[-37.6,-14.25],[-35.2,-11.75]];
     for(const q of posts){
-      add(plaza,new THREE.CylinderGeometry(.055,.075,2.9,8),M(0x2c333c,{roughness:.7,metalness:.5}),q[0],1.45,q[1]);
-      addNS(plaza,new THREE.SphereGeometry(.085,10,8),getBulbMat(0xffe6a8,0),q[0],3.02,q[1]);
-    }
-    const p0=new THREE.Vector3(posts[0][0],2.95,posts[0][1]);
-    const p1=new THREE.Vector3(posts[1][0],2.95,posts[1][1]);
-    const pps=[];
-    for(let i=0;i<=10;i++){
-      const u=i/10,p=new THREE.Vector3().lerpVectors(p0,p1,u);
-      p.y-=Math.sin(u*Math.PI)*.45;
-      pps.push(p);
-    }
-    for(let i=1;i<10;i++)
-      addNS(plaza,new THREE.SphereGeometry(.046,8,6),
-        getBulbMat([0xffd28a,0xff8fa3,0x8fd4ff][i%3],i),pps[i].x,pps[i].y,pps[i].z);
-    lightCable(pps);
-  }
-  /* ── 广场四角的矮灯柱：夜里给广场一圈轮廓 ── */
-  {
-    const haloM=new THREE.MeshBasicMaterial({map:glowTex,color:0xffca86,transparent:true,opacity:.30,
-      blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
-    for(let i=0;i<4;i++){
-      const a=Math.PI/4+i*Math.PI/2;
-      const lx=PX+Math.cos(a)*3.42, lz=PZ+Math.sin(a)*3.42;
-      add(plaza,new THREE.CylinderGeometry(.055,.085,.95,8),M(0x2c333c,{roughness:.62,metalness:.55}),lx,.475,lz);
-      addNS(plaza,new THREE.SphereGeometry(.075,10,8),getBulbMat(0xffe0a0,i),lx,1.03,lz);
-      const halo=new THREE.Mesh(new THREE.PlaneGeometry(1.6,1.6),haloM);
-      halo.rotation.x=-Math.PI/2;halo.position.set(lx,.13,lz);
-      halo.renderOrder=2;halo.userData.noReflect=true;
-      plaza.add(halo);
+      addNS(plaza,new THREE.SphereGeometry(.085,10,8),getBulbMat(0xffd49a,0),q[0],.045,q[1]);
+      const ring=addNS(plaza,new THREE.TorusGeometry(.135,.028,6,16),M(0x3a4149,{roughness:.5,metalness:.7}),q[0],.012,q[1]);
+      ring.rotation.x=Math.PI/2;
+      const sp=addNS(plaza,new THREE.CircleGeometry(.42,20),new THREE.MeshBasicMaterial({
+        map:mulGlowTex,color:0xffffff,transparent:true,opacity:.50,
+        blending:THREE.MultiplyBlending,depthWrite:false,fog:false}),q[0],.016,q[1]);
+      sp.rotation.x=-Math.PI/2;sp.renderOrder=2;sp.userData.noReflect=true;
     }
   }
-  /* ── 地面扫光：一条贴地的旋转扇形光带（不是半透明锥体，不会给全场加雾光） ── */
+  /* ── 钢琴周围一圈地埋灯 ──
+     原来广场四角的矮灯柱，灯杆又矮又细，夜里既看不清也照不到东西，
+     而它们的地面光晕是加色混合 —— 落在白雪上只会更白，等于没有。
+     现在改成围着钢琴的一圈地埋小灯：灯是实体的，在雪地上有明确的形体感，
+     远远就能看见钢琴那边有一圈暖光在呼吸。 */
   {
-    const sm=new THREE.MeshBasicMaterial({color:0xffd9a4,transparent:true,opacity:.16,
-      blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
-    const sw=new THREE.Mesh(new THREE.RingGeometry(2.62,3.80,30,1,0,1.05),sm);
+    const bg2=new THREE.Group();
+    plaza.add(bg2);
+    for(let i=0;i<16;i++){
+      const a=i/16*Math.PI*2;
+      const lx=-45.3+Math.cos(a)*2.45, lz=-11.3+Math.sin(a)*2.45;
+      addNS(bg2,new THREE.SphereGeometry(.085,10,8),getBulbMat(0xffd49a,i),lx,.045,lz);
+      /* 每颗灯下面一圈金属灯圈，雪地上一眼能看出是「地埋灯」而不是浮空的小球 */
+      const ring=addNS(bg2,new THREE.TorusGeometry(.135,.028,6,16),M(0x3a4149,{roughness:.5,metalness:.7}),lx,.012,lz);
+      ring.rotation.x=Math.PI/2;
+      /* 灯脚下的雪面暖斑：地埋灯的球只有 8.5cm，站在地上根本看不见。
+         用乘法贴图在雪地上留一小圈淡暖光，远看就是「钢琴外围一圈亮着的地灯」。 */
+      const spot=addNS(bg2,new THREE.CircleGeometry(.42,20),new THREE.MeshBasicMaterial({
+        map:mulGlowTex,color:0xffffff,transparent:true,opacity:.50,
+        blending:THREE.MultiplyBlending,depthWrite:false,fog:false}),lx,.016,lz);
+      spot.rotation.x=-Math.PI/2;spot.renderOrder=2;spot.userData.noReflect=true;
+    }
+    mergeStatic(bg2);
+  }
+  /* ── 地面扫光：一条贴地旋转的暖色扇形 ──
+     这里必须用「乘法混合」而不是加色混合：加色落在白雪上只会把雪地烧得更白，
+     等于什么都看不见；乘法是「暖色 × 白雪 = 暖色」，雪地上才会真的显出一圈暖光。 ── */
+  {
+    /* color 必须是纯白：MeshBasicMaterial 的 color 会再乘一次 map，
+       乘色 + 乘混合 = 颜色平方，白雪上直接烧成一块深橘色圆盘（等于把拆掉的底盘又画回来）。 */
+    const sm=new THREE.MeshBasicMaterial({map:mulGlowTex,color:0xffffff,transparent:true,opacity:.30,
+      blending:THREE.MultiplyBlending,depthWrite:false,fog:false});
+    const sw=new THREE.Mesh(new THREE.RingGeometry(2.00,3.10,34,1,0,1.05),sm);
     sw.rotation.x=-Math.PI/2;
-    sw.position.set(PX,.132,PZ);
+    sw.position.set(-45.3,.022,-11.3);
     sw.renderOrder=2;sw.userData.noReflect=true;sw.userData.keep=true;
     plaza.add(sw);
     pianoPlaza.sweep=sw;pianoPlaza.sweepMat=sm;
@@ -9764,8 +9820,9 @@ const pianoPlaza={
      真实三角钢琴比例：长 2.4m / 宽 1.5m / 键盘高 0.75m
      掀开 28° 的琴盖 + 内部音板琴弦 + 描金边 + 88 键 + 琴凳 + 踏板 */
   const pg=new THREE.Group();
-  pg.position.set(PX+.9,0,PZ-.2);
+  pg.position.set(-45.3,0,-11.3);        // 挪到广场西边的开阔雪地上，离开市集摊位的挤压
   pg.rotation.y=2.42;                    // 键盘朝东南，正对着从小径进来的方向
+  pg.scale.setScalar(1.28);              // 放大成一台「演出级」大三角钢琴
   plaza.add(pg);
   pianoPlaza.pg=pg;
   {
@@ -9779,6 +9836,11 @@ const pianoPlaza={
     add(pg,BX(.06,.30,1.40),lacqM,-.69,.82,.35);           // 宽段左侧板
     add(pg,BX(.06,.30,1.40),lacqM,.69,.82,.35);            // 宽段右侧板
     add(pg,BX(1.44,.30,.06),lacqM,0,.82,1.02);             // 键盘下方前挡板
+    /* 前挡板外侧也来一道反光，正面看琴时才不是一条死黑的带子 */
+    const faceSheen=addNS(pg,new THREE.PlaneGeometry(1.38,.26),new THREE.MeshBasicMaterial({
+      map:lacquerSheenTex,transparent:true,opacity:.12,
+      blending:THREE.AdditiveBlending,depthWrite:false,fog:false}),0,.85,1.055);
+    faceSheen.renderOrder=3;faceSheen.userData.noReflect=true;
     add(pg,BX(1.44,.30,.06),lacqM,0,.82,-.32);             // 中段挡板
     add(pg,BX(.06,.30,.91),lacqM,-.45,.82,-.805);          // 尾段左侧板
     add(pg,BX(.06,.30,.91),lacqM,.45,.82,-.805);           // 尾段右侧板
@@ -9807,6 +9869,13 @@ const pianoPlaza={
     add(hinge,BX(1.54,.09,2.36),lacqM,.75,0,0);
     addNS(hinge,BX(.035,.11,2.36),goldM,1.52,0,0);
     hinge.rotation.z=.46;
+    /* 掀开的琴盖顶面贴一层环境反光：黑漆立刻有体积，
+       不用再靠加光源（加光源只会把琴盖照成一块死白）。 */
+    const sheen=addNS(hinge,new THREE.PlaneGeometry(1.50,2.26),new THREE.MeshBasicMaterial({
+      map:lacquerSheenTex,transparent:true,opacity:.45,
+      blending:THREE.AdditiveBlending,depthWrite:false,fog:false}),.75,.052,.02);
+    sheen.rotation.x=-Math.PI/2;
+    sheen.renderOrder=3;sheen.userData.noReflect=true;
     add(pg,new THREE.CylinderGeometry(.014,.014,.52,6),brassM,.28,1.26,-.05);
     /* 谱架 */
     const desk=add(pg,BX(.92,.34,.035),lacqM,0,1.02,.86);
@@ -9862,36 +9931,58 @@ const pianoPlaza={
     add(pg,BX(.20,.30,.10),lacqM,0,.22,1.02);
     for(const q of [-.06,0,.06])add(pg,BX(.035,.02,.16),brassM,q,.09,1.06);
   }
-  /* 钢琴脚下的暖光池 */
+  /* ── 钢琴脚下的灯：这轮的重点全在这儿 ──
+     钢琴通体亮漆黑面，夜景里不给底光就是一坨黑影。
+     现在琴身底下塞了三盏贴地的暖光往上照（uplit）——
+     琴腿、琴身下沿、琴凳全被从下往上勾出轮廓，黑色漆面立刻有了体积感；
+     再加琴盖上方一盏窄角射灯压下来，照亮掀开的琴盖和里面的金色音板、琴弦。
+     一台钢琴在雪夜里要靠「光」立得住，不是靠再堆装饰件。 */
   {
+    /* 脚下光池：乘法混合，雪地上真的能看见一圈暖光 */
     const pl=new THREE.Mesh(new THREE.CircleGeometry(1,48),new THREE.MeshBasicMaterial({
-      map:glowTex,color:0xffc98a,transparent:true,opacity:.32,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+      map:mulGlowTex,color:0xffffff,transparent:true,opacity:.34,
+      blending:THREE.MultiplyBlending,depthWrite:false,fog:false}));
     pl.rotation.x=-Math.PI/2;
-    pl.position.set(pg.position.x,.13,pg.position.z);
-    pl.scale.setScalar(2.3);
+    pl.position.set(pg.position.x,.028,pg.position.z);
+    pl.scale.setScalar(2.05);   /* 光池只盖住琴脚，多了就成了「底盘」 */
     pl.renderOrder=2;pl.userData.noReflect=true;
     plaza.add(pl);
-    /* 一盏小范围暖光，只照钢琴和琴凳，旁边的雪地不吃光 */
-    const lt=new THREE.PointLight(0xffc07a,6.5,7.5,2.1);
-    lt.position.set(pg.position.x,1.45,pg.position.z);
-    scene.add(lt);
-    pianoPlaza.light=lt;
+    /* 三盏贴地暖光往上照（跟着钢琴一起移动、一起放大）*/
+    /* decay 1.25 而不是物理的 2：贴地的灯离雪面只有 30cm，
+       1/d² 在那儿会烧出一块死白的过曝斑，1.25 次衰减才收得住。 */
+    const upl=[[0,.34,.88,1.05,3.0],[.64,.52,.42,.72,2.6],[-.56,.44,-.30,.72,2.6]];
+    const uplArr=[];
+    for(const [ux,uy,uz,ii,dd] of upl){
+      const l=new THREE.PointLight(0xffb26a,ii,dd,1.25);
+      l.position.set(ux,uy,uz);
+      l.userData.base=ii;
+      pg.add(l);
+      uplArr.push(l);
+    }
+    pianoPlaza.upl=uplArr;
+    pianoPlaza.light=uplArr[0];
+    /* 琴盖上的窄角射灯：只照琴腔和音板，锥角锁住不外溢 */
+    const spot=new THREE.SpotLight(0xffdcae,10,3.6,.32,.85,1.4);
+    spot.position.set(1.34,2.06,.12);
+    pg.add(spot);
+    const tgt=new THREE.Object3D();tgt.position.set(.10,.86,.06);
+    pg.add(tgt);spot.target=tgt;
+    pianoPlaza.spot=spot;
   }
   /* ── 广场招牌：告诉路过的人这是什么（挪到广场北侧，不挡钢琴的视线） ── */
   {
     const sg=new THREE.Group();
-    sg.position.set(PX+2.60,0,PZ+2.50);
-    sg.rotation.y=2.20;
+    sg.position.set(-48.6,0,-13.6);       // 挪到路边的雪地上，朝向来路，指向钢琴
+    sg.rotation.y=1.95;
     plaza.add(sg);
     add(sg,new THREE.CylinderGeometry(.07,.09,2.55,8),M(0x4b3322,{roughness:.85}),0,1.27,0);
     add(sg,BX(2.05,.66,.07),M(0x1b2c48,{roughness:.5}),0,2.34,0);
     signPanel(sg,1.94,.56,animeSignTex(768,256,'圣诞钢琴广场','CHRISTMAS PIANO PLAZA','#f6d690'),0,2.34,.045,.9);
   }
   /* 碰撞：钢琴 / 琴凳 / 两棵树 / 招牌柱 */
-  OUTDOOR_OBS.push([pg.position.x,pg.position.z,1.75]);
+  OUTDOOR_OBS.push([pg.position.x,pg.position.z,2.30]);
   OUTDOOR_OBS.push([treePos[0][0],treePos[0][1],.85]);
   OUTDOOR_OBS.push([treePos[1][0],treePos[1][1],.75]);
-  OUTDOOR_OBS.push([PX+3.15,PZ-1.30,.35]);
 }
 
 /* ══ 钢琴弹奏 + 灯光秀驱动 ══ */
@@ -9942,14 +10033,15 @@ function updatePianoPlaza(dt,t){
   /* 地面扫光：平时慢转，弹奏时加速 + 提亮 */
   pp.flash=Math.max(0,pp.flash-dt*.85);
   if(pp.sweep){
-    pp.sweep.rotation.y+=dt*(.26+pp.flash*1.5);
-    pp.sweepMat.opacity=.14+.11*Math.sin(t*1.7)+pp.flash*.30;
+    pp.sweep.rotation.y=phaseOf(24.17)*.26+pp.flash*.9;   // 纯相位，扫光全服同进度
+    pp.sweepMat.opacity=.09+.07*Math.sin(t*1.7)+pp.flash*.24;
   }
-  if(pp.light)pp.light.intensity=6.5+pp.flash*8;
+  if(pp.upl)for(const l of pp.upl)l.intensity=l.userData.base*(1+pp.flash*2.2);
+  if(pp.spot)pp.spot.intensity=13+pp.flash*16;
   /* 走近就提示 */
   if(fp.on&&!wheelSys.riding&&!trainSys.riding&&!balloonSys.riding&&!launchSys.active){
     const d=Math.hypot(fp.x-pp.px,fp.z-pp.pz);
-    if(d<4.0)hudShow('圣诞大钢琴 · 按 E 弹一段','弹奏 (E)',pianoPlay);
+    if(d<4.8)hudShow('圣诞大钢琴 · 按 E 弹一段','弹奏 (E)',pianoPlay);
   }
 }
 
@@ -12870,6 +12962,7 @@ window.diorama={cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.t
     wglow:Array.from(pianoPlaza.wglow).map(v=>+v.toFixed(2)),
     bglow:Array.from(pianoPlaza.bglow).map(v=>+v.toFixed(2)),
     flash:+pianoPlaza.flash.toFixed(3),
+    uplI:pianoPlaza.upl?pianoPlaza.upl.map(l=>+l.intensity.toFixed(2)):[],
     sweepY:+pianoPlaza.sweep.rotation.y.toFixed(3),
     lightI:+pianoPlaza.light.intensity.toFixed(2)}),
   pianoPlay:()=>pianoPlay(),
@@ -17928,7 +18021,7 @@ addEventListener('keydown',e=>{
     if(trainSys.riding){toggleRideTrain();return;}
     if(fp.on&&Math.hypot(fp.x-27,fp.z-36)<10.5){toggleRideWheel(null);return;}
     if(fp.on&&trainCars.some(c=>Math.hypot(fp.x-c.position.x,fp.z-c.position.z)<9.5)){toggleRideTrain();return;}
-    if(fp.on&&Math.hypot(fp.x-pianoPlaza.px,fp.z-pianoPlaza.pz)<4.0){pianoPlay();return;}
+    if(fp.on&&Math.hypot(fp.x-pianoPlaza.px,fp.z-pianoPlaza.pz)<4.8){pianoPlay();return;}
   }
 });
 
