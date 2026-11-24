@@ -236,7 +236,7 @@
 
   /* 全局提示条 */
   #xmsg{
-    position:fixed;left:50%;bottom:74px;transform:translate(-50%,8px);z-index:60;
+    position:fixed;left:50%;bottom:74px;transform:translate(-50%,8px);z-index:78;
     padding:9px 16px;border-radius:4px;pointer-events:none;opacity:0;
     font-family:var(--han);font-size:12.5px;color:#eaf4ff;letter-spacing:.02em;
     background:rgba(8,14,22,.9);border:1px solid var(--line-strong);
@@ -249,17 +249,29 @@
   #recpv{
     position:fixed;inset:0;z-index:70;display:none;place-items:center;
     background:rgba(4,8,13,.82);backdrop-filter:blur(6px);
+    padding:10px;overflow:auto;
   }
   #recpv.show{display:grid}
   #recpv .rpv-box{
-    width:min(92vw,560px);padding:14px;border-radius:6px;
+    width:min(92vw,560px);padding:14px;border-radius:6px;max-height:94vh;overflow-y:auto;
     background:rgba(10,16,24,.94);border:1px solid var(--line-strong);
     display:flex;flex-direction:column;gap:10px;align-items:center;
   }
-  #recpv video{width:100%;max-height:62vh;background:#000;border-radius:3px}
+  /* 手机上卡片内容很容易比屏幕高（视频 + 说明 + 4 个按钮），
+     视频占太高会把「关闭」挤出屏幕外，按钮点不到 → 视频收到 42vh。 */
+  #recpv video{width:100%;max-height:42vh;background:#000;border-radius:3px}
   #recpv p{font-family:var(--han);font-size:12px;color:#a9c4d8;text-align:center;line-height:1.7}
   #recpv p b{color:#ffd9a0;font-weight:600}
-  #recpv .rpv-acts{display:flex;gap:10px;align-items:center}
+  #recpv .rpv-acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center}
+  /* 卡片内的状态行：#xmsg 提示条的 z-index 比遮罩低，保存卡片打开时提示会被盖住，
+     「点了没反应」就是这么来的 —— 所以状态必须写在卡片自己里面。 */
+  #recpv-status{
+    display:none;width:100%;margin:0;padding:7px 10px;border-radius:4px;
+    background:rgba(255,180,110,.12);border:1px solid rgba(255,170,110,.34);
+    color:#ffe2c4;font-size:12px;line-height:1.6;text-align:left;
+  }
+  #recpv-status.on{display:block}
+  #recpv-status b{color:#ffd08a;font-weight:600}
   #recpv .rpv-acts .primary{
     padding:9px 22px;border-radius:20px;cursor:pointer;font-family:var(--han);font-size:13px;
     background:rgba(255,138,80,.2);border:1px solid rgba(255,170,110,.6);color:#ffe2c4;font-weight:600;
@@ -625,9 +637,11 @@
   <div class="rpv-box">
     <video id="recpv-video" controls playsinline></video>
     <p id="recpv-tip"></p>
+    <p id="recpv-status"></p>
     <div class="rpv-acts">
       <button id="recpv-save" class="primary">保存到本机</button>
       <button id="recpv-share">系统分享</button>
+      <button id="recpv-tab">新标签打开</button>
       <button id="recpv-close">关闭</button>
     </div>
   </div>
@@ -12566,43 +12580,67 @@ async function _recSave(blob){
   const url=URL.createObjectURL(outBlob);
   _recSaveFallback(url,outName);
 }
-/* 手机端保存卡片：视频 + 「保存到本机」按钮 + 明确告诉用户文件会去哪 */
+/* 手机端保存卡片：视频 + 「保存到本机」按钮 + 明确告诉用户文件会去哪
+   踩过的坑（小米安卓）：点「保存到本机」后页面一点反馈都没有 =
+   ① 全局提示条 #xmsg 的 z-index(60) 比保存卡片遮罩(#recpv,70) 低，提示被盖在下面看不见；
+   ② 部分安卓浏览器（微信内置、小米自带浏览器）根本不执行 blob 下载，静默失败。
+   所以：状态写在卡片自己里面（#recpv-status），并额外给「新标签打开」这条兜底路。 */
+function _recIsPhone(){
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
 function _recSaveCard(blob,name){
   const box=document.getElementById('recpv');
   const v=document.getElementById('recpv-video');
   const tip=document.getElementById('recpv-tip');
+  const st=document.getElementById('recpv-status');
   const btn=document.getElementById('recpv-save');
   if(!box||!v||!btn)return;
   const url=URL.createObjectURL(blob);
   box._url=url;
   v.src=url;
   const ios=_recIsIOS();
+  const wechat=/MicroMessenger/i.test(navigator.userAgent);
+  const file=()=>new File([blob],name,{type:blob.type||'video/mp4'});
+  const say=(t)=>{ if(st){st.innerHTML=t;st.classList.add('on');} };
   tip.innerHTML=ios
     ? '点「保存到本机」→ 在系统面板里选 <b>存储到文件</b>，存好后到「文件」App 里找。<br>'
       +'也可以 <b>长按上面的视频</b> → 存储到照片。'
-    : '点「保存到本机」→ 视频会存进手机的 <b>下载</b> 文件夹<br>'
-      +'（小米：文件管理 → Download；或「设置 → 更多设置 → 下载位置」看路径）。<br>'
-      +'浏览器没弹下载提示的话，用 <b>系统分享</b> 存到文件管理器，或 <b>长按视频</b> 另存。<br>'
+    : '点「保存到本机」→ 视频存进手机 <b>下载</b> 文件夹（小米：文件管理 → Download）。<br>'
+      +'没动静就点 <b>新标签打开</b> → 右上角「…」→ 下载，或用 <b>系统分享</b> 存到文件管理器。<br>'
       +'（微信里打开的话，先点右上角「…」→ 在浏览器中打开再录）';
+  if(wechat)say('你现在是在<b>微信里</b>打开的，微信会拦下载动作。请点右上角「…」→ <b>在浏览器中打开</b>，回到这个页面再录一次。');
   btn.textContent='保存到本机';
   btn.onclick=()=>{
-    const file=new File([blob],name,{type:blob.type||'video/mp4'});
     /* iOS 走系统分享（面板里选「存储到文件」），安卓走浏览器下载（存进「下载」目录）——
        两者都必须在用户手势里触发。 */
-    if(ios&&navigator.canShare&&navigator.canShare({files:[file]})){
-      navigator.share({files:[file],title:name})
-        .then(()=>_recMsg('已保存 · 去「文件」App 里查看'))
-        .catch(()=>_recDl(url,name));
-    }else _recDl(url,name);
+    if(ios&&navigator.canShare&&navigator.canShare({files:[file()]})){
+      navigator.share({files:[file()],title:name})
+        .then(()=>say('已调起系统分享，选 <b>存储到文件</b> 即可。'))
+        .catch(()=>{_recDl(url,name);say('分享被取消，已改为触发下载：<b>'+name+'</b>。');});
+      return;
+    }
+    _recDl(url,name);
+    say('已触发下载：<b>'+name+'</b>。到手机「下载」文件夹里找。<br>'
+      +'如果浏览器没弹下载条、文件夹里也没有，就点下面 <b>新标签打开</b>，用右上角「…」→ 下载。');
   };
   const sh=document.getElementById('recpv-share');
   if(sh){
     sh.style.display=(ios||!navigator.canShare)?'none':'inline-block';
     sh.onclick=()=>{
-      const file=new File([blob],name,{type:blob.type||'video/mp4'});
-      if(navigator.canShare&&navigator.canShare({files:[file]})){
-        navigator.share({files:[file],title:name}).catch(()=>{});
-      }else _recMsg('这个浏览器不支持系统分享，请点「保存到本机」');
+      if(navigator.canShare&&navigator.canShare({files:[file()]})){
+        navigator.share({files:[file()],title:name})
+          .then(()=>say('已调起系统分享，选 <b>文件管理 / 保存到手机</b> 即可。'))
+          .catch(()=>say('分享被取消了，可以点「保存到本机」再试一次。'));
+      }else say('这个浏览器不支持系统分享，请点「保存到本机」或「新标签打开」。');
+    };
+  }
+  const tb=document.getElementById('recpv-tab');
+  if(tb){
+    tb.style.display=ios?'none':'inline-block';
+    tb.onclick=()=>{
+      const w=window.open(url,'_blank');
+      if(w)say('已在新标签打开视频：点浏览器右上角「…」→ <b>下载</b>，就能存到手机。');
+      else say('浏览器把新标签拦了，请改用「系统分享」，或长按上面的视频另存。');
     };
   }
   box.classList.add('show');
@@ -12613,7 +12651,10 @@ function _recDl(url,name){
   a.href=url;a.download=name;a.rel='noopener';
   document.body.appendChild(a);a.click();
   setTimeout(()=>a.remove(),2000);
-  _recMsg('已开始下载：'+name);
+  /* 保存卡片开着的时候，卡片里那行状态已经把话说清楚了，
+     再弹一次全局提示条反而压在状态行上（提示条是 fixed 在屏幕底部的）。 */
+  const card=document.getElementById('recpv');
+  if(!(card&&card.classList.contains('show')))_recMsg('已开始下载：'+name);
 }
 function _recSizeText(b){
   return b>=1048576?Math.round(b/1048576)+'MB':Math.max(1,Math.round(b/1024))+'KB';
@@ -12641,8 +12682,14 @@ async function _recStart(){
   await new Promise(r=>setTimeout(r,320));           // 等新画布尺寸稳定再捕获
   let mime='video/webm';
   if(MediaRecorder.isTypeSupported){
-    mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4']
-      .find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
+    /* 手机上没有本机服务帮忙转 mp4，录出来什么格式就存什么格式：
+       能录 mp4(H.264) 就优先录 mp4 —— 存进「下载」后相册能直接播、
+       长按能「存到相册」；webm 在小米相册里是打不开的。
+       桌面端有本机 ffmpeg 转码兜底，继续用最稳的 webm。 */
+    const cand=_recIsPhone()
+      ? ['video/mp4;codecs=avc1.42E01E','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm']
+      : ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'];
+    mime=cand.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
   }
   let stream=null;
   try{ stream=renderer.domElement.captureStream(0); }
@@ -12670,7 +12717,10 @@ async function _recStart(){
     _recLabel('录制');
     if(blob.size>2048){
       _recSave(blob);
-      _recMsg('已保存到本机 · '+cw+'×'+ch+' · '+_recSizeText(blob.size)+' · '+(_rec.fps||30)+'fps');
+      /* 手机上此刻还没存，只是弹了保存卡片 —— 别在这里说「已保存」 */
+      _recMsg(_recIsMobile()
+        ? '录制完成 · '+cw+'×'+ch+' · '+_recSizeText(blob.size)+' · 下面点「保存到本机」存进手机'
+        : '已保存到本机 · '+cw+'×'+ch+' · '+_recSizeText(blob.size)+' · '+(_rec.fps||30)+'fps');
     }else _recMsg('录制失败，画面是空的');
   };
   rec.onerror=()=>{_recMsg('录制出错，请重试')};
