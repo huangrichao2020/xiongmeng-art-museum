@@ -4361,29 +4361,10 @@ const animePark=new THREE.Group();animePark.userData.tag='park';scene.add(animeP
   add(animePark,BX(.28,.34,21.4),curbM,PX+14,.17,PZ);
   for(const s of [-1,1]) add(animePark,BX(10.6,.34,.28),curbM,PX+s*8.7,.17,PZ+10.7);
 
-  // 2. 南侧迎宾「圣诞狂欢动漫雪园」双柱门楼 + 圣诞花环 + 拐杖糖 + 积雪顶
-  const gateG=new THREE.Group();gateG.position.set(PX,0,PZ+10.55);animePark.add(gateG);
-  const gatePostM=M(0x1d242b,{roughness:.45,metalness:.75});
-  for(const s of [-1,1]){
-    add(gateG,new THREE.CylinderGeometry(.15,.20,4.8,14),gatePostM,s*3.6,2.4,0);
-    add(gateG,new THREE.TorusGeometry(.36,.055,10,20),new THREE.MeshBasicMaterial({color:s<0?0xff4d4d:0xf4c56a}),s*3.6,5.0,0);
-    const gWr=buildWreath(.44);gWr.position.set(s*3.6,3.2,.18);gateG.add(gWr);
-    const gCc=buildCandyCane(1.65);gCc.position.set(s*3.05,.14,.1);gCc.rotation.y=s>0?Math.PI:0;gateG.add(gCc);
-  }
-  add(gateG,BX(7.8,.58,.38),gatePostM,0,4.75,0);
-  add(gateG,BX(7.92,.14,.46),snowCapM,0,5.09,0);
-  const [pc,pctx]=cv(512,96);
-  pctx.fillStyle='#14281e';pctx.fillRect(0,0,512,96);
-  pctx.strokeStyle='#f4c56a';pctx.lineWidth=4;pctx.strokeRect(6,6,500,84);
-  pctx.fillStyle='#ffe28a';pctx.font='700 30px '+HK;pctx.textAlign='center';
-  pctx.fillText('熊萌 · 圣诞狂欢动漫雪园',256,48);
-  pctx.fillStyle='#ff7070';pctx.font='700 14px monospace';
-  pctx.fillText('MERRY CHRISTMAS · ANIME SNOW PLAZA',256,77);
-  const gateTex=ctex(pc);
-  const gateFace=new THREE.Mesh(new THREE.PlaneGeometry(7.2,.96),new THREE.MeshStandardMaterial({
-    map:gateTex,emissiveMap:gateTex,emissive:0xffffff,emissiveIntensity:.95,roughness:.35
-  }));
-  gateFace.position.set(0,4.75,.21);gateG.add(gateFace);
+  // 2. 南侧迎宾双柱门楼已删除：两根 4.8m 黑柱横跨通道架一块 7.2m 绿底金字横匾，
+  //    只挡视线不挡人，还跟正面游乐园的鎏金门楼撞样式。
+  //    现在入口完全敞开，视线一路通进雪园中轴大道；柱子、门楣、雪盖、圣诞花环、
+  //    拐杖糖与门牌贴图全部拆掉，只留迎宾雪人与树阵。游乐园鎏金门楼与艺术馆大门保留。
 
   // 通用双层发光圆台
   function parkPedestal(x,z,rad,glowHex){
@@ -8020,7 +8001,7 @@ const OUTDOOR_OBS=(()=>{
   const PX=26.5,PZ=-2.0;
   list.push([PX,PZ,2.35],[PX-5.5,PZ-4.2,1.85],[PX+5.5,PZ-4.2,1.8],[PX-5.5,PZ+4.2,1.85],[PX+5.5,PZ+4.2,1.75]);
   list.push([PX,PZ-6.8,1.9],[PX-10.2,PZ-6.8,1.8],[PX+10.2,PZ-6.8,1.8],[PX-10.2,PZ,1.75],[PX+10.2,PZ,1.75],[PX-10.2,PZ+6.6,1.75],[PX+10.2,PZ+6.6,1.9]);
-  for(const s of [-1,1]){list.push([PX+s*3.6,PZ+10.55,.65],[PX+s*4.2,PZ+8.4,.85]);}
+  for(const s of [-1,1])list.push([PX+s*4.2,PZ+8.4,.85]);   // 门柱碰撞已删，只剩迎宾雪人
   for(const [tx,tz] of [[PX-11.6,PZ-9],[PX+11.6,PZ-9],[PX-12,PZ+8.8],[PX+12,PZ+8.8]])list.push([tx,tz,1.35]);
   for(const [lx,lz] of [
     [PX-2.4,PZ+8.2],[PX+2.4,PZ+8.2],[PX-2.4,PZ+4.4],[PX+2.4,PZ+4.4],[PX-2.4,PZ-4.4],[PX+2.4,PZ-4.4],
@@ -9919,7 +9900,7 @@ const PANELS={
     ]},
   park:{eyebrow:'EAST PLAZA / 东侧雪园',title:'圣诞狂欢动漫雪园',
     rows:[
-      ['节日焕新','迎宾门楼挂起双花环与拐杖糖，广场四季常青松覆雪挂灯'],
+      ['节日焕新','南侧入口门楼已拆除，视线与通行都敞开；广场四季常青松覆雪挂灯'],
       ['C位与主角','龙猫、哆啦A梦、皮卡丘、布朗熊佩戴圣诞帽欢度圣诞夜'],
       ['园区造景','四角 4 棵中大型圣诞树 + 迎宾雪人 + 冬青红果灌木'],
       ['灯火矩阵','9 条红绿金圣诞天幕串灯(100+灯珠) + 13 组彩色主题照明']
