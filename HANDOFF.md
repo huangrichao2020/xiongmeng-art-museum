@@ -1,6 +1,6 @@
 # 熊萌圣诞冰雪艺术馆 3D 世界 · 项目交接手册 (HANDOFF)
 
-> 最后更新：2026-11-23  
+> 最后更新：2026-11-24  
 > 线上地址：https://preview.ai10088.com/alex-garage/  
 > 仓库主文件：`xiongmeng-art-museum.html`
 
@@ -85,6 +85,18 @@
 ### 3.2 留言信箱后端接口
 - 前端接口路径：`/alex-garage/api/guestbook`（同源反代）。
 - 阿里云后端进程：`127.0.0.1:18791`（`systemd` 托管 Python/SQLite 服务），支持留言 CRUD、30 字上限、匿名投递及管理删除密码 `1225`。
+
+### 3.3 多人联机（WebSocket）
+- **前端**：主文件内 `MP` 模块（`(function(){...})()`），账号登录后可改显示 ID、可切第三人称。
+  - 端点：`wss://preview.ai10088.com/alex-garage/ws/`（nginx 反代，站点开 http2，必须 `proxy_http_version 1.1`）。
+  - 协议：前端发 `login / pos / name / ping / chat`，服务端回 `welcome / players / move / rename / kicked / pong / err`。
+  - **强制登录**：没有「先逛逛」模式，进场必须用账号登录，全场只有一个在线世界（服务端 `room:'main'`）。
+  - **弱网重连**：`MP.gen` 连接代数作废旧连接的回调；应用层心跳 8 秒 `ping`、12 秒收不到 `pong` 判定半开并主动重连；退避 0.8s→6s 带 ±25% 抖动；`visibilitychange` / `online` 事件立刻拉连接；断线时顶部显示 `#mp-net` 提示条（**不要把提示写进已隐藏的登录卡片，玩家看不到**）。
+  - **显示 ID 持久化**：客户端 `localStorage.xm_mp_names`（按账号存）+ 服务端 `names.json` 落盘，改过的 ID 重进、重启都在。
+- **服务端**：`server/xm-ws-server.js`（零依赖，自实现 RFC6455），`systemd` 单元 `xm-ws.service`，监听 `127.0.0.1:18888`。
+  - 账号 `test01`/`test02`（真人）+ `test03`~`test08`（探针专用，按进程号分配，绝不占真人的号）。
+  - **收到客户端 CLOSE 必须回 CLOSE 帧**，否则浏览器永远停在 `CLOSING`，`onclose` 不触发、前端不会重连。
+  - 半开连接清理：60 秒无任何数据 → 主动断开；同号顶号时只有老连接 12 秒内活跃才算「真顶号」，僵尸连接直接替换（否则重连会被自己的护栏挡在门外）。
 
 ---
 

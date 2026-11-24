@@ -13,6 +13,8 @@
 const http = require('http');
 const crypto = require('crypto');
 const os = require('os');
+const fs = require('fs');
+const path = require('path');
 
 const PORT = 18888;
 const HOST = '127.0.0.1';
@@ -40,6 +42,34 @@ const ACCOUNTS = new Map([
    这个护栏让「被踢方的自动重连」撞墙停下，循环自然终止。 */
 const kickGuard = new Map();
 const KICK_GUARD_MS = 3000;
+
+/* ── 显示 ID 存档 ──
+   改过的 ID 必须记住：落盘到 names.json，服务重启也不丢。
+   （之前 ID 只存在内存里，而且登录时前端根本不带 ID，
+     所以每次进去改的名字一刷新就没了）*/
+const NAME_FILE = path.join(__dirname, 'names.json');
+const displayNames = new Map();
+function loadNames() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(NAME_FILE, 'utf8'));
+    for (const k of Object.keys(raw)) {
+      if (typeof raw[k] === 'string' && raw[k]) displayNames.set(k, raw[k]);
+    }
+    log('已载入显示 ID 存档：' + displayNames.size + ' 条');
+  } catch (e) { /* 没有存档文件是正常的 */ }
+}
+function saveNames() {
+  try {
+    const obj = {};
+    for (const [k, v] of displayNames) obj[k] = v;
+    fs.writeFileSync(NAME_FILE, JSON.stringify(obj, null, 2));
+  } catch (e) { log('写 ID 存档失败：' + e.message); }
+}
+
+/* ── 半开连接的判定阈值 ──
+   12 秒内没有任何数据往来 = 这条连接已经死了（弱网/手机息屏/切网） */
+const IDLE_ALIVE_MS = 12000;
+const IDLE_DEAD_MS = 60000;
 
 /* ── 在线会话：account → session ── */
 const sessions = new Map();      // account -> session
@@ -186,13 +216,24 @@ function handleConn(socket) {
       try { msg = JSON.parse(text); } catch (e) { return; }
       onMessage(msg);
     },
-    () => cleanup(),
+    () => {
+      /* 客户端先发关闭 → 必须回一个 CLOSE 帧把关闭握手走完。
+         以前服务端收到 CLOSE 直接清理不回复，浏览器就永远停在 CLOSING，
+         onclose 不触发，前端也不会重连 —— 这正是「掉线后再也连不上」的元凶。 */
+      try { socket.write(encodeFrame(Buffer.alloc(0), OP.CLOSE)); } catch (e) { }
+      try { socket.end(); } catch (e) { }
+      cleanup();
+    },
     (payload) => {
       if (!socket.destroyed) socket.write(encodeFrame(payload, OP.PONG));
     }
   );
 
-  socket.on('data', c => { try { parser.push(c); } catch (e) { cleanup(); } });
+  socket.on('data', c => {
+    /* 任何数据都算「还活着」—— 客户端 15Hz 推位置，正常时每秒都有 */
+    if (session) session.lastSeen = Date.now();
+    try { parser.push(c); } catch (e) { cleanup(); }
+  });
   socket.on('error', () => cleanup());
   socket.on('close', () => cleanup());
 
@@ -202,7 +243,9 @@ function handleConn(socket) {
     if (sessions.get(s.account) === s) sessions.delete(s.account);
     bySocket.delete(socket);
     broadcastRoom(s.room);
-    log('offline', s.account, 'online=' + sessions.size);
+    const idle = Math.round((Date.now() - (s.lastSeen || Date.now())) / 1000);
+    const dur = Math.round((Date.now() - s.joinedAt) / 1000);
+    log('offline', s.account, '在线' + dur + 's', '静默' + idle + 's', 'online=' + sessions.size);
   }
 
   function onMessage(msg) {
@@ -217,7 +260,7 @@ function handleConn(socket) {
       // 刚被踢过的账号，短时间内不再放行登录（防互踢死循环）
       const kickedAt = kickGuard.get(acc);
       if (kickedAt && Date.now() - kickedAt < KICK_GUARD_MS) {
-        send({ t: 'err', code: 'kicked', msg: '该账号已在别处登录' });
+        send({ t: 'err', code: 'retry', msg: '该账号刚在别处登录，稍后重试' });
         close(4009);
         log('guard-block', acc);
         return;
@@ -226,24 +269,42 @@ function handleConn(socket) {
       // 同号重复登录 → 踢掉上一个
       const old = sessions.get(acc);
       if (old && old !== session) {
-        // 先把「被踢」消息写出去，再延迟断开 —— 立刻 end() 会让客户端
-        // 只看到断线、收不到 kicked，提示就变成「连接断开」而不是「别处登录」
-        try { old.socket.write(encodeFrame(JSON.stringify({ t: 'kicked', msg: '该账号在别处登录' }))); } catch (e) { }
-        setTimeout(() => { try { old.socket.end(); } catch (e) { } }, 120);
+        /* 只有老连接「还活着」（12 秒内有数据）才算真被顶号。
+           弱网/息屏留下的僵尸连接不算 —— 否则自己的连接半开时重连，
+           老僵尸被踢 + 触发 3 秒护栏，反而把自己挡在门外（这正是
+           「在线不到一分钟就掉线、还再也连不上」的原因） */
+        const oldIdle = Date.now() - (old.lastSeen || 0);
+        if (oldIdle < IDLE_ALIVE_MS) {
+          // 先把「被踢」消息写出去，再延迟断开 —— 立刻 end() 会让客户端
+          // 只看到断线、收不到 kicked，提示就变成「连接断开」而不是「别处登录」
+          try { old.socket.write(encodeFrame(JSON.stringify({ t: 'kicked', msg: '该账号在别处登录' }))); } catch (e) { }
+          setTimeout(() => { try { old.socket.end(); } catch (e) { } }, 120);
+          kickGuard.set(acc, Date.now());
+          log('kick-old', acc);
+        } else {
+          log('replace-stale', acc, '静默' + Math.round(oldIdle / 1000) + 's');
+        }
         if (sessions.get(acc) === old) sessions.delete(acc);
         bySocket.delete(old.socket);
-        kickGuard.set(acc, Date.now());
-        log('kick-old', acc);
       }
+
+      /* 显示 ID：前端带上来的优先；没带就用存档里的；都没有就用账号名 */
+      const wantName = String(msg.name || '').trim().slice(0, 16);
+      if (wantName && wantName !== acc) {
+        displayNames.set(acc, wantName);
+        saveNames();
+      }
+      const disp = wantName || displayNames.get(acc) || acc;
 
       session = {
         id: ++seq,
         account: acc,
-        display: String(msg.name || acc).slice(0, 16),
+        display: disp,
         room: 'main',
         socket, send,
         pos: { x: 0, y: 0, z: 0, yaw: 0 },
         alive: true,
+        lastSeen: Date.now(),
         joinedAt: Date.now(),
       };
       sessions.set(acc, session);
@@ -267,6 +328,8 @@ function handleConn(socket) {
         const d = String(msg.name || '').trim().slice(0, 16);
         if (!d) break;
         session.display = d;
+        displayNames.set(session.account, d);
+        saveNames();
         broadcastRoom(session.room, { t: 'rename', account: session.account, display: d });
         log('rename', session.account, '->', d);
         break;
@@ -317,12 +380,27 @@ function log(...a) {
   console.log('[' + new Date().toISOString().slice(11, 19) + ']', ...a);
 }
 
-/* 心跳：每 25s ping，60s 无响应判定掉线 */
+/* 心跳：每 20 秒 ping 一次（浏览器会自动回 pong） */
 setInterval(() => {
   for (const s of sessions.values()) {
     try { s.socket.write(encodeFrame(Buffer.alloc(0), OP.PING)); } catch (e) { }
   }
-}, 25000).unref?.();
+}, 20000).unref?.();
+
+/* 半开连接清理：60 秒没有任何数据往来 → 认定连接已死，主动断开。
+   不清的话，僵尸连接会一直占着账号，别人登录时反而被当成「同号顶号」踢掉。 */
+setInterval(() => {
+  const now = Date.now();
+  for (const s of [...sessions.values()]) {
+    const idle = now - (s.lastSeen || now);
+    if (idle > IDLE_DEAD_MS) {
+      log('timeout', s.account, '静默' + Math.round(idle / 1000) + 's');
+      try { s.socket.destroy(); } catch (e) { }
+    }
+  }
+}, 10000).unref?.();
+
+loadNames();
 
 server.listen(PORT, HOST, () => {
   log('多人服务端已启动', HOST + ':' + PORT, '账号:', [...ACCOUNTS.keys()].join(','));

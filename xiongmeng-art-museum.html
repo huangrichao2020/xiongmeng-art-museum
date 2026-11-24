@@ -568,13 +568,26 @@
     box-shadow:0 4px 0 #d4801f;
   }
   .mp-go:active{transform:translateY(3px);box-shadow:0 1px 0 #d4801f}
-  .mp-skip{
-    width:100%;margin-top:10px;padding:8px 0;border-radius:15px;font-size:11px;font-weight:700;cursor:pointer;
-    background:rgba(255,255,255,.5);border:2px solid #dbe4f2;color:#7d89a3;
-  }
-  .mp-skip:hover{background:#fff;color:#5b6683}
   .mp-msg{margin-top:12px;font-size:11px;min-height:15px;text-align:center;font-weight:700;color:#7d89a3}
   .mp-msg.err{color:#e8607f}
+  /* 断线提示条：掉线时必须让人看见 —— 之前提示写进已经隐藏的登录卡片，
+     玩家只看到「别人不动了」，根本不知道是自己掉线了 */
+  #mp-net{
+    position:fixed;z-index:9200;left:50%;top:14px;transform:translateX(-50%) translateY(-26px);
+    display:flex;align-items:center;gap:9px;
+    padding:9px 17px;border-radius:19px;border:3px solid #fff;
+    background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(255,238,238,.94));
+    box-shadow:0 8px 22px rgba(20,40,80,.3);
+    color:#c0392b;font-size:12.5px;font-weight:800;letter-spacing:.4px;
+    opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;
+    font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  #mp-net.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  #mp-net .mp-dot{
+    width:9px;height:9px;border-radius:50%;background:#e8607f;flex:none;
+    animation:mp-blink 1s infinite ease-in-out;
+  }
+  @keyframes mp-blink{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
 
   /* 蛋仔风格 HUD：默认收成一颗「个人」按钮，点开才展开个人信息 */
   #mp-panel{
@@ -12327,8 +12340,34 @@ function updateAerialHaze(dt,t){
     lastSend: 0, sendHz: 15,
     reconnectAt: 0, tries: 0,
     onKicked: null,
+    /* ── 弱网/重连用的状态 ──
+       gen：连接「代数」。每次新建 WebSocket 递增一次，
+             旧连接的 onclose/onmessage 一律作废 ——
+             少了它，旧连接迟到的 close 事件会把刚建好的新连接也一起踢掉，
+             表现就是「刚连上又掉，掉完又连」，无限循环。
+       _deadline：必须收到 pong 的截止时间；超时 = 连接已经半开（弱网/息屏），
+             主动断开重连，比等浏览器几十分钟的 TCP 超时快得多。 */
+    gen: 0, _deadline: 0, _lastPing: 0, _hb: null,
+    _noReconnect: false,       // 登录被拒（密码错/账号不存在）时不再自动重试
   };
   window.MP = MP;
+
+  /* ── 显示 ID 的本地存档（改过的 ID 下次进去还在）──
+     按账号分开存：同一个账号一个 ID，换账号不会串味 */
+  MP.savedName = function () {
+    try {
+      const map = JSON.parse(localStorage.getItem('xm_mp_names') || '{}');
+      return map[MP.account] || '';
+    } catch (e) { return ''; }
+  };
+  MP.saveName = function (v) {
+    if (!MP.account) return;
+    try {
+      const map = JSON.parse(localStorage.getItem('xm_mp_names') || '{}');
+      if (v) map[MP.account] = v; else delete map[MP.account];
+      localStorage.setItem('xm_mp_names', JSON.stringify(map));
+    } catch (e) { }
+  };
 
   /* ── WebSocket URL：同源 wss ── */
   function wsURL() {
@@ -12358,7 +12397,6 @@ function updateAerialHaze(dt,t){
           <button data-a="test02" data-p="123456">test02</button>
         </div>
         <button id="mp-go" class="mp-go">进入展厅</button>
-        <button id="mp-skip" class="mp-skip">先逛逛（不联机）</button>
         <div class="mp-msg" id="mp-msg"></div>
       </div>`;
     document.body.appendChild(wrap);
@@ -12371,16 +12409,12 @@ function updateAerialHaze(dt,t){
     wrap.querySelectorAll('.mp-quick button').forEach(b => {
       b.onclick = () => { acc.value = b.dataset.a; pass.value = b.dataset.p; msg.textContent = ''; };
     });
-    wrap.querySelector('#mp-skip').onclick = () => {
-      hideLogin();
-      if (window.MP) MP.setSkipped(true);
-    };
     wrap.querySelector('#mp-go').onclick = () => {
       const a = acc.value.trim(), p = pass.value;
       if (!a || !p) { msg.textContent = '请填写账号和密码'; return; }
       msg.textContent = '连接中…';
       msg.className = 'mp-msg';
-      MP.connect(a, p);
+      MP.connect(a, p, true);
     };
     [acc, pass].forEach(el => {
       el.addEventListener('keydown', e => { if (e.key === 'Enter') wrap.querySelector('#mp-go').click(); });
@@ -12405,37 +12439,113 @@ function updateAerialHaze(dt,t){
   }
 
   /* ══════════════════════════════════════════════════════
-     连接
+     连接 / 断线重连
      ══════════════════════════════════════════════════════ */
-  MP.connect = function (account, pass) {
+  /* 断线提示条：独立于登录卡片（登录卡片这时是隐藏的，
+     之前提示写进隐藏的卡片里，玩家根本看不到，只觉得「别人不动了」）*/
+  function showNet(txt) {
+    let el = document.getElementById('mp-net');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'mp-net';
+      el.innerHTML = '<span class="mp-dot"></span><span id="mp-net-t"></span>';
+      document.body.appendChild(el);
+    }
+    const t = el.querySelector('#mp-net-t');
+    if (t) t.textContent = txt;
+    el.classList.add('on');
+  }
+  function hideNet() {
+    const el = document.getElementById('mp-net');
+    if (el) el.classList.remove('on');
+  }
+
+  /* 应用层心跳：每 8 秒 ping 一次，12 秒收不到 pong 就判定连接已经半开
+     —— 弱网/手机息屏时 TCP 不会立刻断，浏览器可能几十分钟都不报错，
+        只能靠应用层心跳自己发现，然后主动断开重连 */
+  function startBeat() {
+    stopBeat();
+    MP._lastPing = 0;
+    MP._hb = setInterval(() => {
+      if (!MP.connected) return;
+      const now = performance.now();
+      /* 连接已经不是 OPEN（CLOSING/CLOSED）→ 直接当断线处理，
+         不等心跳超时（关闭握手没走完时浏览器会一直卡在 CLOSING）*/
+      if (!MP.ws || MP.ws.readyState !== 1) { forceReconnect(); return; }
+      if (MP._deadline && now > MP._deadline) { forceReconnect(); return; }
+      if (now - MP._lastPing > 8000) {
+        MP._lastPing = now;
+        MP._deadline = now + 12000;
+        MP.send({ t: 'ping' });
+      }
+    }, 2000);
+  }
+  function stopBeat() {
+    if (MP._hb) { clearInterval(MP._hb); MP._hb = null; }
+    MP._deadline = 0;
+  }
+  /* 主动掐掉半开的连接，交给统一的重连逻辑 */
+  function forceReconnect() {
+    const ws = MP.ws;
+    MP.ws = null;
+    if (ws) {
+      try { ws.onclose = null; ws.onmessage = null; ws.onerror = null; ws.close(); } catch (e) { }
+    }
+    MP.connected = false;
+    MP.clearPeers();
+    stopBeat();
+    scheduleReconnect();
+  }
+  /* 退避重连：0.8s → 1.2s → 1.9s … 封顶 6s，额外 ±25% 抖动
+     （多台设备同时断线时避免一起冲上来）*/
+  function scheduleReconnect() {
+    MP.tries++;
+    const base = Math.min(6000, 800 * Math.pow(1.55, Math.max(0, MP.tries - 1)));
+    const wait = Math.round(base * (0.75 + Math.random() * 0.5));
+    showNet('连接断开，正在重连' + (MP.tries > 1 ? '（第 ' + MP.tries + ' 次）' : '') + '…');
+    clearTimeout(MP._rt);
+    MP._rt = setTimeout(() => { MP.connect(MP.account, MP._pass, true); }, wait);
+  }
+
+  MP.connect = function (account, pass, force) {
     MP.account = account; MP._pass = pass;
-    if (MP.ws) { try { MP.ws.close(); } catch (e) { } }
+    MP._noReconnect = false;
+    MP._kicked = false;      // 手动登录时清掉「被顶号」标记，否则第一次断线会被误当成被踢
+    /* 同一时刻只留一条连接：正在连接/已连接时不再新建 ——
+       否则两条连接会把对方的 close 当成断线，来回互踢 */
+    if (MP.ws) {
+      const st = MP.ws.readyState;
+      if ((st === 0 || st === 1) && !force) return;
+      const old = MP.ws; MP.ws = null;
+      try { old.onclose = null; old.onmessage = null; old.onerror = null; old.close(); } catch (e) { }
+    }
+    const gen = ++MP.gen;
     let ws;
     try { ws = new WebSocket(wsURL()); }
-    catch (e) { setMsg('无法建立连接：' + e.message, 'err'); return; }
+    catch (e) { setMsg('无法建立连接：' + e.message, 'err'); scheduleReconnect(); return; }
     MP.ws = ws;
 
     ws.onopen = () => {
-      MP.tries = 0;
-      ws.send(JSON.stringify({ t: 'login', account, pass }));
+      if (gen !== MP.gen) return;
+      /* 连稳 8 秒后才把退避计数清零 —— 连上就立刻掉的话，
+         退避永远停在 0.8 秒，会把服务端打爆 */
+      setTimeout(() => { if (gen === MP.gen && MP.connected) MP.tries = 0; }, 8000);
+      ws.send(JSON.stringify({ t: 'login', account, pass, name: MP.savedName() }));
     };
     ws.onmessage = ev => {
+      if (gen !== MP.gen) return;      // 旧连接迟到的消息一律忽略
       let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
       MP.onMsg(m);
     };
     ws.onclose = () => {
+      if (gen !== MP.gen) return;      // 已被新连接取代，忽略
       MP.connected = false;
       MP.clearPeers();
+      stopBeat();
       if (MP.onKicked) { MP.onKicked(); return; }
-      if (MP._kicked) {          // 被顶号：不再自动重连（否则会反过来把新登录踢掉）
-        MP._kicked = false;
-        return;
-      }
-      MP.tries++;
-      const wait = Math.min(8000, 1200 * MP.tries);
-      setMsg('连接断开，' + Math.round(wait / 1000) + ' 秒后重连…', 'err');
-      clearTimeout(MP._rt);
-      MP._rt = setTimeout(() => { MP.connect(MP.account, MP._pass); }, wait);
+      if (MP._kicked) { MP._kicked = false; return; }   // 被顶号：不自动重连
+      if (MP._noReconnect) return;                       // 账号密码被拒：不自动重试
+      scheduleReconnect();
     };
     ws.onerror = () => { };
   };
@@ -12451,8 +12561,12 @@ function updateAerialHaze(dt,t){
       case 'welcome': {
         MP.connected = true;
         MP.display = m.you.display || MP.account;
+        hideNet();
         setMsg('');
         hideLogin();
+        startBeat();
+        /* 显示 ID 存档：服务端记住的那份为准，本地也存一份，下次进去还是它 */
+        if (MP.display && MP.display !== MP.account) MP.saveName(MP.display);
         MP.clearPeers();
         (m.players || []).forEach(pl => {
           if (pl.account !== MP.account) MP.addPeer(pl);
@@ -12521,11 +12635,14 @@ function updateAerialHaze(dt,t){
       }
       case 'kicked': {
         MP._kicked = true;        // 标记被顶号，禁止自动重连
+        MP._noReconnect = true;
+        hideNet();
         try { localStorage.removeItem('xm_mp_acc'); localStorage.removeItem('xm_mp_pass'); } catch (e) { }
         MP.onKicked = function () {
           MP.onKicked = null;
           MP.connected = false;
           MP.clearPeers();
+          stopBeat();
           /* 被顶号 = 联机结束，第三人称一并关掉（否则相机没人写，画面冻住）*/
           MP.third = false;
           if (MP.self) MP.self.visible = false;
@@ -12542,15 +12659,36 @@ function updateAerialHaze(dt,t){
         MP.onKicked();
         break;
       }
-      case 'err': {
-        setMsg(m.msg || '登录失败', 'err');
-        MP.onKicked = null;   // 防止 close 时反复重连
-        /* 服务端判定「该账号已在别处登录」→ 明确停止自动重连，
-           否则会被踢 → 重连 → 再顶掉对方，无限互踢 */
-        if (m.code === 'kicked') MP._kicked = true;
-        try { MP.ws.close(); } catch (e) { }
-        MP.ws = null;
+      case 'pong': {
+        MP._deadline = 0;         // 心跳有回音 → 连接是活的
         break;
+      }
+      case 'err': {
+        const code = m.code || '';
+        if (code === 'retry') {
+          /* 服务端说「这个号刚被顶过，过会儿再试」→ 账号没错，保留登录信息稍后重试 */
+          MP._noReconnect = true;
+          showNet('稍后重试…');
+          clearTimeout(MP._rt);
+          MP._rt = setTimeout(() => { MP.connect(MP.account, MP._pass, true); }, 3500);
+          return;
+        }
+        if (code === 'kicked') {
+          /* 真被顶号：停掉自动重连，清账号，等用户重新登录 */
+          MP._kicked = true;
+          MP._noReconnect = true;
+          hideNet();
+          try { localStorage.removeItem('xm_mp_acc'); localStorage.removeItem('xm_mp_pass'); } catch (e) { }
+          showLogin();
+          setMsg(m.msg || '该账号在别处登录', 'err');
+          return;
+        }
+        /* 账号不存在 / 密码错误：停下来让用户改，别一直重试刷服务端 */
+        MP._noReconnect = true;
+        hideNet();
+        setMsg(m.msg || '登录失败', 'err');
+        showLogin();
+        return;
       }
       case 'chat': {
         if (window.MP_UI) MP_UI.pushChat(m);
@@ -12706,90 +12844,155 @@ function updateAerialHaze(dt,t){
      —— 蛋仔派对的主角本身就是一颗蛋，造型越圆润越像那个味儿 */
   function buildAvatar(colorHex) {
     const g = new THREE.Group();
+    const baseCol = new THREE.Color(colorHex);
     const bodyM = new THREE.MeshStandardMaterial({
       color: colorHex, roughness: .62, metalness: .03,
       emissive: new THREE.Color(colorHex).multiplyScalar(.22), emissiveIntensity: .5
     });
     const snowM = new THREE.MeshStandardMaterial({ color: 0xfdfdff, roughness: .78, metalness: 0 });
+    const furM = new THREE.MeshStandardMaterial({ color: 0xfff0d8, roughness: .92 });
     const darkM = new THREE.MeshStandardMaterial({ color: 0x2b3242, roughness: .42 });
     const blushM = new THREE.MeshStandardMaterial({ color: 0xff9db4, roughness: .85 });
+    const scarfM = new THREE.MeshStandardMaterial({ color: 0xd23b32, roughness: .78 });
+    const innerM = new THREE.MeshStandardMaterial({ color: 0xf3a3b5, roughness: .85 });
+    const giftM = new THREE.MeshStandardMaterial({ color: 0xe14b45, roughness: .68 });
+    const ribM = new THREE.MeshStandardMaterial({ color: 0xffd166, roughness: .45, metalness: .2 });
 
-    /* 蛋形身体：用球体压扁 + 上小下大的蛋轮廓（半径往下收）*/
-    const body = new THREE.Mesh(new THREE.SphereGeometry(.46, 24, 18), bodyM);
-    body.position.y = .74; body.scale.set(.92, 1.12, .92);
+    /* 身体 = 大衣本体：蛋形上小下大
+       —— 半宽 .308（上一版 .423，瘦了 27%），头顶 1.69（上一版 1.80），整体小一圈 */
+    const body = new THREE.Mesh(new THREE.SphereGeometry(.385, 20, 14), bodyM);
+    body.position.y = .69; body.scale.set(.80, 1.10, .80);
     body.castShadow = true;
     g.add(body);
 
-    /* 蛋壳上缘的小尖（蛋仔头顶那撮毛）*/
-    const tuft = new THREE.Mesh(new THREE.ConeGeometry(.075, .17, 8), bodyM);
-    tuft.position.y = 1.24; tuft.rotation.z = .22;
-    g.add(tuft);
+    /* 白肚兜（衣服的前襟）：贴在大衣前面，只占胸口一小块，
+       上一版做得太大，整颗蛋都被白球盖住了 */
+    const bib = new THREE.Mesh(new THREE.SphereGeometry(.17, 16, 12), snowM);
+    bib.position.set(0, .62, .24); bib.scale.set(1, .9, .5);
+    g.add(bib);
 
-    /* 白肚皮 */
-    const belly = new THREE.Mesh(new THREE.SphereGeometry(.34, 20, 14), snowM);
-    belly.position.set(0, .68, .17); belly.scale.set(1, 1.12, .62);
-    g.add(belly);
+    /* 奶油毛领（服饰）：脖子一圈厚毛边 */
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(.235, .07, 8, 18), furM);
+    collar.position.y = 1.01; collar.rotation.x = Math.PI / 2; collar.scale.set(1, 1, .9);
+    g.add(collar);
 
-    /* 大圆头（蛋仔的头身比很夸张）*/
-    const head = new THREE.Mesh(new THREE.SphereGeometry(.36, 24, 18), bodyM);
-    head.position.y = 1.44; head.scale.set(1, .96, 1);
+    /* 红围巾（服饰）+ 垂下来的围巾尾 */
+    const scarf = new THREE.Mesh(new THREE.TorusGeometry(.215, .085, 8, 18), scarfM);
+    scarf.position.y = 1.13; scarf.rotation.x = Math.PI / 2; scarf.scale.set(1, 1, .85);
+    g.add(scarf);
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(.13, .30, .06), scarfM);
+    tail.position.set(.16, .95, .17); tail.rotation.z = -.20;
+    g.add(tail);
+
+    /* 腰带（服饰）：腰上一圈深色带子（在肚兜下方，才看得见）*/
+    const belt = new THREE.Mesh(new THREE.TorusGeometry(.25, .028, 6, 20), darkM);
+    belt.position.y = .44; belt.rotation.x = Math.PI / 2; belt.scale.set(1, 1, .88);
+    g.add(belt);
+
+    /* 纽扣（服饰）：肚兜上两颗，凸出前襟一点才看得见 */
+    for (const by of [.66, .56]) {
+      const b = new THREE.Mesh(new THREE.SphereGeometry(.024, 8, 6), darkM);
+      b.position.set(0, by, by > .6 ? .330 : .326);
+      g.add(b);
+    }
+
+    /* 大圆头（比上一版小一圈：半径 .325）*/
+    const head = new THREE.Mesh(new THREE.SphereGeometry(.325, 20, 14), bodyM);
+    head.position.y = 1.38; head.scale.set(1, .96, 1);
     head.castShadow = true;
     g.add(head);
 
-    /* 眼睛：黑豆眼 + 高光（蛋仔的招牌表情）*/
+    /* 熊耳朵（耳朵）：头顶两只圆耳朵 + 粉色耳心
+       —— 放在头顶偏后（z=-.02）而不是两侧，否则会被脑袋挡住看不见 */
     for (const s of [-1, 1]) {
-      const e = new THREE.Mesh(new THREE.SphereGeometry(.052, 10, 10), darkM);
-      e.position.set(s * .125, 1.47, .30); e.scale.set(1, 1.12, .7);
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(.105, 12, 8), bodyM);
+      ear.position.set(s * .13, 1.70, -.02);
+      ear.scale.set(1, 1.05, .9);
+      ear.rotation.z = -s * .18;
+      ear.castShadow = true;
+      g.add(ear);
+      const ie = new THREE.Mesh(new THREE.SphereGeometry(.052, 8, 6), innerM);
+      ie.position.set(s * .13, 1.705, .055);
+      ie.scale.set(1, 1, .5);
+      ie.rotation.z = -s * .18;
+      g.add(ie);
+    }
+
+    /* 眼睛：黑豆眼 + 高光；腮红；小嘴
+       —— 每一件的位置都按「头部球面实际半径」往外推一点，不然会埋进脑袋里看不见 */
+    for (const s of [-1, 1]) {
+      const e = new THREE.Mesh(new THREE.SphereGeometry(.05, 8, 6), darkM);
+      e.position.set(s * .105, 1.405, .285); e.scale.set(1, 1.12, .7);
       g.add(e);
-      const gl = new THREE.Mesh(new THREE.SphereGeometry(.019, 8, 8), snowM);
-      gl.position.set(s * .125 - .014, 1.51, .335);
+      const gl = new THREE.Mesh(new THREE.SphereGeometry(.018, 6, 5), snowM);
+      gl.position.set(s * .092, 1.44, .312);
       g.add(gl);
       /* 腮红 */
-      const bl = new THREE.Mesh(new THREE.CircleGeometry(.072, 14), blushM);
-      bl.position.set(s * .225, 1.37, .27); bl.rotation.y = s * .3;
+      const bl = new THREE.Mesh(new THREE.SphereGeometry(.065, 10, 8), blushM);
+      bl.position.set(s * .175, 1.325, .245); bl.scale.set(1, .85, .4);
       g.add(bl);
     }
     /* 小嘴（弧线）*/
-    const mouth = new THREE.Mesh(new THREE.TorusGeometry(.055, .013, 6, 14, Math.PI), darkM);
-    mouth.position.set(0, 1.345, .305); mouth.rotation.z = Math.PI;
+    const mouth = new THREE.Mesh(new THREE.TorusGeometry(.05, .012, 6, 12, Math.PI), darkM);
+    mouth.position.set(0, 1.305, .312); mouth.rotation.z = Math.PI;
     g.add(mouth);
 
-    /* 围巾（蛋仔常戴的那种宽围巾）*/
-    const scarfM = new THREE.MeshStandardMaterial({ color: 0xd23b32, roughness: .78 });
-    const scarf = new THREE.Mesh(new THREE.TorusGeometry(.30, .095, 10, 24), scarfM);
-    scarf.position.y = 1.14; scarf.rotation.x = Math.PI / 2; scarf.scale.set(1, 1, .8);
-    g.add(scarf);
-    const tail = new THREE.Mesh(new THREE.BoxGeometry(.15, .34, .07), scarfM);
-    tail.position.set(.20, .98, .18); tail.rotation.z = -.18;
-    g.add(tail);
+    /* 小背包（单品）：背后一个方方的小包 + 翻盖 + 两条肩带
+       —— 上一版是个圆球，远看只像一坨贴上去的圆饼，认不出是包 */
+    const bagM = new THREE.MeshStandardMaterial({ color: 0x8d5b43, roughness: .85 });
+    const bag = new THREE.Mesh(new THREE.BoxGeometry(.30, .32, .17), bagM);
+    bag.position.set(0, .72, -.30);
+    bag.castShadow = true;
+    g.add(bag);
+    const flap = new THREE.Mesh(new THREE.BoxGeometry(.32, .13, .19), furM);
+    flap.position.set(0, .84, -.30);
+    g.add(flap);
+    /* 肩带：从包顶绕过肩膀的两条带子 */
+    for (const s of [-1, 1]) {
+      const st = new THREE.Mesh(new THREE.BoxGeometry(.045, .30, .045), furM);
+      st.position.set(s * .105, .72, -.20); st.rotation.x = -.38;
+      g.add(st);
+    }
 
     /* 圆脚：每只脚挂一个 footGrp，跳跃时整只脚能一起抬起/前伸 */
     const feet = [];
     for (const s of [-1, 1]) {
       const fg = new THREE.Group();
-      const ft = new THREE.Mesh(new THREE.SphereGeometry(.155, 12, 10), darkM);
-      ft.position.set(s * .19, .13, .04); ft.scale.set(1, .72, 1.35);
+      const ft = new THREE.Mesh(new THREE.SphereGeometry(.135, 10, 8), darkM);
+      ft.position.set(s * .165, .125, .035); ft.scale.set(1, .72, 1.3);
       fg.add(ft);
       /* 脚底白边 */
-      const sole = new THREE.Mesh(new THREE.SphereGeometry(.15, 12, 10), snowM);
-      sole.position.set(s * .19, .085, .04); sole.scale.set(1, .5, 1.3);
+      const sole = new THREE.Mesh(new THREE.SphereGeometry(.13, 10, 8), snowM);
+      sole.position.set(s * .165, .08, .035); sole.scale.set(1, .5, 1.25);
       fg.add(sole);
       g.add(fg);
       feet.push(fg);
     }
-    /* 短胖小手（蛋仔的手臂很短粗）
-       —— 手挂在「肩关节组」里，肩组再挂到身体组，
-          这样走路时是「肩绕身体转」，而不是整个球体平移 */
+    /* 短手：挂在「肩关节组」里，肩组再挂到身体组，
+       这样走路时是「肩绕身体转」，而不是整个球体平移 */
     const shoulders = [];
     for (const s of [-1, 1]) {
       const shoulder = new THREE.Group();
-      shoulder.position.set(s * .40, .92, 0);
-      const arm = new THREE.Mesh(new THREE.SphereGeometry(.135, 12, 10), bodyM);
-      arm.position.set(0, -.10, .05); arm.scale.set(1, 1.25, .9);
+      shoulder.position.set(s * .27, .90, 0);
+      const arm = new THREE.Mesh(new THREE.SphereGeometry(.11, 10, 8), bodyM);
+      arm.position.set(0, -.10, .04); arm.scale.set(1, 1.25, .9);
       arm.castShadow = true;
       shoulder.add(arm);
       g.add(shoulder);
       shoulders.push(shoulder);
+
+      /* 单品：右手捧一个圣诞礼物盒，走路时跟着手一起晃 */
+      if (s === 1) {
+        const box = new THREE.Mesh(new THREE.BoxGeometry(.13, .11, .13), giftM);
+        box.position.set(0, -.32, .13); box.rotation.y = .3;
+        shoulder.add(box);
+        const rb1 = new THREE.Mesh(new THREE.BoxGeometry(.03, .125, .135), ribM);
+        rb1.position.copy(box.position); rb1.rotation.copy(box.rotation);
+        shoulder.add(rb1);
+        const rb2 = new THREE.Mesh(new THREE.BoxGeometry(.135, .03, .135), ribM);
+        rb2.position.copy(box.position); rb2.rotation.copy(box.rotation);
+        shoulder.add(rb2);
+      }
     }
     /* 身体组：跑动时整体前后倾 + 上下弹（蛋仔的「软」重心）*/
     const bodyGrp = new THREE.Group();
@@ -12917,9 +13120,10 @@ function updateAerialHaze(dt,t){
       f.position.z = footFwd;
       f.rotation.x = footTilt;
     }
-    /* 名牌贴着头顶：身体拉伸/压扁时一起升降，别悬在半空 */
+    /* 名牌贴着头顶：身体拉伸/压扁时一起升降，别悬在半空
+       （角色改小后头顶到 1.81，牌子跟着降）*/
     const tg = avatar.userData.tag;
-    if (tg) tg.position.y = 1.80 * sy + .22;
+    if (tg) tg.position.y = 1.81 * sy + .24;
     return inAir;
   }
 
@@ -12989,7 +13193,24 @@ function updateAerialHaze(dt,t){
     MP._lastX = x; MP._lastY = y || 0; MP._lastZ = z; MP._lastYaw = yaw || 0;
   };
 
-  /* 诊断接口：给自动化测试读状态用 */
+  /* 把相机钉死在一个机位（自动化截图用）：
+     第三人称相机每帧都会改相机位置和朝向，钉死后才能拍到指定角度 */
+  MP.freezeCam = function (px, py, pz, tx, ty, tz) {
+    if (!MP._camFrozen) {
+      MP._camFrozen = true;
+      camera.position.lerp = function () { return this; };
+      camera.quaternion.slerp = function () { return this; };
+      camera.lookAt = function () { return this; };
+    }
+    camera.position.set(px, py, pz);
+    camera.up.set(0, 1, 0);
+    const m = new THREE.Matrix4().lookAt(
+      camera.position, new THREE.Vector3(tx, ty, tz), camera.up);
+    camera.quaternion.setFromRotationMatrix(m);
+    return MP.debug();
+  };
+
+  /* 调试接口：给自动化测试读状态用 */
   MP.debug = function () {
     const peers = {};
     for (const p of MP.peers.values()) {
@@ -13023,7 +13244,7 @@ function updateAerialHaze(dt,t){
         const d = new THREE.Vector3();
         camera.getWorldDirection(d);
         return {
-          head: pr(1.80), feet: pr(0),
+          head: pr(1.70), feet: pr(0),
           camPitchDeg: +(Math.asin(Math.max(-1, Math.min(1, d.y))) * 180 / Math.PI).toFixed(2)
         };
       })() : null,
@@ -13192,6 +13413,7 @@ function updateAerialHaze(dt,t){
       if (!v) return;
       MP.send({ t: 'name', name: v });
       MP.display = v;
+      MP.saveName(v);          // 存下来，下次进去还是这个 ID
       if (MP.selfTag) {
         const s2 = makeTagSprite(v, '#ffd9a0');
         MP.selfTag.material.map.dispose();
@@ -13205,9 +13427,12 @@ function updateAerialHaze(dt,t){
     nameI.addEventListener('keydown', e => { if (e.key === 'Enter') p.querySelector('#mp-save').click(); });
     p.querySelector('#mp-third').onclick = () => MP.toggleThird();
     p.querySelector('#mp-logout').onclick = () => {
-      try { MP.ws && MP.ws.close(); } catch (e) { }
+      try { if (MP.ws) { MP.ws.onclose = null; MP.ws.close(); } } catch (e) { }
       MP.ws = null; MP.connected = false; MP.onKicked = null; MP._kicked = true;
+      MP._noReconnect = true;
       MP.clearPeers();
+      stopBeat();
+      hideNet();
       /* 退出联机 = 回到纯单机：第三人称随之关闭，
          不然 MP.third 残留 true 会让第一人称和多人模块都不写相机 → 画面冻住 */
       MP.third = false;
@@ -13281,12 +13506,33 @@ function updateAerialHaze(dt,t){
       }
       origLogin(m);
     };
-  };
 
-  /* 「先逛逛」：不登录也能进场景，多人面板收起 */
-  MP.setSkipped = function (v) {
-    MP.skipped = !!v;
-    if (MP._panel) MP._panel.p.style.display = v ? 'none' : '';
+    /* ── 弱网 / 后台回来时的补救 ──
+       手机切后台、锁屏、断 Wi-Fi 换流量之后，浏览器的 WebSocket
+       常常既不报错也不重连（半开）。这里用可见性和网络状态两个信号
+       把连接立刻拉起来，不用干等心跳超时。 */
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      if (MP.connected) {
+        /* 回到前台先探一下：6 秒内没有回音就当连接已死 */
+        MP._lastPing = 0;
+        MP._deadline = performance.now() + 6000;
+        MP.send({ t: 'ping' });
+      } else if (MP.account) {
+        MP.tries = 0;
+        MP.connect(MP.account, MP._pass, true);
+      }
+    });
+    window.addEventListener('online', () => {
+      if (MP.connected) { MP.send({ t: 'ping' }); return; }
+      if (!MP.account) return;
+      MP.tries = 0;
+      MP.connect(MP.account, MP._pass, true);
+    });
+    window.addEventListener('pagehide', () => {
+      /* 页面被关掉/切走时，主动断开，别留一个僵尸连接占着账号 */
+      try { if (MP.ws) { MP.ws.onclose = null; MP.ws.close(); } } catch (e) { }
+    });
   };
 
   MP.setThird = function (v) {
