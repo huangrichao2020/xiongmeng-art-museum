@@ -1,0 +1,9 @@
+{
+  "name": "xm-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "熊萌艺术馆 · AI 取景录制服务",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "playwright-core": "^1.47.0" }
+}
