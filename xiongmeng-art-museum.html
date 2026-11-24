@@ -726,8 +726,16 @@ const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-per
    并把泛光降到 0.35 倍分辨率，再配合阴影降频，手机上才跑得动。 */
 const _forceMobile=new URLSearchParams(location.search).has('mobile');
 const IS_TOUCH_DEV=_forceMobile||('ontouchstart' in window)||(navigator.maxTouchPoints>0)||innerWidth<820;
-const HI_DPR=IS_TOUCH_DEV?Math.min(devicePixelRatio||1,1.15):Math.min(devicePixelRatio||1,1.55);
-const LO_DPR=Math.min(HI_DPR,IS_TOUCH_DEV?.92:1.05);
+/* ── 渲染分辨率：按「渲染像素总量」封顶，不再粗暴砍 DPR ──
+   旧策略移动端固定 1.15、低画质档 0.92（甚至低于 CSS 像素的 1 倍），
+   在 iPhone DPR=3 屏上等于把画面放大 2.6~3.3 倍 → 整屏发糊 + 像素块。
+   现按像素预算换算：iPhone 按 2x 渲染（原生像素的 44%，总负载仍只有桌面的 ~1/4），
+   低画质档下限锁死 1.0，绝不再出现 <1 的马赛克。 */
+const _dprRaw=Math.max(1,devicePixelRatio||1);
+const _pxBudget=IS_TOUCH_DEV?2.1e6:6.2e6;
+const _dprFit=Math.sqrt(_pxBudget/Math.max(1,innerWidth*innerHeight));
+const HI_DPR=Math.max(1,Math.min(_dprRaw,IS_TOUCH_DEV?2:1.55,_dprFit));
+const LO_DPR=Math.max(1,Math.min(HI_DPR,IS_TOUCH_DEV?1.25:1.05));
 renderer.setPixelRatio(HI_DPR);
 renderer.setSize(innerWidth,innerHeight);
 renderer.shadowMap.enabled=true;
@@ -766,7 +774,10 @@ controls.autoRotateSpeed=.55;
 const HOME={pos:camera.position.clone(),tgt:controls.target.clone()};
 
 /* ── 后期：日系二次元电影感三渲二管线 (2x MSAA Render -> 柔化细描边&新海诚调色 -> 柔和Bloom -> ACES) ── */
-const _msaaSamples=IS_TOUCH_DEV?0:Math.min(2,renderer.capabilities.maxSamples||2);   // 触屏关 MSAA，像素比已降，开着白费
+/* 移动端同样开 2x MSAA：composer 走 RenderTarget，renderer 的 antialias:true 对它无效，
+   触屏关 MSAA = 零抗锯齿，斑马线 / 栏杆 / 远景轮廓全是硬毛刺。
+   像素比提到 2x 后总渲染负载仍只有桌面的 ~1/4，2x MSAA 的带宽开销吃得下。 */
+const _msaaSamples=Math.min(2,renderer.capabilities.maxSamples||2);
 const _composerRT=new THREE.WebGLRenderTarget(Math.max(1,Math.round(innerWidth*HI_DPR)),Math.max(1,Math.round(innerHeight*HI_DPR)),{type:THREE.HalfFloatType,samples:_msaaSamples});
 const composer=new EffectComposer(renderer,_composerRT);
 composer.addPass(new RenderPass(scene,camera));
@@ -841,16 +852,25 @@ bloom.setSize=(w,h)=>_bloomSetSize(Math.max(64,Math.round(w*BLOOM_SCALE)),Math.m
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 composer.setPixelRatio(renderer.getPixelRatio());
+/* 所有像素比切换统一走这里：animePass 的 Sobel 描边核按 uRes 采样，
+   像素比一变就必须同步，否则描边核被拉大 → 额外一层毛刺。 */
+function applyDpr(r){
+  renderer.setPixelRatio(r);
+  composer.setPixelRatio(r);
+  if(animePass&&animePass.uniforms&&animePass.uniforms.uRes){
+    animePass.uniforms.uRes.value.set(Math.max(1,innerWidth*r),Math.max(1,innerHeight*r));
+  }
+}
 
 /* ── 灯光（冬夜清澈天光补色，消除灰雾感，保持夜景高对比通透度） ─────────── */
 const ambient=new THREE.AmbientLight(0x324966,.46); scene.add(ambient);
 const hemi=new THREE.HemisphereLight(0x5c82b0,0x162230,.62); scene.add(hemi);
 const key=new THREE.DirectionalLight(0xc2dbf6,.52);
 key.castShadow=true;
-key.shadow.mapSize.set(IS_TOUCH_DEV?1024:1536,IS_TOUCH_DEV?1024:1536);
+key.shadow.mapSize.set(1536,1536);
 key.shadow.radius=3.2;
 { // 阴影相机：触屏端收窄到 ±38m，阴影贴图精度直接提升约 2 倍
-  const SH=IS_TOUCH_DEV?38:56;
+  const SH=IS_TOUCH_DEV?34:56;
   key.shadow.camera.left=-SH;key.shadow.camera.right=SH;
   key.shadow.camera.top=SH;key.shadow.camera.bottom=-SH;
 }
@@ -10195,7 +10215,9 @@ const TIMES=[
   {k:'dusk', name:'暮',h:17.5,weather:'雪霞',sky:['#263b68','#995878','#f0a46c','rgba(255,176,105,.65)'],fog:0x9b746a,fogD:.0082},
   {k:'night',name:'夜',h:21.5,weather:'雪夜',sky:WINTER_SKY,fog:WINTER_FOG,fogD:WINTER_FOG_D}
 ];
-const state={timeKey:'night',hour:21.5,lights:true,quality:false,envDirty:true,stars:true,clean:true};
+/* 移动端默认开高画质档：低画质档会关掉 uHQ 抗闪烁柔光和 Bloom，
+   在低像素比下远处路灯会闪成噪点，整屏发脏。桌面维持原样。 */
+const state={timeKey:'night',hour:21.5,lights:true,quality:IS_TOUCH_DEV,envDirty:true,stars:true,clean:true};
 let rainLevel=0,resetPerf=true;
 const rSeason=document.getElementById('r-season'),rWeather=document.getElementById('r-weather'),
       rTime=document.getElementById('r-time'),rTemp=document.getElementById('r-temp'),
@@ -10300,8 +10322,7 @@ function applyQualityMode(on){
     }
   }
   const targetDpr=state.quality?HI_DPR:LO_DPR;
-  renderer.setPixelRatio(targetDpr);
-  composer.setPixelRatio(targetDpr);
+  applyDpr(targetDpr);
   if(animePass&&animePass.uniforms){
     animePass.uniforms.uHQ.value=state.quality?1.0:0.0;
     animePass.uniforms.uRes.value.set(Math.max(1,innerWidth*targetDpr),Math.max(1,innerHeight*targetDpr));
@@ -10325,7 +10346,7 @@ for(const id of ['w-quality','w-quality-top']){
     sfx.blip(state.quality?780:520,.08,.06);
   };
 }
-applyQualityMode(false);
+applyQualityMode(state.quality);
 document.getElementById('t-lights').onclick=function(){
   state.lights=!state.lights;this.classList.toggle('on',state.lights);
 };
@@ -11907,12 +11928,21 @@ function animate(){
   if(nowMs-fpsT0>500){
     const f=Math.round(fpsFrames*1000/(nowMs-fpsT0));
     fpsEl.textContent=f+' FPS';
-    if(!ridingFast&&!state.quality){
+    /* 移动端：掉帧连续 3 次降到低分辨率档，回稳后连续 6 次升回高清档
+       （旧逻辑只降不升，掉一次帧就永久留在低分辨率，越看越糊）。
+       桌面：只有低画质档才允许自动调节，高画质档用户点了就不动。 */
+    if(!ridingFast&&IS_TOUCH_DEV){
       if(f<36){
         window._lowFpsStreak=(window._lowFpsStreak||0)+1;window._hiFpsStreak=0;
-        if(window._lowFpsStreak>=3&&renderer.getPixelRatio()>LO_DPR+.05){
-          renderer.setPixelRatio(LO_DPR);composer.setPixelRatio(LO_DPR);
-        }
+        if(window._lowFpsStreak>=3&&renderer.getPixelRatio()>LO_DPR+.05)applyDpr(LO_DPR);
+      }else if(f>54&&renderer.getPixelRatio()<HI_DPR-.05){
+        window._hiFpsStreak=(window._hiFpsStreak||0)+1;window._lowFpsStreak=0;
+        if(window._hiFpsStreak>=6)applyDpr(HI_DPR);
+      }
+    }else if(!ridingFast&&!state.quality){
+      if(f<36){
+        window._lowFpsStreak=(window._lowFpsStreak||0)+1;window._hiFpsStreak=0;
+        if(window._lowFpsStreak>=3&&renderer.getPixelRatio()>LO_DPR+.05)applyDpr(LO_DPR);
       }
     }
     fpsFrames=0;fpsT0=nowMs;
@@ -11931,8 +11961,9 @@ addEventListener('resize',()=>{
   renderer.setSize(innerWidth,innerHeight);
   composer.setSize(innerWidth,innerHeight);
   bloom.setSize(Math.max(64,Math.round(innerWidth*BLOOM_SCALE)),Math.max(64,Math.round(innerHeight*BLOOM_SCALE)));
+  const _rdpr=renderer.getPixelRatio();
   if(animePass&&animePass.uniforms&&animePass.uniforms.uRes){
-    animePass.uniforms.uRes.value.set(Math.max(1,innerWidth*HI_DPR),Math.max(1,innerHeight*HI_DPR));
+    animePass.uniforms.uRes.value.set(Math.max(1,innerWidth*_rdpr),Math.max(1,innerHeight*_rdpr));
   }
 });
 
@@ -12441,7 +12472,7 @@ const trainBtnEl=document.getElementById('train-btn');
 function toggleRideTrain(){
   if(trainSys.riding){
     trainSys.riding=false;
-    renderer.setPixelRatio(HI_DPR);composer.setPixelRatio(HI_DPR);
+    applyDpr(HI_DPR);
     const caboose=trainCars[trainCars.length-1];
     const p=caboose.position;
     const outX=p.x>=0?-3.2:3.2;
@@ -12453,7 +12484,7 @@ function toggleRideTrain(){
   }else{
     if(!fp.on)enterWalk();
     trainSys.riding=true;
-    renderer.setPixelRatio(LO_DPR);composer.setPixelRatio(LO_DPR);
+    applyDpr(LO_DPR);
     sfx.blip(880,.12,.08);
   }
 }
@@ -12463,7 +12494,7 @@ const RIDE_EXITS={
 };
 function stopFacilityRide(){
   if(wheelSys.cab&&wheelSys.cab.userData.rods)wheelSys.cab.userData.rods.forEach(r=>r.visible=true);
-  if(wheelSys.kind==='coaster'){camera.up.set(0,1,0);renderer.setPixelRatio(HI_DPR);composer.setPixelRatio(HI_DPR);}
+  if(wheelSys.kind==='coaster'){camera.up.set(0,1,0);applyDpr(HI_DPR);}
   const ex=RIDE_EXITS[wheelSys.kind]||[4,24];
   wheelSys.riding=false;wheelSys.cab=null;wheelSys.kind=null;wheelSys.car=null;
   fp.x=ex[0];fp.z=ex[1];fp.y=0;fp.vx=fp.vz=0;
@@ -12475,7 +12506,7 @@ function toggleRideFacility(info){
   if(!fp.on)enterWalk();
   wheelSys.kind=info.kind;wheelSys.car=info.car||null;wheelSys.heli=info.heli||null;wheelSys.label=info.label||'游乐设施';
   wheelSys.riding=true;
-  if(info.kind==='coaster'){renderer.setPixelRatio(LO_DPR);composer.setPixelRatio(LO_DPR);}
+  if(info.kind==='coaster'){applyDpr(LO_DPR);}
   if(info.kind==='sleigh'){fp.yaw=flyingSleigh.rotation.y+Math.PI;fp.pitch=-.16;}
   if(info.kind==='heli'&&info.heli){fp.yaw=info.heli.g.rotation.y+Math.PI;fp.pitch=-.42;}
   sfx.blip(988,.14,.08);
@@ -12729,7 +12760,7 @@ function toggleFpvMode(force){
     fpvSys.active=true;
     fpvSys.bank=0;fpvSys.rollExtra=0;fpvSys.rollVel=0;fpvSys.manualRoll=0;
     fpvSys.fov=78;
-    renderer.setPixelRatio(LO_DPR);composer.setPixelRatio(LO_DPR);
+    applyDpr(LO_DPR);
     document.getElementById('fpv-osd').classList.add('show');
     const b1=document.getElementById('t-fpv'), b2=document.getElementById('w-fpv');
     if(b1)b1.classList.add('on');
@@ -12744,7 +12775,7 @@ function toggleFpvMode(force){
     if(b2)b2.classList.remove('on');
     camera.fov=60;camera.updateProjectionMatrix();
     camera.up.set(0,1,0);
-    renderer.setPixelRatio(HI_DPR);composer.setPixelRatio(HI_DPR);
+    applyDpr(HI_DPR);
     if(fpvSys.wasFp){
       fpEnter(true);
     }else{
