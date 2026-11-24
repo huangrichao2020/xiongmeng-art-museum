@@ -8243,14 +8243,15 @@ const METEOR_FS=`
       phase[idx]=R(0,Math.PI*2);
       const isStreak=(j%4===2);                    // 每 4 颗里 1 颗当拖尾微粒
       const isBig=(j%13===0)||j<6;                // 星头少数几颗放大过曝成白核
-      const szBase=isBig?R(2.4,4.0):R(1.0,2.6);
+      const szBase=isBig?R(2.0,3.3):R(.85,2.05);
       size[idx]=szBase*(1.0-.62*u)*(isStreak?.50:1)*(isBig?1.15:1);
       /* 颜色：主体柔和紫罗兰，只有星头几颗泛白 */
       if(u<.08) color.set([1.0,.97,1.0],idx*3);
       else if(u<.45) color.set([.58,.46,.92],idx*3);
       else color.set([.34,.28,.78],idx*3);
       /* 横向弥散：头部几乎成束，尾端散开 —— 由窄到宽的光带 */
-      const spread=(.25+2.4*u*u)*(isBig?.55:1);
+      /* 带宽：原来尾巴散到 2.65m 宽，看着粗；收到 1.6m → 更细长 */
+      const spread=(.16+1.45*u*u)*(isBig?.55:1);
       const ang=R(0,Math.PI*2);
       off[idx*4]=Math.cos(ang)*spread;
       off[idx*4+1]=Math.sin(ang)*spread;
@@ -8324,8 +8325,8 @@ function spawnWave(big){
   const n=big?Math.round(R(22,30)):Math.round(R(14,20));
   const D=R(230,340);
   const H=Math.max(innerHeight,1);
-  const headPx=H*(big?.30:.24);
-  const trailPx=H*(big?.24:.20);
+  const headPx=H*(big?.33:.27);
+  const trailPx=H*(big?.27:.23);
   for(let j=0;j<n;j++){
     const i=METEOR_BASE+(meteorWave.slot++%Math.max(METEOR_N-METEOR_BASE,1));
     const m=meteors[i];
@@ -8338,7 +8339,7 @@ function spawnWave(big){
 /* 常驻零星：单颗独奏 */
 function spawnBase(m){
   const H=Math.max(innerHeight,1);
-  placeMeteor(m,R(-1.2,1.1),R(.55,1.30),R(230,340),H*R(.20,.30),H*R(.17,.24),R(3.0,4.4),.62);
+  placeMeteor(m,R(-1.2,1.1),R(.55,1.30),R(230,340),H*R(.22,.32),H*R(.19,.26),R(3.0,4.4),.62);
 }
 /* 8 颗常驻零星：开场就位，错峰出发 */
 for(let i=0;i<METEOR_BASE;i++){const m=meteors[i];spawnBase(m);m.wait=R(.4,3.0);}
@@ -9930,6 +9931,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     add(g,new THREE.TorusGeometry(4.15,.07,8,36),giltM,0,.44,0).rotation.x=Math.PI/2;
     const spin=new THREE.Group();spin.position.y=.46;g.add(spin);
     spin.userData.physObj={type:'ride',ref:{kind:'carousel',label:'皇家圣诞旋转木马'}};
+    spin.userData.keep=true;   // 整盘一直在转，别被自动合批冻成静态雕塑
     amusement.carousel=spin;amusement.dyn.add(spin);
     amusement.horses=[];
     // 转盘木地板 + 中央八角鎏金镜柱
@@ -9996,17 +9998,14 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
         add(hg,new THREE.CapsuleGeometry(.045,.28,5,8),hMat,sx*.11,-.24,.28).rotation.x=-.55;
         add(hg,new THREE.CapsuleGeometry(.045,.28,5,8),hMat,sx*.11,-.26,-.28).rotation.x=.45;
       }
-      // 华丽红金马鞍 + 小熊骑士
+      // 华丽红金马鞍（马背上的小熊骑手已按要求删掉，只留鞍子）
       add(hg,BX(.34,.12,.32),sadMat,0,.20,-.02);
       add(hg,BX(.36,.05,.34),giltM,0,.15,-.02);
-      const rider=makePerson(saddleCols[(i+1)%saddleCols.length],0xfbe2cf,{scale:.55,acc:i%2?'santa':'beret'});
-      rider.position.set(0,.16,-.02);
-      // 真实跨坐马鞍姿势：双腿前屈微张夹住马身，双手前伸扶金杆
-      rider.userData.legL.rotation.set(-.95,0,.38);
-      rider.userData.legR.rotation.set(-.95,0,-.38);
-      rider.userData.armL.rotation.x=-.88;
-      rider.userData.armR.rotation.x=-.88;
-      hg.add(rider);
+      /* 每匹马自己合批成 2~4 个 mesh：
+         之前整盘一起合批，木马的零件被烘成一张静态网格，
+         结果马匹不再上下起伏（看着像停摆的雕塑），draw call 还压不下去。
+         现在按马合批 —— 马仍然能上下跑动，一匹马只占几个 draw call。 */
+      mergeStatic(hg);
       amusement.horses.push({g:hg,ph:i*1.57,baseY:1.08});
     }
     pool(g,4.2,.03,.20);
@@ -14598,7 +14597,8 @@ function animate(){
       }
     }
   }
-  if(amusement.carousel)amusement.carousel.rotation.y+=dt*.45;
+  /* 木马转速：原来 0.45 rad/s（14 秒一圈），远看几乎像静止 → 提到 0.72（约 8.7 秒一圈）*/
+  if(amusement.carousel)amusement.carousel.rotation.y+=dt*.72;
   if(amusement.horses){for(const h of amusement.horses)h.g.position.y=h.baseY+Math.sin(t*2.8+h.ph)*.26;}
   if(amusement.skaters){
     for(const sk of amusement.skaters){
