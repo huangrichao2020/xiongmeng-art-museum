@@ -627,6 +627,7 @@
     <p id="recpv-tip"></p>
     <div class="rpv-acts">
       <button id="recpv-save" class="primary">保存到本机</button>
+      <button id="recpv-share">系统分享</button>
       <button id="recpv-close">关闭</button>
     </div>
   </div>
@@ -12408,6 +12409,13 @@ function _recStamp(){
 function _recIsIOS(){
   return /iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 }
+/* 手机端（安卓/苹果都算）一律走「保存卡片」：
+   手机浏览器一律要求下载动作发生在用户手势里（Chrome 会报
+   "Download is disallowed because the user gesture is required"），
+   在录制结束的异步回调里自动下载必然被拦，用户看不到任何东西存下来。 */
+function _recIsMobile(){
+  return IS_TOUCH_DEV||/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
 function _recMsg(t,ms){
   const el=document.getElementById('xmsg');
   if(!el)return;
@@ -12474,10 +12482,10 @@ async function _recSave(blob){
       outName=name.replace(/\.webm$/,'.mp4');
     }
   }catch(e){ /* 服务没开就算了，直接存原格式 */ }
-  if(_recIsIOS()){
-    /* iOS 上「保存」必须发生在用户手势里：在录制结束的异步回调里自动下载 /
-       自动弹分享都会被 Safari 静默拦掉，用户什么都看不到。
-       所以这里只弹一张显眼的保存卡片，真正的保存动作交给用户点按钮触发。 */
+  if(_recIsMobile()){
+    /* 手机上「保存」必须发生在用户手势里：安卓 Chrome 和 iOS Safari 都会
+       拦掉异步回调里的自动下载。所以弹一张显眼的保存卡片，
+       真正的保存动作交给用户点按钮触发。 */
     _recSaveCard(outBlob,outName);
     return;
   }
@@ -12494,18 +12502,35 @@ function _recSaveCard(blob,name){
   const url=URL.createObjectURL(blob);
   box._url=url;
   v.src=url;
-  tip.innerHTML='点「保存到本机」→ 在系统面板里选 <b>存储到文件</b>，存好后到「文件」App 里找。<br>'
-    +'也可以 <b>长按上面的视频</b> → 存储到照片。<br>'
-    +'（如果是在微信里打开的，请点右上角「…」→ 在 Safari 中打开再录）';
+  const ios=_recIsIOS();
+  tip.innerHTML=ios
+    ? '点「保存到本机」→ 在系统面板里选 <b>存储到文件</b>，存好后到「文件」App 里找。<br>'
+      +'也可以 <b>长按上面的视频</b> → 存储到照片。'
+    : '点「保存到本机」→ 视频会存进手机的 <b>下载</b> 文件夹<br>'
+      +'（小米：文件管理 → Download；或「设置 → 更多设置 → 下载位置」看路径）。<br>'
+      +'浏览器没弹下载提示的话，用 <b>系统分享</b> 存到文件管理器，或 <b>长按视频</b> 另存。<br>'
+      +'（微信里打开的话，先点右上角「…」→ 在浏览器中打开再录）';
   btn.textContent='保存到本机';
   btn.onclick=()=>{
     const file=new File([blob],name,{type:blob.type||'video/mp4'});
-    if(navigator.canShare&&navigator.canShare({files:[file]})){
+    /* iOS 走系统分享（面板里选「存储到文件」），安卓走浏览器下载（存进「下载」目录）——
+       两者都必须在用户手势里触发。 */
+    if(ios&&navigator.canShare&&navigator.canShare({files:[file]})){
       navigator.share({files:[file],title:name})
         .then(()=>_recMsg('已保存 · 去「文件」App 里查看'))
         .catch(()=>_recDl(url,name));
     }else _recDl(url,name);
   };
+  const sh=document.getElementById('recpv-share');
+  if(sh){
+    sh.style.display=(ios||!navigator.canShare)?'none':'inline-block';
+    sh.onclick=()=>{
+      const file=new File([blob],name,{type:blob.type||'video/mp4'});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){
+        navigator.share({files:[file],title:name}).catch(()=>{});
+      }else _recMsg('这个浏览器不支持系统分享，请点「保存到本机」');
+    };
+  }
   box.classList.add('show');
 }
 /* 在用户手势里触发下载（iOS 这时才不会被拦） */
