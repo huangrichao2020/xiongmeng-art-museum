@@ -576,15 +576,40 @@
   .mp-msg{margin-top:12px;font-size:11px;min-height:15px;text-align:center;font-weight:700;color:#7d89a3}
   .mp-msg.err{color:#e8607f}
 
-  /* 蛋仔风格 HUD：圆润卡片 + 糖果色按钮 + 圆章头像 */
+  /* 蛋仔风格 HUD：默认收成一颗「个人」按钮，点开才展开个人信息 */
   #mp-panel{
-    position:fixed;z-index:8800;left:14px;top:14px;width:186px;padding:12px;border-radius:20px;
-    background:linear-gradient(180deg,rgba(255,255,255,.94),rgba(238,244,255,.9));
-    border:3px solid #fff;
-    box-shadow:0 10px 26px rgba(20,40,80,.3),0 3px 0 rgba(255,255,255,.9) inset;
-    color:#2b3242;font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:11px;
+    position:fixed;z-index:8800;left:14px;top:14px;width:190px;
+    font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
     user-select:none;
   }
+  /* 收起时露出的那一颗按钮 */
+  #mp-me-btn{
+    display:inline-flex;align-items:center;gap:7px;padding:4px 13px 4px 4px;
+    border-radius:22px;border:3px solid #fff;cursor:pointer;
+    background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(238,244,255,.92));
+    box-shadow:0 6px 18px rgba(20,40,80,.28),0 2px 0 rgba(255,255,255,.9) inset;
+    color:#2b3242;font-size:12.5px;font-weight:800;
+  }
+  #mp-me-btn:hover{background:linear-gradient(180deg,#fff,#e9f1ff)}
+  #mp-me-btn:active{transform:translateY(1px)}
+  #mp-me-btn .mp-avatar{width:26px;height:26px;font-size:12.5px}
+  /* 队友数量角标：收起时也知道场上有几个人 */
+  .mp-cnt{
+    min-width:17px;height:17px;padding:0 5px;border-radius:9px;
+    background:#ff9db4;color:#fff;font-size:10px;font-weight:800;
+    display:none;align-items:center;justify-content:center;
+    box-shadow:0 2px 0 #cf5271;
+  }
+  .mp-cnt.on{display:inline-flex}
+  /* 展开后的个人信息面板 */
+  .mp-body{
+    display:none;margin-top:8px;padding:12px;border-radius:20px;
+    background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(238,244,255,.92));
+    border:3px solid #fff;
+    box-shadow:0 10px 26px rgba(20,40,80,.3),0 3px 0 rgba(255,255,255,.9) inset;
+    color:#2b3242;font-size:11px;
+  }
+  #mp-panel.open .mp-body{display:block}
   .mp-me-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
   .mp-avatar{
     width:30px;height:30px;flex:none;border-radius:50%;
@@ -594,7 +619,11 @@
     box-shadow:0 2px 6px rgba(180,120,40,.45),0 0 0 2.5px #fff;
   }
   .mp-me-name{font-weight:800;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .mp-peers{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;min-height:32px;align-items:center}
+  /* 账号 / ID 两行 */
+  .mp-field{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+  .mp-field b{font-weight:800;color:#7b869c;font-size:10px;flex:none}
+  .mp-field span{font-weight:700;color:#2b3242;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mp-peers{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0 10px;min-height:32px;align-items:center}
   .mp-badge{
     position:relative;width:30px;height:30px;border-radius:50%;
     background:linear-gradient(150deg,var(--c),rgba(0,0,0,.18) 160%);
@@ -632,7 +661,7 @@
   .mp-btn.on{background:linear-gradient(180deg,#8ee8b4,#43c47c);box-shadow:0 3px 0 #2e9a5f}
   .mp-btn2{background:linear-gradient(180deg,#ff9db4,#f2708f);box-shadow:0 3px 0 #cf5271}
   @media(max-width:700px){
-    #mp-panel{width:158px;left:10px;top:10px;padding:10px;border-radius:17px}
+    #mp-panel{width:162px;left:10px;top:10px}
     .mp-avatar,.mp-badge{width:26px;height:26px;font-size:12px}
   }
 </style>
@@ -12429,6 +12458,8 @@ function updateAerialHaze(dt,t){
           if (pl.account !== MP.account) MP.addPeer(pl);
         });
         MP.syncPeersUI();
+        /* 登录成功后露出「个人」按钮，但个人信息默认不展开 */
+        if (MP._panel) { MP._panel.p.style.display = ''; MP._panel.p.classList.remove('open'); }
         MP.startThirdPersonBody();
         /* 单机模式下已经建过本地角色的话，把头顶名牌换成账号名 */
         if (MP.selfTag) {
@@ -12500,6 +12531,8 @@ function updateAerialHaze(dt,t){
           if (MP._panel) {
             MP._panel.third.classList.remove('on');
             MP._panel.third.textContent = '第三人称';
+            MP._panel.p.style.display = 'none';
+            MP._panel.p.classList.remove('open');
           }
           if (typeof setViewBtn === 'function') setViewBtn();
           showLogin();
@@ -13059,24 +13092,45 @@ function updateAerialHaze(dt,t){
     if (document.getElementById('mp-panel')) return;
     const p = document.createElement('div');
     p.id = 'mp-panel';
+    /* 默认收起：只有一颗「个人」按钮，点开才显示账号 / ID / 改 ID / 玩家列表 */
     p.innerHTML = `
-      <div class="mp-me-row">
+      <button id="mp-me-btn" title="个人信息">
         <span class="mp-avatar" id="mp-me-av">?</span>
-        <span class="mp-me-name" id="mp-me">未登录</span>
-      </div>
-      <div class="mp-peers" id="mp-peers"></div>
-      <div class="mp-edit">
-        <input id="mp-name" type="text" maxlength="16" placeholder="换个名字">
-        <button id="mp-save">改</button>
-      </div>
-      <div class="mp-btn-row">
-        <button id="mp-third" class="mp-btn mp-btn3">第三人称</button>
-        <button id="mp-logout" class="mp-btn mp-btn2">退出</button>
+        <span>个人</span>
+        <span class="mp-cnt" id="mp-cnt"></span>
+      </button>
+      <div class="mp-body">
+        <div class="mp-me-row">
+          <span class="mp-avatar" id="mp-me-av2">?</span>
+          <span class="mp-me-name" id="mp-me">未登录</span>
+        </div>
+        <div class="mp-field"><b>账号</b><span id="mp-acc-t">-</span></div>
+        <div class="mp-field"><b>ID</b><span id="mp-id-t">-</span></div>
+        <div class="mp-peers" id="mp-peers"></div>
+        <div class="mp-edit">
+          <input id="mp-name" type="text" maxlength="16" placeholder="换个名字">
+          <button id="mp-save">改</button>
+        </div>
+        <div class="mp-btn-row">
+          <button id="mp-third" class="mp-btn mp-btn3">第三人称</button>
+          <button id="mp-logout" class="mp-btn mp-btn2">退出</button>
+        </div>
       </div>`;
     document.body.appendChild(p);
     const self = p.querySelector('#mp-me');
     const peers = p.querySelector('#mp-peers');
     const nameI = p.querySelector('#mp-name');
+    const accT = p.querySelector('#mp-acc-t');
+    const idT = p.querySelector('#mp-id-t');
+    const cnt = p.querySelector('#mp-cnt');
+    const meBtn = p.querySelector('#mp-me-btn');
+    /* 未登录时整块藏起来 */
+    p.style.display = 'none';
+    /* 点「个人」展开 / 再点收起 */
+    meBtn.onclick = () => {
+      p.classList.toggle('open');
+      if (p.classList.contains('open')) nameI.focus();
+    };
     p.querySelector('#mp-save').onclick = () => {
       const v = nameI.value.trim();
       if (!v) return;
@@ -13088,8 +13142,9 @@ function updateAerialHaze(dt,t){
         MP.selfTag.material.map = s2.material.map;
         MP.selfTag.material.needsUpdate = true;
       }
-      self.textContent = v + '（' + MP.account + '）';
+      idT.textContent = v;
       nameI.value = '';
+      MP.syncPeersUI();
     };
     nameI.addEventListener('keydown', e => { if (e.key === 'Enter') p.querySelector('#mp-save').click(); });
     p.querySelector('#mp-third').onclick = () => MP.toggleThird();
@@ -13106,19 +13161,25 @@ function updateAerialHaze(dt,t){
         MP._panel.third.textContent = '第三人称';
       }
       try { localStorage.removeItem('xm_mp_acc'); localStorage.removeItem('xm_mp_pass'); } catch (e) { }
-      if (MP._panel) MP._panel.p.style.display = 'none';
+      if (MP._panel) { MP._panel.p.style.display = 'none'; MP._panel.p.classList.remove('open'); }
       if (typeof setViewBtn === 'function') setViewBtn();
       showLogin();
     };
-    MP._panel = { p, self, peers, nameI, meAv: p.querySelector('#mp-me-av'), third: p.querySelector('#mp-third') };
+    MP._panel = { p, self, peers, nameI, meAv: p.querySelector('#mp-me-av'),
+                  meAv2: p.querySelector('#mp-me-av2'), accT, idT, cnt, meBtn,
+                  third: p.querySelector('#mp-third') };
   }
 
   /* 在线玩家：蛋仔那种横排小圆章，每人一枚，悬停显示名字 */
   MP.syncPeersUI = function () {
     if (!MP._panel) return;
-    const { self, peers, meAv } = MP._panel;
-    self.textContent = MP.display;
-    if (meAv) meAv.textContent = (MP.display || MP.account).slice(0, 1).toUpperCase();
+    const { self, peers, meAv, meAv2, accT, idT, cnt } = MP._panel;
+    self.textContent = MP.display || MP.account || '未登录';
+    const ch = (MP.display || MP.account || '?').slice(0, 1).toUpperCase();
+    if (meAv) meAv.textContent = ch;
+    if (meAv2) meAv2.textContent = ch;
+    if (accT) accT.textContent = MP.account || '-';
+    if (idT) idT.textContent = MP.display || '-';
     const list = [];
     for (const p of MP.peers.values()) {
       const hex = '#' + p.color.toString(16).padStart(6, '0');
@@ -13128,6 +13189,12 @@ function updateAerialHaze(dt,t){
     }
     if (!list.length) list.push('<span class="mp-none">暂无其他玩家</span>');
     peers.innerHTML = list.join('');
+    /* 收起状态下的队友数量角标 */
+    if (cnt) {
+      const n = MP.peers.size;
+      cnt.textContent = n ? String(n) : '';
+      cnt.classList.toggle('on', n > 0);
+    }
   };
 
   function escapeHtml(s) {
