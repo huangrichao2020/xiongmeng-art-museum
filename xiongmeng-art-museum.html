@@ -7177,18 +7177,23 @@ function balloonRadialTex(){
 }
 function buildHotAirBalloon(x,z){
   const g=new THREE.Group();
-  const GORES=14,RAD=3.05,HGT=9.0;
-  /* 伞体轮廓：t=0 火焰口 → t=1 冠环 */
+  /* ── 尺寸按真实热气球比例重做 ──
+     伞体最大直径 11.2m、伞高 15.5m、篮口 2.4×1.3×1.9m（伞高≈直径1.3倍）
+     火焰口离地 4.9m，人在篮里抬头能看到整张伞 ── */
+  const GORES=16,RAD=5.6,HGT=15.5,BASE=4.9;
+  const BW=2.4,BH=1.3,BD=1.9;                     // 吊篮 宽/高/深
   const prof=t=>RAD*(.34+.66*Math.pow(Math.sin(Math.PI*Math.pow(t,.56)),.78))*(1-.46*Math.pow(t,7));
   const fabricM=new THREE.MeshStandardMaterial({
     vertexColors:true,roughness:.82,metalness:0,side:THREE.DoubleSide,
-    emissive:0xffd7a4,emissiveIntensity:.16,envMapIntensity:.16
+    emissive:0xffe6c4,emissiveIntensity:.12,envMapIntensity:.18
   });
-  const cB=new THREE.Color(),cBase=new THREE.Color(0xfbf2e2),cBand=new THREE.Color(0xf0c07e),
-        cTop=new THREE.Color(0xf8e8d6),cTape=new THREE.Color(0xb59a7c);
-  const US=6,VS=18;
+  /* ── 光遇风格：每片瓜瓣一个高饱和主色，褶皱压暗、顶部透暖光、接缝压成载重带 ── */
+  const GORE_PALETTE=[0xe8453c,0xff8c2b,0xffc93c,0x46c98a,0x3fa9f5,0xb47ae8,0xff6fa5,0x2fbcc9];
+  const cB=new THREE.Color(),cMain=new THREE.Color(),cWarm=new THREE.Color(0xfff3d8);
+  const US=10,VS=20;
   for(let gi=0;gi<GORES;gi++){
     const a0=gi/GORES*Math.PI*2,a1=(gi+1)/GORES*Math.PI*2;
+    cMain.setHex(GORE_PALETTE[gi%GORE_PALETTE.length]);
     const pos=new Float32Array((US+1)*(VS+1)*3),cs=new Float32Array((US+1)*(VS+1)*3),idx=[];
     let p=0;
     for(let v=0;v<=VS;v++){
@@ -7196,13 +7201,14 @@ function buildHotAirBalloon(x,z){
       for(let u=0;u<=US;u++){
         const uu=u/US,r=r0*(1+.042*Math.sin(Math.PI*uu)),a=a0+(a1-a0)*uu;
         pos[p]=Math.cos(a)*r;
-        pos[p+1]=3.2+HGT*t-.10*Math.sin(Math.PI*uu)*Math.sin(Math.PI*Math.min(1,t*.92));
+        pos[p+1]=BASE+HGT*t-.16*Math.sin(Math.PI*uu)*Math.sin(Math.PI*Math.min(1,t*.92));
         pos[p+2]=Math.sin(a)*r;
-        /* 配色：奶白主体 + 暖金腰带 + 顶部蜜桃，缝边压暗成载重带 */
-        cB.copy(t<.30?cBase:(t<.50?cBand:(t<.62?cBase:cTop)));
+        cB.copy(cMain);
+        cB.multiplyScalar(.82+.26*Math.sin(Math.PI*uu));        // 横向褶皱明暗
+        cB.lerp(cWarm,Math.pow(t,3.2)*.34);                     // 顶部受暖光
+        cB.multiplyScalar(.70+.30*Math.min(1,t*3.4));          // 火焰口附近压暗
         const edge=Math.min(uu,1-uu);
-        if(edge<.06)cB.lerp(cTape,(.06-edge)/.06*.55);
-        cB.offsetHSL(0,0,((gi%3)-1)*.012);
+        if(edge<.05)cB.multiplyScalar(.60);                     // 瓜瓣接缝 = 载重带
         cs[p]=cB.r;cs[p+1]=cB.g;cs[p+2]=cB.b;
         p+=3;
       }
@@ -7218,42 +7224,46 @@ function buildHotAirBalloon(x,z){
     m.castShadow=false;m.userData.noReflect=true;
     g.add(m);
   }
-  /* 火焰口裙边（敞口，能看见里面烧火）+ 冠环 */
-  const skirt=new THREE.Mesh(new THREE.CylinderGeometry(1.22,1.06,.90,18,1,true),
-    new THREE.MeshStandardMaterial({color:0xcf8f57,roughness:.92,side:THREE.DoubleSide,emissive:0xff8a30,emissiveIntensity:.22}));
-  skirt.position.y=2.75;skirt.userData.noReflect=true;g.add(skirt);
-  const crown=new THREE.Mesh(new THREE.TorusGeometry(.56,.055,8,22),M(0x8a6b4c,{roughness:.7,metalness:.3}));
-  crown.position.y=3.2+HGT;crown.rotation.x=Math.PI/2;crown.userData.noReflect=true;g.add(crown);
-  const capDisc=new THREE.Mesh(new THREE.CircleGeometry(.55,20),M(0xe8d3b4,{roughness:.85}));
-  capDisc.rotation.x=-Math.PI/2;capDisc.position.y=3.2+HGT+.01;capDisc.userData.noReflect=true;g.add(capDisc);
-  /* 载重带 + 吊索（全部用一条 LineSegments，省 draw call） */
+  /* 火焰口裙边（敞口能看见里面烧火）+ 冠环 + 顶盖 */
+  const skirt=new THREE.Mesh(new THREE.CylinderGeometry(2.05,1.78,1.35,20,1,true),
+    new THREE.MeshStandardMaterial({color:0x8f4a3c,roughness:.92,side:THREE.DoubleSide,emissive:0xff8a30,emissiveIntensity:.18}));
+  skirt.position.y=4.35;skirt.userData.noReflect=true;g.add(skirt);
+  const crown=new THREE.Mesh(new THREE.TorusGeometry(1.02,.09,8,24),M(0x8a6b4c,{roughness:.7,metalness:.3}));
+  crown.position.y=BASE+HGT;crown.rotation.x=Math.PI/2;crown.userData.noReflect=true;g.add(crown);
+  const capDisc=new THREE.Mesh(new THREE.CircleGeometry(1.0,22),M(0xe8d3b4,{roughness:.85}));
+  capDisc.rotation.x=-Math.PI/2;capDisc.position.y=BASE+HGT+.02;capDisc.userData.noReflect=true;g.add(capDisc);
+  /* 载重带 + 吊索（单条 LineSegments） */
   const lp=[];
   for(let k=0;k<GORES;k++){
     const a=k/GORES*Math.PI*2;
     for(let v=0;v<VS;v++){
       const t0=v/VS,t1=(v+1)/VS;
-      lp.push(Math.cos(a)*prof(t0),3.2+HGT*t0,Math.sin(a)*prof(t0));
-      lp.push(Math.cos(a)*prof(t1),3.2+HGT*t1,Math.sin(a)*prof(t1));
+      lp.push(Math.cos(a)*prof(t0),BASE+HGT*t0,Math.sin(a)*prof(t0));
+      lp.push(Math.cos(a)*prof(t1),BASE+HGT*t1,Math.sin(a)*prof(t1));
     }
   }
-  for(const t of [.50]){
-    const r=prof(t),y=3.2+HGT*t;
+  {
+    const t=.50,r=prof(t),y=BASE+HGT*t;
     for(let k=0;k<GORES;k++){
       const a0=k/GORES*Math.PI*2,a1=(k+1)/GORES*Math.PI*2;
       lp.push(Math.cos(a0)*r,y,Math.sin(a0)*r,Math.cos(a1)*r,y,Math.sin(a1)*r);
     }
   }
-  const corners=[[-.62,.52],[.62,.52],[.62,-.52],[-.62,-.52]];
-  const rimR=1.14,rimY=1.95;
-  for(let k=0;k<8;k++){
-    const a=k/8*Math.PI*2,c2=corners[Math.floor(k/2)%4];
-    lp.push(Math.cos(a)*rimR,rimY,Math.sin(a)*rimR,c2[0],1.16,c2[1]);
+  /* 8 根吊索：篮角上方 → 伞口下沿 */
+  {
+    const mouthR=prof(0),corners=[[-1.05,.82],[1.05,.82],[1.05,-.82],[-1.05,-.82]];
+    for(let k=0;k<8;k++){
+      const a=k/8*Math.PI*2,c2=corners[Math.floor(k/2)%4];
+      lp.push(Math.cos(a)*mouthR,BASE,Math.sin(a)*mouthR,c2[0],2.0,c2[1]);
+    }
   }
   const lineGeo=new THREE.BufferGeometry();
   lineGeo.setAttribute('position',new THREE.Float32BufferAttribute(lp,3));
-  const lines=new THREE.LineSegments(lineGeo,new THREE.LineBasicMaterial({color:0x9c8266,transparent:true,opacity:.30}));
+  const lines=new THREE.LineSegments(lineGeo,new THREE.LineBasicMaterial({color:0x6b563f,transparent:true,opacity:.42}));
   lines.userData.noReflect=true;g.add(lines);
-  /* 吊篮：藤编 + 皮革包边 + 立柱 + 燃烧器架 + 燃料瓶 */
+  /* ── 吊篮：藤编底板 + 皮革包边 + 四角柱 + 镂空藤条栅栏 ──
+     栅栏做成稀疏竖条（44 根，InstancedMesh 一个 draw call），
+     坐在里面能直接透过缝隙看出去，不会被一堵实心篮子墙堵死视线。 */
   const wickerTex=(()=>{
     const [c,x]=cv(128,128);
     x.fillStyle='#a8763f';x.fillRect(0,0,128,128);
@@ -7267,38 +7277,62 @@ function buildHotAirBalloon(x,z){
       x.fillStyle='rgba(226,178,120,.30)';
       x.fillRect(0,j*13+4,128,2);
     }
-    return ctex(c,[3,2]);
+    return ctex(c,[4,3]);
   })();
   const wickerM=new THREE.MeshStandardMaterial({map:wickerTex,roughness:.86});
-  const basket=new THREE.Mesh(new THREE.BoxGeometry(1.5,1.05,1.15),wickerM);
-  basket.position.y=.52;g.add(basket);
-  const rim=new THREE.Mesh(new THREE.BoxGeometry(1.58,.13,1.23),M(0x5a3a24,{roughness:.62}));
-  rim.position.y=1.06;g.add(rim);
+  const wickerPlain=M(0xa8763f,{roughness:.85});
+  const leatherM=M(0x5a3a24,{roughness:.62});
+  const floor=new THREE.Mesh(new THREE.BoxGeometry(BW,.20,BD),wickerM);
+  floor.position.y=.10;g.add(floor);
+  for(const seg of [[BW+.14,.14,0,BD/2],[BW+.14,.14,0,-BD/2],[.14,BD,BW/2,0],[.14,BD,-BW/2,0]]){
+    const r=new THREE.Mesh(new THREE.BoxGeometry(seg[0],.17,seg[1]),leatherM);
+    r.position.set(seg[2],BH-.07,seg[3]);g.add(r);
+  }
+  for(const cx of [-BW/2+.09,BW/2-.09])for(const cz of [-BD/2+.09,BD/2-.09]){
+    const pst=new THREE.Mesh(new THREE.BoxGeometry(.17,BH,.17),leatherM);
+    pst.position.set(cx,BH/2,cz);g.add(pst);
+  }
+  {
+    const bars=[],cnt=11;
+    for(let i=0;i<cnt;i++){
+      const u=(i+.5)/cnt;
+      bars.push([-BW/2+u*BW,0,BD/2],[-BW/2+u*BW,0,-BD/2],
+               [BW/2,0,-BD/2+u*BD],[-BW/2,0,-BD/2+u*BD]);
+    }
+    const im=new THREE.InstancedMesh(new THREE.BoxGeometry(.055,BH-.16,.055),wickerPlain,bars.length);
+    const m4=new THREE.Matrix4();
+    bars.forEach((b,i)=>{m4.makeTranslation(b[0],(BH-.16)/2+.11,b[2]);im.setMatrixAt(i,m4);});
+    im.instanceMatrix.needsUpdate=true;im.castShadow=false;
+    g.add(im);
+  }
+  /* 燃烧器架：4 根立柱 + 横梁 + 喷火盘 + 两只燃料瓶 */
   const metalM=M(0x8a8f96,{roughness:.34,metalness:.78});
-  for(const c2 of corners){
-    const post=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,.62,6),metalM);
-    post.position.set(c2[0]*.78,1.36,c2[1]*.78);g.add(post);
+  /* 燃烧器架抬到头顶 2.98m（篮沿 1.3m 之上），人坐在篮里时头顶到横梁之间完全通透，
+     平视、俯视、抬头都看不到横杆挡视线。 */
+  for(const cx of [-.92,.92])for(const cz of [-.68,.68]){
+    const post=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,1.52,8),metalM);
+    post.position.set(cx,BH+.76,cz);g.add(post);
   }
-  const burnerBar=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,.62,8),metalM);
-  burnerBar.rotation.z=Math.PI/2;burnerBar.position.y=1.66;g.add(burnerBar);
-  const coil=new THREE.Mesh(new THREE.TorusGeometry(.16,.045,6,14),metalM);
-  coil.rotation.x=Math.PI/2;coil.position.y=1.74;g.add(coil);
-  for(const c2 of [[-.42,-.3],[.42,.3]]){
-    const tank=new THREE.Mesh(new THREE.CylinderGeometry(.14,.14,.46,10),M(0x9c3a34,{roughness:.44,metalness:.3}));
-    tank.position.set(c2[0],.28,c2[1]);g.add(tank);
+  const burnerBar=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,1.95,10),metalM);
+  burnerBar.rotation.z=Math.PI/2;burnerBar.position.y=2.98;g.add(burnerBar);
+  const coil=new THREE.Mesh(new THREE.TorusGeometry(.24,.055,8,16),metalM);
+  coil.rotation.x=Math.PI/2;coil.position.y=3.04;g.add(coil);
+  for(const c2 of [[-.62,-.42],[.62,.42]]){
+    const tank=new THREE.Mesh(new THREE.CylinderGeometry(.19,.19,.58,12),M(0x9c3a34,{roughness:.44,metalness:.3}));
+    tank.position.set(c2[0],.40,c2[1]);g.add(tank);
   }
-  /* 火焰：锥尖朝上（ConeGeometry 尖端默认 +Y），外套橙、内芯白黄 */
-  const flame=new THREE.Mesh(new THREE.ConeGeometry(.34,1.25,10,1,true),
+  /* 火焰：外套橙、内芯白黄（锥尖朝上） */
+  const flame=new THREE.Mesh(new THREE.ConeGeometry(.46,1.60,12,1,true),
     new THREE.MeshBasicMaterial({color:0xffb347,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false,fog:false,side:THREE.DoubleSide}));
-  flame.position.y=2.30;flame.userData.noReflect=true;g.add(flame);
-  const flameIn=new THREE.Mesh(new THREE.ConeGeometry(.15,.80,8,1,true),
+  flame.position.y=3.62;flame.userData.noReflect=true;g.add(flame);
+  const flameIn=new THREE.Mesh(new THREE.ConeGeometry(.20,1.05,10,1,true),
     new THREE.MeshBasicMaterial({color:0xfff2cc,transparent:true,opacity:.92,blending:THREE.AdditiveBlending,depthWrite:false,fog:false,side:THREE.DoubleSide}));
-  flameIn.position.y=2.12;flameIn.userData.noReflect=true;g.add(flameIn);
-  const burnerLight=new THREE.PointLight(0xffa64d,14,15,1.7);
-  burnerLight.position.y=2.0;g.add(burnerLight);
-  shopLights.push({l:burnerLight,base:14,street:false,delay:1.2});
-  /* 地面光池（单独挂在 scene，高度越高越大越淡） */
-  const pool=new THREE.Mesh(new THREE.CircleGeometry(1,40),
+  flameIn.position.y=3.42;flameIn.userData.noReflect=true;g.add(flameIn);
+  const burnerLight=new THREE.PointLight(0xffa64d,22,30,1.7);
+  burnerLight.position.y=3.0;g.add(burnerLight);
+  shopLights.push({l:burnerLight,base:22,street:false,delay:1.2});
+  /* 地面光池（单独挂 scene，高度越高越大越淡） */
+  const pool=new THREE.Mesh(new THREE.CircleGeometry(1,48),
     new THREE.MeshBasicMaterial({map:balloonRadialTex(),color:0xffb877,transparent:true,opacity:.30,
       blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
   pool.rotation.x=-Math.PI/2;pool.position.set(x,.03,z);pool.renderOrder=2;pool.userData.noReflect=true;
@@ -7310,14 +7344,17 @@ function buildHotAirBalloon(x,z){
   return b;
 }
 /* 教堂后场西侧 / 剧院后场东侧，各一朵；都落在空地正中，升起后四周无遮挡 */
-buildHotAirBalloon(-44.0,50.0);
-buildHotAirBalloon(50.5,50.0);
+/* 落点定在教堂 / 剧院后场最北的空旷带（z=66）：
+   伞体半径 5.9m、伞底离地 5.95m，后场中央那几棵 21m 高的圣诞树正好会穿进伞体，
+   往北让开 15m 后净空 9m 以上，伞体与树、建筑都不再打架。 */
+buildHotAirBalloon(-35.0,66.0);   // 教堂后场西北：避开教堂主体与圣诞树阵
+buildHotAirBalloon(44.0,66.0);    // 剧院后场东北：避开剧院主体与圣诞树阵
 
 function balloonNearPlayer(){
   if(!fp.on||balloonSys.riding)return -1;
   for(let i=0;i<balloons.length;i++){
     const b=balloons[i];
-    if(Math.hypot(fp.x-b.x,fp.z-b.z)<3.8&&Math.abs(fp.y-b.y)<3.0)return i;
+    if(Math.hypot(fp.x-b.x,fp.z-b.z)<4.6&&Math.abs(fp.y-b.y)<3.0)return i;
   }
   return -1;
 }
@@ -7333,7 +7370,7 @@ function toggleBalloonRide(i){
   fp.x=b.x;fp.z=b.z;fp.y=b.y;fp.vx=fp.vz=0;
   /* 初始朝向前方场地中心（游乐园），而不是背对 */
   const tx=4-b.x,tz=34-b.z,tn=Math.hypot(tx,tz)||1;
-  fp.yaw=Math.atan2(-tx/tn,-tz/tn);fp.pitch=-.08;
+  fp.yaw=Math.atan2(-tx/tn,-tz/tn);fp.pitch=-.16;
   sfx.blip(523,.16,.07);
 }
 function stopBalloonRide(){
@@ -7357,11 +7394,11 @@ function updateBalloonRide(dt){
       if(fp.keys['KeyS']||fp.keys['ArrowDown'])up-=1;
       if(joy.mag>0.02)up+=-joy.dy*1.2;
       up=Math.max(-1,Math.min(1,up));
-      b.vy+=(up*2.1-b.vy)*Math.min(1,dt*2.4);
-      b.y=Math.max(1.05,Math.min(44,b.y+b.vy*dt));
+      b.vy+=(up*3.4-b.vy)*Math.min(1,dt*2.4);
+      b.y=Math.max(1.05,Math.min(62,b.y+b.vy*dt));
       b.burn+=(Math.max(0,up)*.85+.20-b.burn)*Math.min(1,dt*6);
       fp.x=b.x;fp.z=b.z;fp.y=b.y;
-      camera.position.set(b.x,b.y+1.52,b.z);
+      camera.position.set(b.x,b.y+2.45,b.z);   // 站进篮口上方，视线越过篮沿直接看出去
       camera.rotation.set(fp.pitch,fp.yaw,0,'YXZ');
       trainHud.classList.add('show');
       trainMsgEl.textContent='正在乘坐大号热气球（高度 '+b.y.toFixed(1)+'m · W/↑ 上升 S/↓ 下降 · 拖动鼠标环顾 · E 下气球）';
@@ -7385,9 +7422,9 @@ function updateBalloonRide(dt){
     b.flame.scale.set(.80+b.burn*.50,fl,.80+b.burn*.50);
     b.flame.material.opacity=.30+b.burn*.58;
     b.flameIn.scale.set(.70+b.burn*.40,fl*.82,.70+b.burn*.40);
-    b.fabricM.emissiveIntensity=.14+b.burn*.26;
-    b.burnerLight.intensity=(9+b.burn*24)*(1+Math.sin(t*23+i)*.05);
-    const h=Math.max(0,b.y-1.05),pr=4.2+h*.55;
+    b.fabricM.emissiveIntensity=.10+b.burn*.18;
+    b.burnerLight.intensity=(14+b.burn*30)*(1+Math.sin(t*23+i)*.05);
+    const h=Math.max(0,b.y-1.05),pr=7.0+h*1.05;
     b.pool.position.set(b.x,.03,b.z);
     b.pool.scale.set(pr,pr,1);
     b.pool.material.opacity=Math.max(.04,.32/(1+h*.15));
@@ -8009,7 +8046,7 @@ const OUTDOOR_OBS=(()=>{
     [PX-12.4,PZ+3.2],[PX+12.4,PZ+3.2]
   ])list.push([lx,lz,.42]);
   // 2.5 热气球吊篮（教堂后场 / 剧院后场各一朵）：吊篮悬空，地面留一个圆避免人穿进篮子里
-  for(const [bx,bz] of [[-44,50],[50.5,50]])list.push([bx,bz,1.15]);
+  for(const [bx,bz] of [[-35,66],[44,66]])list.push([bx,bz,1.7]);
   // 3. 西侧喷泉花园中心区域
   list.push([-24.4,.2,6.2]);
   return list;
