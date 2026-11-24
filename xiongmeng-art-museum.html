@@ -12507,6 +12507,7 @@ function updateAerialHaze(dt,t){
           p.rawTgt = { x: m.p.x, y: m.p.y, z: m.p.z };
           p.rawTime = now;
           p.target = m.p;
+          p.targetJy = m.p.jy || 0;
           p.mode = m.mode || 'fp';
           p.lastSeen = performance.now();
         }
@@ -12544,6 +12545,9 @@ function updateAerialHaze(dt,t){
       case 'err': {
         setMsg(m.msg || '登录失败', 'err');
         MP.onKicked = null;   // 防止 close 时反复重连
+        /* 服务端判定「该账号已在别处登录」→ 明确停止自动重连，
+           否则会被踢 → 重连 → 再顶掉对方，无限互踢 */
+        if (m.code === 'kicked') MP._kicked = true;
         try { MP.ws.close(); } catch (e) { }
         MP.ws = null;
         break;
@@ -12657,8 +12661,7 @@ function updateAerialHaze(dt,t){
     scene.add(group);
     const tag = makeTagSprite(pl.display || pl.account, '#' + color.toString(16).padStart(6, '0'));
     tag.position.y = 2.05;
-    /* 名牌直接挂在 group 上（group 的 scale 由 walkCycle 控制），
-       所以单独记一个基准 scale，绘制时补偿回去 */
+    /* 名牌直接挂在 group 上（形变只作用在身体组，名牌不受影响）*/
     group.add(tag);
     group.userData.tag = tag;
     const peer = {
@@ -12760,15 +12763,19 @@ function updateAerialHaze(dt,t){
     tail.position.set(.20, .98, .18); tail.rotation.z = -.18;
     g.add(tail);
 
-    /* 圆脚 */
+    /* 圆脚：每只脚挂一个 footGrp，跳跃时整只脚能一起抬起/前伸 */
+    const feet = [];
     for (const s of [-1, 1]) {
+      const fg = new THREE.Group();
       const ft = new THREE.Mesh(new THREE.SphereGeometry(.155, 12, 10), darkM);
       ft.position.set(s * .19, .13, .04); ft.scale.set(1, .72, 1.35);
-      g.add(ft);
+      fg.add(ft);
       /* 脚底白边 */
       const sole = new THREE.Mesh(new THREE.SphereGeometry(.15, 12, 10), snowM);
       sole.position.set(s * .19, .085, .04); sole.scale.set(1, .5, 1.3);
-      g.add(sole);
+      fg.add(sole);
+      g.add(fg);
+      feet.push(fg);
     }
     /* 短胖小手（蛋仔的手臂很短粗）
        —— 手挂在「肩关节组」里，肩组再挂到身体组，
@@ -12790,9 +12797,11 @@ function updateAerialHaze(dt,t){
     g.userData.keep = true;   // 不参与静态合批
     g.userData.shoulders = shoulders;
     g.userData.bodyGrp = bodyGrp;
-    /* 把身体部件整体挪进 bodyGrp（脖子/头/肚/脚/围巾保持原坐标 → 用反向平移补偿）*/
+    g.userData.feet = feet;
+    /* 把身体部件整体挪进 bodyGrp（脖子/头/肚/围巾保持原坐标 → 用反向平移补偿）
+       脚除外：脚留在外面，压扁拉伸时脚才不会跟着变形陷进地面 */
     const bodyParts = [];
-    g.children.forEach(c => { if (c !== bodyGrp && !shoulders.includes(c)) bodyParts.push(c); });
+    g.children.forEach(c => { if (c !== bodyGrp && !shoulders.includes(c) && !feet.includes(c)) bodyParts.push(c); });
     bodyParts.forEach(c => bodyGrp.add(c));
     return g;
   }
@@ -12818,52 +12827,100 @@ function updateAerialHaze(dt,t){
     avatar.rotation.y += d * k;
   }
 
-  /* 蛋仔式走路循环：身体上下弹 + 前后倾 + 手臂反相摆 + 落地压缩
-     —— 用 sin（不是 |sin|），保留波形连续性，否则会出现「一颤一颤」的抽搐感 */
-  function walkCycle(avatar, dt, speed, phaseRef) {
-    const moving = speed > .35;
-    const sp = Math.min(1, speed / 3.2);
-    /* 步频随速度提高，但有上限（太快会像抽搐）*/
-    const freq = moving ? Math.min(9.5, 4.2 + sp * 5.3) : 0;
-    phaseRef.v += freq * dt;
-    const ph = phaseRef.v;
+  /* 蛋仔式角色动画：走路循环 + 跳跃三段
+     —— 走地用 sin（不是 |sin|）：绝对值整流会让波峰导数突变，看起来就是一路抽搐
+     —— 跳跃分三段：起跳蹬地拉伸 → 滞空手臂上举、脚收起 → 落地压扁回弹
+     —— 全部压缩/拉伸都作用在 bodyGrp（以脚底为轴），脚单独放在外面不参与形变 */
+  const LAND_T = .22;          // 落地缓冲时长（秒）
+  function animateAvatar(avatar, dt, speed, jumpY, jumpVy, st) {
     const body = avatar.userData.bodyGrp;
     const shoulders = avatar.userData.shoulders || [];
+    const feet = avatar.userData.feet || [];
+    const moving = speed > .35;
+    const sp = Math.min(1, speed / 3.2);
+    const inAir = jumpY > .01 || jumpVy !== 0;
+
+    /* 状态机：进空中 / 落地缓冲计时 */
+    if (inAir) {
+      if (!st.air) { st.air = true; st.airT = 0; }
+      st.airT += dt;
+      st.landT = 0;
+    } else {
+      if (st.air) { st.air = false; st.landT = LAND_T; st.lastJy = 0; st.riseAcc = 0; }
+      else if (st.landT > 0) st.landT -= dt;
+    }
+
+    /* 走路相位：空中停摆，别在滞空时手脚乱动 */
+    const freq = (moving && !inAir) ? Math.min(9.5, 4.2 + sp * 5.3) : 0;
+    st.v += freq * dt;
+    const ph = st.v;
+
+    let sy = 1, sxz = 1, rotX = 0, rotZ = 0, bodyY = 0;
+    let armL = 0, armR = 0, armZ = .18;
+    let footLift = 0, footFwd = 0, footTilt = 0;
+
+    if (inAir) {
+      /* ── 滞空：起跳那一瞬拉得最高 → 顶点回落 → 下落再拉一点 ──
+         拉伸量按「上升阶段已经涨了多高」算，不按速度幅度算：
+         远端玩家的速度是估算出来的（幅度偏小），
+         用速度会让远端看起来几乎不拉伸，用上升高度则两边一致 */
+      const dy = jumpY - (st.lastJy === undefined ? jumpY : st.lastJy);
+      st.lastJy = jumpY;
+      const rising = jumpVy > .05;
+      if (rising) st.riseAcc = (st.riseAcc || 0) + Math.max(0, dy);
+      else st.riseAcc = 0;
+      const target = rising
+        ? 1.14 - Math.min(.10, st.riseAcc * .55)
+        : 1.06;
+      st.sy = (st.sy === undefined) ? target
+        : st.sy + (target - st.sy) * (1 - Math.pow(.002, dt));
+      sy = st.sy; sxz = 1 / Math.sqrt(sy);
+      rotX = -.14;                                  // 空中微微前倾
+      rotZ = Math.sin(ph * .7) * .03;
+      armL = -2.05; armR = -2.05; armZ = .55;       // 双手高举过头
+      footLift = .085; footFwd = .05; footTilt = -.35;  // 收腿
+    } else if (st.landT > 0) {
+      /* ── 落地：触地瞬间最扁 → 回弹（末端连续，不突变）── */
+      const k = Math.max(0, st.landT / LAND_T);      // 1 → 0
+      const prog = 1 - k;                            // 0 → 1
+      const sq = 1 - .20 * Math.cos(prog * Math.PI) * (1 - prog);
+      sy = sq; sxz = 1 / Math.sqrt(sq);
+      rotX = -.10;
+      armL = .45; armR = .45; armZ = .30;            // 手臂落下
+    } else {
+      /* ── 地面行走 ── */
+      bodyY = moving ? Math.sin(ph * 2) * .055 * sp : 0;
+      rotX = moving ? -.10 * sp : 0;
+      rotZ = moving ? Math.sin(ph) * .07 * sp : 0;
+      if (moving) { armL = Math.sin(ph) * .85 * sp; armR = -armL; armZ = .18; }
+      /* 走路节奏压缩：脚落地那一瞬压一下 */
+      let sq = 1;
+      if (moving) sq = 1 - Math.max(0, -Math.sin(ph * 2)) * .055 * sp;
+      sy = sq; sxz = 1 / Math.sqrt(sq);
+    }
 
     if (body) {
-      /* 上下弹：正弦（有正负 → 身体有重心起伏，不是单边跳）*/
-      const bob = moving ? Math.sin(ph * 2) * .055 * sp : 0;
-      body.position.y = bob;
-      /* 前后倾：跑起来上身前倾 */
-      body.rotation.x = moving ? -.10 * sp : 0;
-      /* 侧倾：脚步带来的左右摇摆 */
-      body.rotation.z = moving ? Math.sin(ph) * .07 * sp : 0;
+      body.scale.set(sxz, sy, sxz);
+      body.position.y = bodyY;
+      body.rotation.x = rotX;
+      body.rotation.z = rotZ;
     }
-    /* 手臂：左右反相前后摆（sin 的奇偶倍频 → 走起来才协调）*/
     if (shoulders.length === 2) {
-      const sw = moving ? Math.sin(ph) * .85 * sp : 0;
-      shoulders[0].rotation.x = sw;
-      shoulders[1].rotation.x = -sw;
-      /* 手臂微微外张，别贴着身体 */
-      shoulders[0].rotation.z = -.18;
-      shoulders[1].rotation.z = .18;
+      shoulders[0].rotation.x = armL;
+      shoulders[1].rotation.x = armR;
+      shoulders[0].rotation.z = -armZ;
+      shoulders[1].rotation.z = armZ;
     }
-    /* 整体挤压：落地瞬间压扁、抬起时拉长 */
-    let sq = 1;
-    if (moving) {
-      /* 身体最低点（bob 为负）时压扁 */
-      sq = 1 - Math.max(0, -Math.sin(ph * 2)) * .055 * sp;
+    for (let i = 0; i < feet.length; i++) {
+      const f = feet[i];
+      f.position.y = footLift;
+      f.position.z = footFwd;
+      f.rotation.x = footTilt;
     }
-    avatar.scale.set(1 / Math.sqrt(sq), sq, 1 / Math.sqrt(sq));
-    /* 名牌不参与挤压（否则会跟着身体变形）*/
+    /* 名牌贴着头顶：身体拉伸/压扁时一起升降，别悬在半空 */
     const tg = avatar.userData.tag;
-    if (tg) {
-      tg.scale.set(1.72 / avatar.scale.x, 0.538 / avatar.scale.y, 1);
-      /* 名牌的世界高度也要保持恒定 ——
-         avatar 被压扁时名牌不能跟着一起往下掉，否则每一步都在点头 */
-      tg.position.y = 2.05 / avatar.scale.y;
-    }
-    return moving;
+    if (tg) tg.position.y = 1.80 * sy + .22;
+    return inAir;
   }
 
   /* ══════════════════════════════════════════════════════
@@ -12875,12 +12932,12 @@ function updateAerialHaze(dt,t){
     g.visible = false;
     scene.add(g);
     MP.self = g;
-    /* 名牌挂在「不参与挤压」的外层 group 上 ——
-       否则 walkCycle 的整体 scale 会把名牌压扁 */
+    /* 名牌挂在「不参与形变」的外层 group 上 —— 身体压缩/拉伸只作用在 bodyGrp，
+       名牌既不会被压扁，也不会跟着上下点头 */
     MP.selfTag = makeTagSprite(MP.display || MP.account || '我', '#ffd9a0');
     MP.selfTag.position.y = 2.05;
     g.add(MP.selfTag);
-    g.userData.tag = MP.selfTag;      // 供 walkCycle 做反向 scale 补偿
+    g.userData.tag = MP.selfTag;
     MP._phase = { v: 0 };
   };
 
@@ -12981,21 +13038,13 @@ function updateAerialHaze(dt,t){
     /* ── 本地第三人称角色 + 相机（不依赖联机：没登录也能切第三人称）── */
     /* 本地第三人称角色跟随 */
     if (MP.third && fp.on && MP.self) {
-      MP.self.position.set(fp.x, fp.y, fp.z);
+      /* 角色根节点跟着离地高度抬起来 —— 少了这一步，人只是原地拉伸，不会跳起来 */
+      MP.self.position.set(fp.x, fp.y + fp.jumpY, fp.z);
       const spd = Math.hypot(fp.vx, fp.vz);
       /* 面朝移动方向（不是镜头方向）—— 侧着走就侧着走，不会扭头看镜头 */
       faceByMove(MP.self, dt, fp.vx, fp.vz, fp.yaw);
-      /* 蛋仔式走路循环 */
-      walkCycle(MP.self, dt, spd, MP._phase);
-      /* 跳跃：空中拉伸、落地压扁（独立于走路循环）*/
-      if (fp.jumpY > .01 || fp.jumpVy !== 0) {
-        const air = 1 + Math.min(.14, Math.abs(fp.jumpVy) * .02);
-        MP.self.scale.set(1 / Math.sqrt(air), air, 1 / Math.sqrt(air));
-        if (MP.self.userData.bodyGrp) MP.self.userData.bodyGrp.rotation.x = -.16;
-        /* 跳跃的拉伸也同步补偿名牌，别让名牌跟着变胖变瘦 */
-        const jt = MP.self.userData.tag;
-        if (jt) jt.scale.set(1.72 / MP.self.scale.x, 0.538 / MP.self.scale.y, 1);
-      }
+      /* 蛋仔式动画：走路循环 + 跳跃三段（起跳 / 滞空 / 落地）*/
+      animateAvatar(MP.self, dt, spd, fp.jumpY, fp.jumpVy, MP._phase);
 
       /* 相机：蛋仔式第三人称构图 ——
          相机挂在角色后上方（orbit），视线沿角色正前方 12m 出去，
@@ -13009,8 +13058,8 @@ function updateAerialHaze(dt,t){
       MP._cp += (pTarget - MP._cp) * (1 - Math.pow(.0006, dt));
       const pitch = MP._cp;
       const dist = MP.camDist;
-      /* pivot = 角色头顶略上方 */
-      const pivot = new THREE.Vector3(fp.x, fp.y + 1.90, fp.z);
+      /* pivot = 角色头顶略上方（跟着离地高度一起抬，跳跃时相机才不会把角色甩出画面）*/
+      const pivot = new THREE.Vector3(fp.x, fp.y + fp.jumpY + 1.90, fp.z);
       const fwd = new THREE.Vector3(
         -Math.sin(yaw) * Math.cos(pitch),
         Math.sin(pitch),
@@ -13052,6 +13101,12 @@ function updateAerialHaze(dt,t){
       p.cur.x += (tx - p.cur.x) * k;
       p.cur.y += (ty - p.cur.y) * k;
       p.cur.z += (tz - p.cur.z) * k;
+      /* 离地高度插值 + 竖直速度估算（远端也要能播跳跃动作）*/
+      const tj = p.targetJy || 0;
+      const prevJy = p.curJy === undefined ? tj : p.curJy;
+      p.curJy = prevJy + (tj - prevJy) * k;
+      const vyRaw = (p.curJy - prevJy) / Math.max(dt, .001);
+      p.curVy = (p.curVy === undefined) ? vyRaw : p.curVy * .78 + vyRaw * .22;
       // 朝向：走最短弧
       let dy = p.target.yaw - p.cur.yaw;
       while (dy > Math.PI) dy -= Math.PI * 2;
@@ -13062,14 +13117,14 @@ function updateAerialHaze(dt,t){
       const mvX = p.rawDx || 0, mvZ = p.rawDz || 0;
       const vNow = p.rawSpeed !== undefined ? p.rawSpeed : 0;
       faceByMove(p.group, dt, mvX, mvZ, p.cur.yaw);
-      walkCycle(p.group, dt, vNow, p.phase || (p.phase = { v: 0 }));
+      animateAvatar(p.group, dt, vNow, p.curJy || 0, p.curVy || 0, p.phase || (p.phase = { v: 0 }));
       // 标签始终朝向相机（Sprite 自带）
       // 远距离时淡出标签，避免糊屏
       const d = camera.position.distanceTo(p.group.position);
       p.tag.material.opacity = d > 42 ? 0 : (d > 26 ? (42 - d) / 16 : 1);
     }
 
-    /* 推本地位置 */
+    /* 推本地位置（y 含离地高度，jy 单独给一份让对方能播跳跃动作）*/
     const now2 = performance.now();
     if (now2 - MP.lastSend > 1000 / MP.sendHz) {
       MP.lastSend = now2;
@@ -13077,10 +13132,11 @@ function updateAerialHaze(dt,t){
       const py = MP._manual ? MP._lastY : (fp.on ? fp.y : (MP._lastY || 0));
       const pz = MP._manual ? MP._lastZ : (fp.on ? fp.z : (MP._lastZ || 0));
       const pyaw = MP._manual ? MP._lastYaw : (fp.on ? fp.yaw : (MP._lastYaw || 0));
+      const pjy = MP._manual ? 0 : (fp.on ? fp.jumpY : 0);
       if (!MP._manual) { MP._lastX = px; MP._lastY = py; MP._lastZ = pz; MP._lastYaw = pyaw; }
       MP.send({
         t: 'pos', mode: MP.third ? 'tp' : 'fp',
-        p: { x: px, y: py, z: pz, yaw: pyaw }
+        p: { x: px, y: py + pjy, z: pz, yaw: pyaw, jy: pjy }
       });
     }
   };

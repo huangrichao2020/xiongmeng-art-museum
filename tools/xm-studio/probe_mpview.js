@@ -3,6 +3,8 @@
    ③ 沙盘视角下本地角色隐藏 */
 const { chromium } = require('playwright-core');
 const path=require('path'),os=require('os');
+const { pickAccounts } = require('./mp-accounts');
+const ACC = pickAccounts(process.argv[2]||'');
 const EXE=path.join(os.homedir(),"Library/Caches/ms-playwright/chromium-1248/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing");
 const URL_ = process.env.PURL || 'https://preview.ai10088.com/alex-garage/';
 (async()=>{
@@ -47,7 +49,7 @@ const URL_ = process.env.PURL || 'https://preview.ai10088.com/alex-garage/';
   console.log('=== F：联机第三人称 → 退出联机 → 切视角 ===');
   await A.evaluate(()=>{const w=document.getElementById('mp-login');if(w)w.classList.remove('hide');});
   await A.waitForSelector('#mp-acc');
-  await A.fill('#mp-acc','test01'); await A.fill('#mp-pass','123456');
+  await A.fill('#mp-acc',ACC.a); await A.fill('#mp-pass','123456');
   await A.click('#mp-go');
   await A.waitForTimeout(2500);
   await click('w-third'); await st('联机三人称  ');

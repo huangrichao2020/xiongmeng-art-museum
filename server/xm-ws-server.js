@@ -18,11 +18,28 @@ const PORT = 18888;
 const HOST = '127.0.0.1';
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
-/* ── 账号表：默认两个测试号 ── */
+/* ── 账号表 ──
+   test01 / test02 是给真人玩家用的（游戏登录页的快捷按钮就是这两个）；
+   test03~test08 是自动化探针专用的 —— 探针按进程号分配账号，
+   免得探针跟真人抢同一个号、把人家顶下线。 */
 const ACCOUNTS = new Map([
   ['test01', { pass: '123456' }],
   ['test02', { pass: '123456' }],
+  ['test03', { pass: '123456' }],
+  ['test04', { pass: '123456' }],
+  ['test05', { pass: '123456' }],
+  ['test06', { pass: '123456' }],
+  ['test07', { pass: '123456' }],
+  ['test08', { pass: '123456' }],
 ]);
+
+/* ── 最近一次「踢人」的时间戳 ──
+   同账号被踢后 3 秒内的再次登录直接拒绝：
+   被踢的一方如果没收到 kicked 消息（连接已半开），它会自动重连，
+   重连又会顶掉刚登录的新客户端 → 两边无限互踢。
+   这个护栏让「被踢方的自动重连」撞墙停下，循环自然终止。 */
+const kickGuard = new Map();
+const KICK_GUARD_MS = 3000;
 
 /* ── 在线会话：account → session ── */
 const sessions = new Map();      // account -> session
@@ -197,6 +214,15 @@ function handleConn(socket) {
       if (!rec) { send({ t: 'err', code: 'noaccount', msg: '账号不存在' }); close(4004); return; }
       if (rec.pass !== pass) { send({ t: 'err', code: 'badpass', msg: '密码错误' }); close(4003); return; }
 
+      // 刚被踢过的账号，短时间内不再放行登录（防互踢死循环）
+      const kickedAt = kickGuard.get(acc);
+      if (kickedAt && Date.now() - kickedAt < KICK_GUARD_MS) {
+        send({ t: 'err', code: 'kicked', msg: '该账号已在别处登录' });
+        close(4009);
+        log('guard-block', acc);
+        return;
+      }
+
       // 同号重复登录 → 踢掉上一个
       const old = sessions.get(acc);
       if (old && old !== session) {
@@ -206,6 +232,7 @@ function handleConn(socket) {
         setTimeout(() => { try { old.socket.end(); } catch (e) { } }, 120);
         if (sessions.get(acc) === old) sessions.delete(acc);
         bySocket.delete(old.socket);
+        kickGuard.set(acc, Date.now());
         log('kick-old', acc);
       }
 
@@ -249,6 +276,7 @@ function handleConn(socket) {
         session.pos = {
           x: +(+p.x).toFixed(3), y: +(+p.y).toFixed(3), z: +(+p.z).toFixed(3),
           yaw: +(+p.yaw).toFixed(3),
+          jy: +(+p.jy || 0).toFixed(3),      // 离地高度（跳跃）—— 少了它对方看不到跳跃动作
         };
         broadcastRoom(session.room, {
           t: 'move', account: session.account, display: session.display,

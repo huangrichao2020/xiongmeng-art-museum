@@ -1,5 +1,7 @@
 const { chromium } = require('playwright-core');
 const path=require('path'),os=require('os');
+const { pickAccounts } = require('./mp-accounts');
+const ACC = pickAccounts('m');
 const EXE=path.join(os.homedir(),"Library/Caches/ms-playwright/chromium-1248/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing");
 const URL_ = (process.env.PURL || 'https://preview.ai10088.com/alex-garage/') + '?mobile=1';
 (async()=>{
@@ -13,7 +15,7 @@ const URL_ = (process.env.PURL || 'https://preview.ai10088.com/alex-garage/') + 
   await A.waitForTimeout(6000);
   await A.evaluate(()=>{const w=document.getElementById('mp-login');if(w)w.classList.remove('hide');});
   await A.waitForSelector('#mp-acc');
-  await A.fill('#mp-acc','test02'); await A.fill('#mp-pass','123456');
+  await A.fill('#mp-acc',ACC.a); await A.fill('#mp-pass','123456');
   await A.click('#mp-go');
   await A.waitForTimeout(2500);
   await A.screenshot({path:'/tmp/mp_mob_closed.png'});

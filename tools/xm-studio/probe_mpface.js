@@ -3,6 +3,8 @@
    PURL 不设则测线上 */
 const { chromium } = require('playwright-core');
 const path=require('path'),os=require('os');
+const { pickAccounts } = require('./mp-accounts');
+const ACC = pickAccounts(process.argv[2]||'');
 const EXE=path.join(os.homedir(),"Library/Caches/ms-playwright/chromium-1248/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing");
 const URL_ = process.env.PURL || 'https://preview.ai10088.com/alex-garage/';
 (async()=>{
@@ -23,8 +25,8 @@ const URL_ = process.env.PURL || 'https://preview.ai10088.com/alex-garage/';
     await pg.fill('#mp-acc',acc); await pg.fill('#mp-pass','123456');
     await pg.click('#mp-go');
   }
-  await login(A,'test01'); await A.waitForTimeout(1200);
-  await login(B,'test02'); await B.waitForTimeout(2000);
+  await login(A,ACC.a); await A.waitForTimeout(1200);
+  await login(B,ACC.b); await B.waitForTimeout(2000);
   await A.evaluate(()=>MP.toggleThird());
   await A.waitForTimeout(2500);
 

@@ -1,6 +1,8 @@
 /* 验证：个人信息默认收起 → 点「个人」才展开 → 账号/ID/改 ID 都在里面 */
 const { chromium } = require('playwright-core');
 const path=require('path'),os=require('os');
+const { pickAccounts } = require('./mp-accounts');
+const ACC = pickAccounts(process.argv[2]||'');
 const EXE=path.join(os.homedir(),"Library/Caches/ms-playwright/chromium-1248/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing");
 const URL_ = process.env.PURL || 'https://preview.ai10088.com/alex-garage/';
 (async()=>{
@@ -36,7 +38,7 @@ const URL_ = process.env.PURL || 'https://preview.ai10088.com/alex-garage/';
   await st('未登录    ');
   await A.evaluate(()=>{const w=document.getElementById('mp-login');if(w)w.classList.remove('hide');});
   await A.waitForSelector('#mp-acc');
-  await A.fill('#mp-acc','test01'); await A.fill('#mp-pass','123456');
+  await A.fill('#mp-acc',ACC.a); await A.fill('#mp-pass','123456');
   await A.click('#mp-go');
   await A.waitForTimeout(2500);
   await st('登录后    ');

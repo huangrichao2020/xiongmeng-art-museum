@@ -3,6 +3,8 @@
         ③ 位置实时同步到对方 ④ 双方第三人称相机正常 */
 const { chromium } = require('playwright-core');
 const path=require('path'),os=require('os');
+const { pickAccounts } = require('./mp-accounts');
+const ACC = pickAccounts(process.argv[2]||'');
 const EXE=path.join(os.homedir(),"Library/Caches/ms-playwright/chromium-1248/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing");
 const URL_ = process.env.PURL || 'https://preview.ai10088.com/alex-garage/';
 
@@ -47,8 +49,8 @@ const stickRelease=async(pg)=>{
   await D.waitForTimeout(6000); await M.waitForTimeout(6000);
 
   console.log('=== 登录 ===');
-  await login(D,'test01');
-  await login(M,'test02');
+  await login(D,ACC.a);
+  await login(M,ACC.b);
   await D.waitForTimeout(1500);
   console.log('桌面 peers:', JSON.stringify(await D.evaluate(()=>Object.keys(MP.peers))));
   console.log('手机 peers:', JSON.stringify(await M.evaluate(()=>Object.keys(MP.peers))));
@@ -82,8 +84,8 @@ const stickRelease=async(pg)=>{
   await stickRelease(M);
 
   console.log('=== 桌面看到的手机角色位置 ===');
-  const seenByDesk=await D.evaluate(()=>{
-    const p=MP.peers.get('test02'); if(!p)return null;   // peers 是 Map
+  const seenByDesk=await D.evaluate((acc)=>{
+    const p=MP.peers.get(acc); if(!p)return null;   // peers 是 Map
     const g=p.group;
     return {display:p.display, groupPos:[+g.position.x.toFixed(2),+g.position.y.toFixed(2),+g.position.z.toFixed(2)],
             rotY:+g.rotation.y.toFixed(3),
@@ -91,8 +93,8 @@ const stickRelease=async(pg)=>{
             bodyPosY:g.userData.bodyGrp?+g.userData.bodyGrp.position.y.toFixed(4):null,
             rawSpeed:p.rawSpeed!==undefined?+p.rawSpeed.toFixed(2):null,
             screen:p.tag.material.opacity};
-  });
-  console.log('桌面看到的 test02:', JSON.stringify(seenByDesk));
+  }, ACC.b);
+  console.log('桌面看到的 '+ACC.b+':', JSON.stringify(seenByDesk));
   console.log('手机真实位置   :', JSON.stringify([mDuring.fp.x,mDuring.fp.y,mDuring.fp.z]));
 
   await D.screenshot({path:'/tmp/mp_duo_desk.png'});
