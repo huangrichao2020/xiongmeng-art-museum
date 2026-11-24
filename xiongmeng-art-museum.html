@@ -5334,7 +5334,9 @@ const treeX=[-24,-17.8,-6,5.5,14.5,21.5,32.5,39.5];
 /* 路灯（一体修长弯管 + 圣诞花环挂饰 + 灯顶积雪 + 暖金光晕） */
 const lampPools=[];
 {
-  const lx=[-19.5,-10.5,9.5,18.0,26.8,36.0];
+  /* 路灯布点：原 x=26.8 那根正好立在动漫园中轴（PX=26.5）门口，
+     挡住「进动漫雪园」的第一眼视线，按要求整根去掉（含它带的点光源和碰撞体）。 */
+  const lx=[-19.5,-10.5,9.5,18.0,36.0];
   const poleM=M(0x2a3138,{roughness:.42,metalness:.72,flatShading:false});
   const poleCurve=new THREE.CatmullRomCurve3([
     new THREE.Vector3(0,.2,0),
@@ -5385,7 +5387,7 @@ const lampPools=[];
     const cone=new THREE.Mesh(lampConeGeo,lampConeMat);
     cone.position.set(0,2.9,1.40);cone.castShadow=false;cone.raycast=()=>{};
     g.add(cone);
-    if(x===-19.5||x===9.5||x===26.8){
+    if(x===-19.5||x===9.5){
       const pl=new THREE.PointLight(0xffd9a4,68,34,1.65);
       pl.position.set(x,5.8,12.85);scene.add(pl);shopLights.push({l:pl,base:68,street:true});
     }
@@ -8252,7 +8254,7 @@ const OUTDOOR_OBS=(()=>{
   const list=[];
   // 1. 街道树坑 + 路灯杆 + 垃圾桶 + 消防栓 + 隔离柱 + 长椅 + 交通牌/灯 + 门前迎宾摆件
   for(const tx of [-24,-17.8,-6,5.5,14.5,21.5,32.5,39.5])list.push([tx,9.35,.92]);
-  for(const lx of [-19.5,-10.5,9.5,18.0,26.8,36.0])list.push([lx,11.45,.68]);
+  for(const lx of [-19.5,-10.5,9.5,18.0,36.0])list.push([lx,11.45,.68]);
   for(const bx of [-8.4,4.5])list.push([bx,9.5,.55]);
   list.push([-7.2,9.3,.45],[9.6,10.6,.48],[-10.75,11.2,.48],[19.6,10.7,.58],[3.25,8.75,.72],[-10.9,9.55,.95]);
   for(const s of [-1,1])list.push([s*8.3,8.55,1.05],[s*4.9,8.55,.72],[s*3.9,8.20,.5]);
