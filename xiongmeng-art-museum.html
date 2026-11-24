@@ -532,77 +532,106 @@
   /* ══ 多人联机 UI ══ */
   #mp-login{
     position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;
-    background:radial-gradient(120% 90% at 50% 30%,rgba(18,30,50,.42) 0%,rgba(6,10,18,.74) 78%);
+    background:radial-gradient(120% 90% at 50% 32%,rgba(40,60,100,.30) 0%,rgba(10,16,30,.62) 80%);
     backdrop-filter:blur(2px);transition:opacity .35s;
   }
   #mp-login.hide{opacity:0;pointer-events:none}
   .mp-card{
-    width:min(340px,calc(100vw - 32px));padding:26px 24px 22px;border-radius:18px;
-    background:rgba(14,20,32,.9);border:1px solid rgba(140,190,255,.22);
-    box-shadow:0 18px 60px rgba(0,0,0,.6);
-    color:#e8f0fb;font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    width:min(352px,calc(100vw - 32px));padding:26px 24px 22px;border-radius:26px;
+    background:linear-gradient(180deg,rgba(255,255,255,.97),rgba(240,246,255,.95));
+    border:4px solid #fff;
+    box-shadow:0 18px 50px rgba(20,40,80,.4);
+    color:#2b3242;font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
   }
-  .mp-title{font-size:21px;font-weight:800;letter-spacing:2px;text-align:center}
-  .mp-sub{font-size:11px;opacity:.55;text-align:center;margin:6px 0 20px}
-  .mp-row{display:flex;align-items:center;gap:10px;margin-bottom:11px;font-size:12px}
-  .mp-row span{width:34px;opacity:.65;flex:none}
+  .mp-title{font-size:22px;font-weight:900;letter-spacing:2px;text-align:center;color:#3b4763}
+  .mp-sub{font-size:11px;opacity:.55;text-align:center;margin:6px 0 20px;color:#6b7793}
+  .mp-row{display:flex;align-items:center;gap:10px;margin-bottom:11px;font-size:12px;color:#5b6683}
+  .mp-row span{width:34px;flex:none;font-weight:800}
   .mp-row input{
-    flex:1;min-width:0;padding:9px 11px;border-radius:9px;font-size:13px;
-    background:rgba(255,255,255,.07);border:1px solid rgba(150,190,240,.24);color:#eaf2ff;outline:none;
+    flex:1;min-width:0;padding:10px 13px;border-radius:15px;font-size:13px;font-weight:600;
+    background:#fff;border:2.5px solid #e2e9f5;color:#2b3242;outline:none;
   }
-  .mp-row input:focus{border-color:rgba(120,210,255,.6);background:rgba(255,255,255,.1)}
-  .mp-quick{display:flex;gap:8px;margin:14px 0 16px}
+  .mp-row input:focus{border-color:#ffb35c;box-shadow:0 0 0 3px rgba(255,179,92,.2)}
+  .mp-quick{display:flex;gap:9px;margin:14px 0 16px}
   .mp-quick button{
-    flex:1;padding:7px 0;border-radius:8px;font-size:11px;cursor:pointer;
-    background:rgba(90,150,220,.2);border:1px solid rgba(130,190,255,.3);color:#d6e8ff;
+    flex:1;padding:9px 0;border-radius:15px;font-size:12px;font-weight:800;cursor:pointer;border:none;
+    background:linear-gradient(180deg,#8ee8b4,#43c47c);color:#fff;box-shadow:0 3px 0 #2e9a5f;
   }
-  .mp-quick button:hover{background:rgba(90,150,220,.4)}
+  .mp-quick button:nth-child(2){background:linear-gradient(180deg,#a9d8ff,#5aa9ec);box-shadow:0 3px 0 #3a83c4}
+  .mp-quick button:active{transform:translateY(2px);box-shadow:none}
   .mp-go{
-    width:100%;padding:11px 0;border-radius:10px;border:none;cursor:pointer;
-    font-size:14px;font-weight:700;letter-spacing:2px;
-    background:linear-gradient(180deg,#3f9ae0,#2a6fb5);color:#fff;
-    box-shadow:0 6px 18px rgba(50,140,220,.35);
+    width:100%;padding:12px 0;border-radius:17px;border:none;cursor:pointer;
+    font-size:14px;font-weight:900;letter-spacing:2px;
+    background:linear-gradient(180deg,#ffd08a,#f9a03f);color:#5a3a10;
+    box-shadow:0 4px 0 #d4801f;
   }
-  .mp-go:hover{filter:brightness(1.12)}
+  .mp-go:active{transform:translateY(3px);box-shadow:0 1px 0 #d4801f}
   .mp-skip{
-    width:100%;margin-top:9px;padding:7px 0;border-radius:8px;font-size:11px;cursor:pointer;
-    background:transparent;border:1px solid rgba(150,190,240,.22);color:#a9c2de;
+    width:100%;margin-top:10px;padding:8px 0;border-radius:15px;font-size:11px;font-weight:700;cursor:pointer;
+    background:rgba(255,255,255,.5);border:2px solid #dbe4f2;color:#7d89a3;
   }
-  .mp-skip:hover{background:rgba(255,255,255,.06);color:#d6e8ff}
-  .mp-msg{margin-top:11px;font-size:11px;min-height:15px;text-align:center;opacity:.8}
-  .mp-msg.err{color:#ff9a9a;opacity:1}
+  .mp-skip:hover{background:#fff;color:#5b6683}
+  .mp-msg{margin-top:12px;font-size:11px;min-height:15px;text-align:center;font-weight:700;color:#7d89a3}
+  .mp-msg.err{color:#e8607f}
 
+  /* 蛋仔风格 HUD：圆润卡片 + 糖果色按钮 + 圆章头像 */
   #mp-panel{
-    position:fixed;z-index:8800;left:14px;top:14px;width:172px;padding:11px 12px;border-radius:12px;
-    background:rgba(12,18,28,.78);border:1px solid rgba(140,190,255,.2);
-    color:#e6eefb;font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:11px;
-    backdrop-filter:blur(8px);user-select:none;
+    position:fixed;z-index:8800;left:14px;top:14px;width:186px;padding:12px;border-radius:20px;
+    background:linear-gradient(180deg,rgba(255,255,255,.94),rgba(238,244,255,.9));
+    border:3px solid #fff;
+    box-shadow:0 10px 26px rgba(20,40,80,.3),0 3px 0 rgba(255,255,255,.9) inset;
+    color:#2b3242;font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:11px;
+    user-select:none;
   }
-  .mp-ph{display:flex;align-items:center;gap:7px;font-weight:700;margin-bottom:8px;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .mp-dot{width:7px;height:7px;border-radius:50%;background:#4be08a;flex:none;
-    box-shadow:0 0 7px #4be08a}
-  .mp-peers{margin-bottom:9px;max-height:132px;overflow:auto}
-  .mp-pr{display:flex;align-items:center;gap:6px;padding:2.5px 0;opacity:.9}
-  .mp-pr b{flex:none;font-weight:400}
-  .mp-pr span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .mp-edit{display:flex;gap:5px;margin-bottom:7px}
+  .mp-me-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .mp-avatar{
+    width:30px;height:30px;flex:none;border-radius:50%;
+    background:linear-gradient(150deg,#ffd9a0,#ffb35c);
+    color:#fff;font-weight:800;font-size:14px;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 2px 6px rgba(180,120,40,.45),0 0 0 2.5px #fff;
+  }
+  .mp-me-name{font-weight:800;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mp-peers{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;min-height:32px;align-items:center}
+  .mp-badge{
+    position:relative;width:30px;height:30px;border-radius:50%;
+    background:linear-gradient(150deg,var(--c),rgba(0,0,0,.18) 160%);
+    color:#fff;font-weight:800;font-size:13px;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 2px 6px rgba(0,0,0,.22),0 0 0 2.5px #fff;
+  }
+  .mp-badge i{
+    position:absolute;left:50%;bottom:-19px;transform:translateX(-50%);
+    font-style:normal;font-size:10px;font-weight:700;color:#3a4356;
+    background:rgba(255,255,255,.95);padding:1px 6px;border-radius:9px;white-space:nowrap;
+    opacity:0;pointer-events:none;transition:opacity .15s;z-index:2;
+  }
+  .mp-badge:hover i{opacity:1}
+  .mp-none{font-size:10px;color:#8a94a8}
+  .mp-edit{display:flex;gap:6px;margin-bottom:9px}
   .mp-edit input{
-    flex:1;min-width:0;padding:6px 8px;border-radius:7px;font-size:11px;
-    background:rgba(255,255,255,.07);border:1px solid rgba(150,190,240,.22);color:#eaf2ff;outline:none;
+    flex:1;min-width:0;padding:7px 10px;border-radius:13px;font-size:11px;font-weight:600;
+    background:#fff;border:2px solid #dbe4f2;color:#2b3242;outline:none;
   }
+  .mp-edit input:focus{border-color:#ffb35c}
   .mp-edit button{
-    padding:0 10px;border-radius:7px;font-size:11px;cursor:pointer;flex:none;
-    background:rgba(90,150,220,.28);border:1px solid rgba(130,190,255,.3);color:#d6e8ff;
+    padding:0 12px;border-radius:13px;font-size:11px;font-weight:800;cursor:pointer;flex:none;border:none;
+    background:linear-gradient(180deg,#ffb35c,#f09230);color:#fff;
+    box-shadow:0 2px 0 #c96f1c;
   }
+  .mp-edit button:active{transform:translateY(1px);box-shadow:0 1px 0 #c96f1c}
+  .mp-btn-row{display:flex;gap:6px}
   .mp-btn{
-    display:block;width:100%;margin-top:5px;padding:7px 0;border-radius:8px;font-size:11px;cursor:pointer;
-    background:rgba(255,255,255,.07);border:1px solid rgba(150,190,240,.22);color:#dbe7f7;
+    flex:1;padding:8px 0;border-radius:14px;font-size:11px;font-weight:800;cursor:pointer;border:none;
+    background:linear-gradient(180deg,#7fd4ff,#3ea9e8);color:#fff;
+    box-shadow:0 3px 0 #2b86bd;
   }
-  .mp-btn.on{background:rgba(70,190,140,.3);border-color:rgba(110,235,180,.5);color:#d6ffe9}
-  .mp-btn2{background:rgba(200,90,90,.18);border-color:rgba(235,120,120,.3);color:#f2d2d2}
+  .mp-btn:active{transform:translateY(1.5px);box-shadow:0 1px 0 #2b86bd}
+  .mp-btn.on{background:linear-gradient(180deg,#8ee8b4,#43c47c);box-shadow:0 3px 0 #2e9a5f}
+  .mp-btn2{background:linear-gradient(180deg,#ff9db4,#f2708f);box-shadow:0 3px 0 #cf5271}
   @media(max-width:700px){
-    #mp-panel{width:142px;left:10px;top:10px;padding:9px 10px;font-size:10px}
+    #mp-panel{width:158px;left:10px;top:10px;padding:10px;border-radius:17px}
+    .mp-avatar,.mp-badge{width:26px;height:26px;font-size:12px}
   }
 </style>
 </head>
@@ -12439,29 +12468,84 @@ function updateAerialHaze(dt,t){
   /* ══════════════════════════════════════════════════════
      远端玩家
      ══════════════════════════════════════════════════════ */
+  /* 蛋仔风格头顶名牌：圆角气泡 + 左侧头像圆片 + 底部小尖角指向角色
+     （蛋仔派对里每个玩家头顶就是一个圆鼓鼓的气泡名牌）*/
   function makeTagSprite(text, color) {
     const c = document.createElement('canvas');
-    const w = 256, h = 64;
-    c.width = w; c.height = h;
+    const W = 512, H = 160;
+    c.width = W; c.height = H;
     const x = c.getContext('2d');
-    x.clearRect(0, 0, w, h);
-    x.font = '600 30px system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
-    x.textAlign = 'center'; x.textBaseline = 'middle';
-    const tw = Math.min(w - 12, x.measureText(text).width + 34);
-    const bx = (w - tw) / 2;
-    x.fillStyle = 'rgba(12,16,22,.72)';
-    roundRect(x, bx, 12, tw, 40, 10); x.fill();
-    x.strokeStyle = color; x.lineWidth = 2;
-    roundRect(x, bx, 12, tw, 40, 10); x.stroke();
-    x.fillStyle = '#f2f7ff';
-    x.fillText(text, w / 2, 33, w - 24);
+    x.clearRect(0, 0, W, H);
+    /* color 统一传 '#rrggbb' 字符串（调用方已拼好，这里不再重复加 #） */
+    const hex = String(color).charAt(0) === '#' ? String(color) : '#' + color.toString(16).padStart(6, '0');
+
+    x.font = '800 46px system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+    x.textBaseline = 'middle';
+    const nameW = x.measureText(text).width;
+    const R = 40;                       // 气泡圆角
+    const PAD = 16;
+    const AV = 68;                      // 头像直径
+    const bubbleW = Math.min(W - 8, PAD * 2 + AV + 12 + nameW + 18);
+    const bx = (W - bubbleW) / 2, by = 14, bh = 84;
+    const tipY = by + bh;
+
+    /* 底部小尖角（指向角色头顶）—— 蛋仔式三角气泡嘴 */
+    const tipW = 26, tipH = 20;
+    const tipX = W / 2;
+    x.beginPath();
+    x.moveTo(tipX - tipW / 2, tipY - 4);
+    x.lineTo(tipX, tipY + tipH);
+    x.lineTo(tipX + tipW / 2, tipY - 4);
+    x.closePath();
+    x.fillStyle = hex; x.fill();
+
+    /* 气泡主体：白底 + 彩色描边 + 底部内侧也填白 */
+    x.beginPath();
+    x.moveTo(bx + R, by);
+    x.arcTo(bx + bubbleW, by, bx + bubbleW, by + bh, R);
+    x.arcTo(bx + bubbleW, by + bh, bx, by + bh, R);
+    x.arcTo(bx, by + bh, bx, by, R);
+    x.arcTo(bx, by, bx + bubbleW, by, R);
+    x.closePath();
+    x.fillStyle = 'rgba(255,255,255,.94)'; x.fill();
+    x.strokeStyle = hex; x.lineWidth = 7; x.lineJoin = 'round'; x.stroke();
+
+    /* 头像圆片：同色渐变球，蛋仔玩家列表那种小圆章 */
+    const ax = bx + PAD + AV / 2, ay = by + bh / 2;
+    const g = x.createLinearGradient(ax - AV / 2, ay - AV / 2, ax + AV / 2, ay + AV / 2);
+    g.addColorStop(0, hex);
+    g.addColorStop(1, shade(color, .55));
+    x.beginPath(); x.arc(ax, ay, AV / 2 - 3, 0, Math.PI * 2);
+    x.fillStyle = g; x.fill();
+    x.strokeStyle = 'rgba(255,255,255,.9)'; x.lineWidth = 4; x.stroke();
+    /* 头像里的首字 */
+    x.fillStyle = '#fff';
+    x.font = '800 34px system-ui,-apple-system,"PingFang SC",sans-serif';
+    x.textAlign = 'center';
+    x.fillText(text.slice(0, 1).toUpperCase(), ax, ay + 2);
+
+    /* 名字 */
+    x.fillStyle = '#2b3242';
+    x.font = '800 44px system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+    x.textAlign = 'left';
+    x.fillText(text, ax + AV / 2 + 10, ay + 3, bubbleW - AV - PAD * 2);
+
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
     const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true });
     const sp = new THREE.Sprite(mat);
-    sp.scale.set(1.5, 0.375, 1);
+    sp.scale.set(1.72, 0.538, 1);
     sp.renderOrder = 999;
     return sp;
+  }
+  /* 颜色压暗（头像渐变用）—— 接受 '#rrggbb' 字符串 */
+  function shade(hex, k) {
+    const h = String(hex).replace('#', '');
+    const r = Math.round(parseInt(h.slice(0, 2), 16) * k);
+    const g = Math.round(parseInt(h.slice(2, 4), 16) * k);
+    const b = Math.round(parseInt(h.slice(4, 6), 16) * k);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
   }
   function roundRect(x, px, py, w, h, r) {
     x.beginPath();
@@ -12522,58 +12606,82 @@ function updateAerialHaze(dt,t){
   }
 
   /* ── 远端玩家模型：矮胖雪人熊（跟场景风格一致，不抢戏）── */
+  /* 蛋仔风格角色：蛋形身体 + 大圆头 + 小短手 + 圆脚 + 白肚皮
+     —— 蛋仔派对的主角本身就是一颗蛋，造型越圆润越像那个味儿 */
   function buildAvatar(colorHex) {
     const g = new THREE.Group();
     const bodyM = new THREE.MeshStandardMaterial({
-      color: colorHex, roughness: .78, metalness: .04,
-      emissive: new THREE.Color(colorHex).multiplyScalar(.28), emissiveIntensity: .55
+      color: colorHex, roughness: .62, metalness: .03,
+      emissive: new THREE.Color(colorHex).multiplyScalar(.22), emissiveIntensity: .5
     });
-    const snowM = new THREE.MeshStandardMaterial({ color: 0xf4f9ff, roughness: .9, metalness: 0 });
-    const darkM = new THREE.MeshStandardMaterial({ color: 0x232a33, roughness: .6 });
+    const snowM = new THREE.MeshStandardMaterial({ color: 0xfdfdff, roughness: .78, metalness: 0 });
+    const darkM = new THREE.MeshStandardMaterial({ color: 0x2b3242, roughness: .42 });
+    const blushM = new THREE.MeshStandardMaterial({ color: 0xff9db4, roughness: .85 });
 
-    const body = new THREE.Mesh(new THREE.SphereGeometry(.42, 18, 14), bodyM);
-    body.position.y = .82; body.scale.set(1, .92, .92);
+    /* 蛋形身体：用球体压扁 + 上小下大的蛋轮廓（半径往下收）*/
+    const body = new THREE.Mesh(new THREE.SphereGeometry(.46, 24, 18), bodyM);
+    body.position.y = .74; body.scale.set(.92, 1.12, .92);
     body.castShadow = true;
     g.add(body);
 
-    const belly = new THREE.Mesh(new THREE.SphereGeometry(.30, 16, 12), snowM);
-    belly.position.set(0, .78, .22); belly.scale.set(1, 1, .55);
+    /* 蛋壳上缘的小尖（蛋仔头顶那撮毛）*/
+    const tuft = new THREE.Mesh(new THREE.ConeGeometry(.075, .17, 8), bodyM);
+    tuft.position.y = 1.24; tuft.rotation.z = .22;
+    g.add(tuft);
+
+    /* 白肚皮 */
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(.34, 20, 14), snowM);
+    belly.position.set(0, .68, .17); belly.scale.set(1, 1.12, .62);
     g.add(belly);
 
-    const head = new THREE.Mesh(new THREE.SphereGeometry(.30, 18, 14), bodyM);
-    head.position.y = 1.40; head.castShadow = true;
+    /* 大圆头（蛋仔的头身比很夸张）*/
+    const head = new THREE.Mesh(new THREE.SphereGeometry(.36, 24, 18), bodyM);
+    head.position.y = 1.44; head.scale.set(1, .96, 1);
+    head.castShadow = true;
     g.add(head);
 
-    // 耳朵
+    /* 眼睛：黑豆眼 + 高光（蛋仔的招牌表情）*/
     for (const s of [-1, 1]) {
-      const ear = new THREE.Mesh(new THREE.SphereGeometry(.115, 12, 10), bodyM);
-      ear.position.set(s * .21, 1.60, 0);
-      g.add(ear);
-    }
-    // 眼睛
-    for (const s of [-1, 1]) {
-      const e = new THREE.Mesh(new THREE.SphereGeometry(.038, 8, 8), darkM);
-      e.position.set(s * .10, 1.44, .27);
+      const e = new THREE.Mesh(new THREE.SphereGeometry(.052, 10, 10), darkM);
+      e.position.set(s * .125, 1.47, .30); e.scale.set(1, 1.12, .7);
       g.add(e);
+      const gl = new THREE.Mesh(new THREE.SphereGeometry(.019, 8, 8), snowM);
+      gl.position.set(s * .125 - .014, 1.51, .335);
+      g.add(gl);
+      /* 腮红 */
+      const bl = new THREE.Mesh(new THREE.CircleGeometry(.072, 14), blushM);
+      bl.position.set(s * .225, 1.37, .27); bl.rotation.y = s * .3;
+      g.add(bl);
     }
-    // 鼻子
-    const nose = new THREE.Mesh(new THREE.SphereGeometry(.05, 8, 8), darkM);
-    nose.position.set(0, 1.35, .29);
-    g.add(nose);
-    // 围巾
-    const scarf = new THREE.Mesh(new THREE.TorusGeometry(.24, .075, 8, 20), new THREE.MeshStandardMaterial({ color: 0xd23b32, roughness: .85 }));
-    scarf.position.y = 1.16; scarf.rotation.x = Math.PI / 2;
+    /* 小嘴（弧线）*/
+    const mouth = new THREE.Mesh(new THREE.TorusGeometry(.055, .013, 6, 14, Math.PI), darkM);
+    mouth.position.set(0, 1.345, .305); mouth.rotation.z = Math.PI;
+    g.add(mouth);
+
+    /* 围巾（蛋仔常戴的那种宽围巾）*/
+    const scarfM = new THREE.MeshStandardMaterial({ color: 0xd23b32, roughness: .78 });
+    const scarf = new THREE.Mesh(new THREE.TorusGeometry(.30, .095, 10, 24), scarfM);
+    scarf.position.y = 1.14; scarf.rotation.x = Math.PI / 2; scarf.scale.set(1, 1, .8);
     g.add(scarf);
-    // 脚
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(.15, .34, .07), scarfM);
+    tail.position.set(.20, .98, .18); tail.rotation.z = -.18;
+    g.add(tail);
+
+    /* 圆脚 */
     for (const s of [-1, 1]) {
-      const ft = new THREE.Mesh(new THREE.SphereGeometry(.16, 10, 8), darkM);
-      ft.position.set(s * .17, .16, .05); ft.scale.set(1, .7, 1.3);
+      const ft = new THREE.Mesh(new THREE.SphereGeometry(.155, 12, 10), darkM);
+      ft.position.set(s * .19, .13, .04); ft.scale.set(1, .72, 1.35);
       g.add(ft);
+      /* 脚底白边 */
+      const sole = new THREE.Mesh(new THREE.SphereGeometry(.15, 12, 10), snowM);
+      sole.position.set(s * .19, .085, .04); sole.scale.set(1, .5, 1.3);
+      g.add(sole);
     }
-    // 手臂
+    /* 短胖小手（蛋仔的手臂很短粗）*/
     for (const s of [-1, 1]) {
-      const arm = new THREE.Mesh(new THREE.SphereGeometry(.12, 10, 8), bodyM);
-      arm.position.set(s * .44, .86, .02); arm.scale.set(1, 1.5, 1);
+      const arm = new THREE.Mesh(new THREE.SphereGeometry(.135, 12, 10), bodyM);
+      arm.position.set(s * .42, .82, .05); arm.scale.set(1, 1.25, .9);
+      arm.castShadow = true;
       g.add(arm);
     }
     g.userData.keep = true;   // 不参与静态合批
@@ -12663,6 +12771,21 @@ function updateAerialHaze(dt,t){
       p.cur.yaw += dy * k;
       p.group.position.set(p.cur.x, p.cur.y, p.cur.z);
       p.group.rotation.y = p.cur.yaw;
+      /* 远端也做蛋仔式挤压拉伸：用「这一帧实际移动了多远」推速度 */
+      const moved = Math.hypot(p.cur.x - (p.prevX || p.cur.x), p.cur.z - (p.prevZ || p.cur.z));
+      p.prevX = p.cur.x; p.prevZ = p.cur.z;
+      const vNow = moved / Math.max(dt, .001);
+      const movingP = vNow > .35;
+      const ph = now * .011 * (1 + Math.min(1, vNow / 4) * .28);
+      const bobP = movingP ? Math.abs(Math.sin(ph)) * .09 * Math.min(1, vNow / 4) : 0;
+      p.group.position.y = p.cur.y + bobP;
+      const sqP = movingP ? 1 + Math.sin(ph * 2) * .045 : 1;
+      p.group.scale.set(1 / Math.sqrt(sqP), sqP, 1 / Math.sqrt(sqP));
+      p.group.children.forEach((c) => {
+        if (c.geometry && c.geometry.type === 'SphereGeometry' && Math.abs(c.position.x) > .35 && Math.abs(c.position.x) < .5) {
+          c.rotation.x = movingP ? Math.sin(ph) * .62 : 0;
+        }
+      });
       // 标签始终朝向相机（Sprite 自带）
       // 远距离时淡出标签，避免糊屏
       const d = camera.position.distanceTo(p.group.position);
@@ -12687,13 +12810,25 @@ function updateAerialHaze(dt,t){
     if (MP.third && fp.on && MP.self) {
       MP.self.position.set(fp.x, fp.y, fp.z);
       MP.self.rotation.y = fp.yaw;
-      // 走路时上下轻晃 + 手臂摆动（简化）
+      /* 蛋仔式挤压拉伸：跑起来身体上下弹 + 落地压扁
+         —— 蛋仔派对最标志性的手感就是这个「软软的」身体形变 */
       const spd = Math.hypot(fp.vx, fp.vz);
-      const bob = spd > .4 ? Math.sin(now2 * .012 * (1 + spd * .3)) * .045 * Math.min(1, spd / 4) : 0;
+      const moving = spd > .4;
+      const ph = now2 * .011 * (1 + spd * .28);
+      const bob = moving ? Math.abs(Math.sin(ph)) * .09 * Math.min(1, spd / 4) : 0;
       MP.self.position.y = fp.y + bob;
-      MP.self.children.forEach((c, i) => {
-        if (c.geometry && c.geometry.type === 'SphereGeometry' && Math.abs(c.position.x) > .3 && Math.abs(c.position.x) < .5) {
-          c.rotation.x = spd > .4 ? Math.sin(now2 * .012 * (1 + spd * .3)) * .5 : 0;
+      /* 挤压：落地时 y 压扁 xz 撑开；跑动时随步伐轻微反向 */
+      let sq = 1;
+      if (fp.jumpY <= .001 && fp.jumpVy === 0) {
+        sq = moving ? 1 + Math.sin(ph * 2) * .045 : 1;
+      } else {
+        sq = 1 + Math.min(.16, Math.abs(fp.jumpVy) * .022);   // 空中拉伸
+      }
+      MP.self.scale.set(1 / Math.sqrt(sq), sq, 1 / Math.sqrt(sq));
+      /* 手臂摆动 */
+      MP.self.children.forEach((c) => {
+        if (c.geometry && c.geometry.type === 'SphereGeometry' && Math.abs(c.position.x) > .35 && Math.abs(c.position.x) < .5) {
+          c.rotation.x = moving ? Math.sin(ph) * .62 : 0;
         }
       });
 
@@ -12731,17 +12866,19 @@ function updateAerialHaze(dt,t){
     const p = document.createElement('div');
     p.id = 'mp-panel';
     p.innerHTML = `
-      <div class="mp-ph">
-        <span class="mp-dot"></span>
-        <span id="mp-me">未登录</span>
+      <div class="mp-me-row">
+        <span class="mp-avatar" id="mp-me-av">?</span>
+        <span class="mp-me-name" id="mp-me">未登录</span>
       </div>
       <div class="mp-peers" id="mp-peers"></div>
       <div class="mp-edit">
-        <input id="mp-name" type="text" maxlength="16" placeholder="你的ID">
+        <input id="mp-name" type="text" maxlength="16" placeholder="换个名字">
         <button id="mp-save">改</button>
       </div>
-      <button id="mp-third" class="mp-btn">第三人称</button>
-      <button id="mp-logout" class="mp-btn mp-btn2">退出</button>`;
+      <div class="mp-btn-row">
+        <button id="mp-third" class="mp-btn mp-btn3">第三人称</button>
+        <button id="mp-logout" class="mp-btn mp-btn2">退出</button>
+      </div>`;
     document.body.appendChild(p);
     const self = p.querySelector('#mp-me');
     const peers = p.querySelector('#mp-peers');
@@ -12770,17 +12907,23 @@ function updateAerialHaze(dt,t){
       if (MP._panel) MP._panel.p.style.display = 'none';
       showLogin();
     };
-    MP._panel = { p, self, peers, nameI, third: p.querySelector('#mp-third') };
+    MP._panel = { p, self, peers, nameI, meAv: p.querySelector('#mp-me-av'), third: p.querySelector('#mp-third') };
   }
 
+  /* 在线玩家：蛋仔那种横排小圆章，每人一枚，悬停显示名字 */
   MP.syncPeersUI = function () {
     if (!MP._panel) return;
-    const { self, peers } = MP._panel;
-    self.textContent = MP.display + '（' + MP.account + '）';
-    const list = ['<div class="mp-pr"><b>我</b><span>' + MP.display + '</span></div>'];
+    const { self, peers, meAv } = MP._panel;
+    self.textContent = MP.display;
+    if (meAv) meAv.textContent = (MP.display || MP.account).slice(0, 1).toUpperCase();
+    const list = [];
     for (const p of MP.peers.values()) {
-      list.push('<div class="mp-pr"><b style="color:#' + p.color.toString(16).padStart(6, '0') + '">●</b><span>' + escapeHtml(p.display) + '</span></div>');
+      const hex = '#' + p.color.toString(16).padStart(6, '0');
+      list.push('<span class="mp-badge" style="--c:' + hex + '" title="' + escapeHtml(p.display) + '">'
+        + escapeHtml((p.display || '?').slice(0, 1).toUpperCase())
+        + '<i>' + escapeHtml(p.display) + '</i></span>');
     }
+    if (!list.length) list.push('<span class="mp-none">暂无其他玩家</span>');
     peers.innerHTML = list.join('');
   };
 
