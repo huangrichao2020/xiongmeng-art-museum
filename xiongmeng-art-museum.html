@@ -12,6 +12,9 @@
     客户端拿它跟服务端当前在线版本的标记比对，
     一旦不一致就说明「这个标签页打开的是旧版本」，弹提示让用户刷新。-->
 <meta name="xm-build" content="__XM_BUILD__" />
+<!-- 线上发新版后，各端（安卓 / iOS / 电脑）右上角会自动弹出「立即更新」按钮：
+     服务端检测到 index.html 变了就主动推 WS 通知，页面另有一条 30 秒轮询兜底；
+     点按钮会通知 Service Worker 更新并带版本号强制拉新页面重载。 -->
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -530,7 +533,7 @@
   #hand-no{background:linear-gradient(180deg,#ff9db4,#f2708f);box-shadow:0 3px 0 #cf5271}
   /* ---------- 版本过期提示（这个标签页打开的是旧页面）---------- */
   #xm-upd{
-    position:fixed;right:12px;top:12px;z-index:9100;
+    position:fixed;right:12px;top:calc(12px + env(safe-area-inset-top,0px));z-index:9100;
     display:none;align-items:center;gap:7px;padding:5px 6px 5px 11px;border-radius:18px;
     background:linear-gradient(180deg,#ffd9a0,#ffb35c);color:#4a2c06;
     font-size:11.5px;font-weight:800;
@@ -544,6 +547,11 @@
     background:#fff;color:#a8570c;box-shadow:0 2px 0 rgba(0,0,0,.12);
   }
   #xm-upd button:active{transform:translateY(1px)}
+  /* 手机上按钮要够大才好按（iOS 建议 ≥44px 高），但仍然贴边不挡画面 */
+  @media (pointer:coarse),(hover:none){
+    #xm-upd{right:calc(10px + env(safe-area-inset-right,0px));padding:7px 7px 7px 13px;font-size:12.5px}
+    #xm-upd button{padding:9px 14px;font-size:12.5px;border-radius:15px}
+  }
   /* ---------- FPV 穿越机特技模式 OSD 抬头显示 ---------- */
   #fpv-osd{
     position:fixed;inset:0;z-index:26;pointer-events:none;display:none;
@@ -13369,27 +13377,65 @@ function updateAerialHaze(dt,t){
     if (el) el.classList.remove('on');
   }
 
-  /* ── 版本自检：这个标签页是不是旧版本？──
-     服务端登录时把「当前线上版本」的构建标记发过来，
-     跟本页 <meta name="xm-build"> 里的标记比对；
-     不一致 = 这个标签页打开的是部署之前的旧页面，功能会缺
-     （比如新加的牵手提示就收不到）。
-     以前这种事只能靠玩家口头说「怎么没反应」，根本查不到。 */
-  function checkBuild(serverBuild) {
+  /* ── 版本自检 + 主动更新 ──
+     服务端把「当前线上版本」的构建标记推过来（WS 的 update 消息），
+     跟本页 <meta name="xm-build"> 比对；不一致 = 这个标签页跑的是旧页面。
+     三条来源都会走到这里：① WS 主动推送 ② 登录时的 welcome ③ 自己轮询。
+     按钮小、贴右上角（不横在屏幕中间），手机端用安全区避开刘海。
+     点一下 = 通知 Service Worker 更新 + 带版本号强制拉新页面重载。 */
+  function xmMyBuild() {
     const meta = document.querySelector('meta[name="xm-build"]');
-    const mine = meta ? meta.content : '';
+    return meta ? meta.content : '';
+  }
+  function showUpdateUI(serverBuild) {
+    const mine = xmMyBuild();
     if (!serverBuild || !mine || mine.indexOf('__') === 0) return;   // 没标记就跳过
     if (mine === serverBuild) return;
     let el = document.getElementById('xm-upd');
     if (!el) {
       el = document.createElement('div');
       el.id = 'xm-upd';
-      el.innerHTML = '<span>旧版本</span><button id="xm-upd-btn">刷新</button>';
+      el.innerHTML = '<span>有新版本</span><button id="xm-upd-btn">立即更新</button>';
       document.body.appendChild(el);
-      el.querySelector('#xm-upd-btn').onclick = function () { location.reload(); };
+      el.querySelector('#xm-upd-btn').onclick = function () { applyUpdate(); };
     }
     el.classList.add('on');
   }
+  function checkBuild(serverBuild) { showUpdateUI(serverBuild); }
+  async function applyUpdate() {
+    const btn = document.getElementById('xm-upd-btn');
+    if (btn) { btn.textContent = '更新中…'; btn.disabled = true; }
+    try {
+      if (navigator.serviceWorker) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) { try { await reg.update(); } catch (e) { } }
+        if (navigator.serviceWorker.controller) {
+          try { navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' }); } catch (e) { }
+        }
+      }
+    } catch (e) { }
+    /* 带一个唯一参数强制走网络拿新页面；原来的 ?ui 之类的参数全部保留 */
+    try {
+      const u = new URL(location.href);
+      u.searchParams.set('_v', Date.now().toString());
+      location.replace(u.toString());
+    } catch (e) { location.reload(); }
+  }
+  /* 兜底轮询：还没登录、WS 断了、被代理挡了 —— 这几种情况都收不到推送，
+     但只要页面开着，30 秒内一定会自己发现新版本并弹按钮。
+     URL 后面带时间戳，绕过 Service Worker 的 stale-while-revalidate 缓存。 */
+  (function pollBuild(){
+    const tick = async () => {
+      try {
+        const r = await fetch('/alex-garage/ws/build?_=' + Date.now(), { cache: 'no-store' });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (j && j.build) showUpdateUI(j.build);
+      } catch (e) { }
+    };
+    setTimeout(tick, 5000);
+    setInterval(tick, 30000);
+  })();
 
   /* 应用层心跳：每 8 秒 ping 一次，12 秒收不到 pong 就判定连接已经半开
      —— 弱网/手机息屏时 TCP 不会立刻断，浏览器可能几十分钟都不报错，
@@ -13696,6 +13742,11 @@ function updateAerialHaze(dt,t){
           MP.selfTag.material.needsUpdate = true;
         }
         if (window.MP_UI) MP_UI.onLogin(m.you);
+        break;
+      }
+      case 'update': {           // 服务端主动推送：线上有新版本了
+        showUpdateUI(m.build);
+        if (window.sfx) sfx.blip(880,.10,.06);
         break;
       }
       case 'players': {

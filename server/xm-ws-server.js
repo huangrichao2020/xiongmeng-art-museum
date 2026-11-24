@@ -89,6 +89,40 @@ function currentBuild() {
   } catch (e) { return ''; }
 }
 
+/* ── 全部连接（含还没登录的） ── */
+const allSockets = new Set();
+
+/* ══════════════════════════════════════════════════════════════════════
+   新版本广播
+   ──────────────────────────────────────────────────────────────────────
+   线上发布很频繁，但一个标签页可能开了一整天。旧做法是「登录时比对一次
+   构建标记」，于是：没登录的人收不到、WS 断着的人收不到、已经登录挂着不动
+   的人也收不到 —— 只能靠人肉发现「怎么没反应」。
+   现在三条路都通：
+     ① 服务端每 5 秒看一眼 index.html 的 mtime，变了就**主动推**给所有在线连接；
+     ② 部署脚本上传完立刻 curl /notify-update，推送是即时的；
+     ③ 客户端自己每 30 秒轮询一次 /build（WS 没连上也能收到）。
+   客户端拿到新标记后，右上角弹一个小按钮，点一下强制拉新页面重载。
+   ══════════════════════════════════════════════════════════════════════ */
+let lastBuild = currentBuild();
+function broadcastAll(obj){
+  const txt = JSON.stringify(obj);
+  for(const sock of allSockets){
+    if(sock.destroyed) continue;
+    try{ sock.write(encodeFrame(txt)); }catch(e){ }
+  }
+}
+/* 检测到线上文件变了就广播；返回 true 表示确实换版本了 */
+function checkBuildChange(){
+  const b = currentBuild();
+  if(!b || b === lastBuild) return false;
+  lastBuild = b;
+  broadcastAll({t:'update', build:b, changed:true, ts:Date.now()});
+  log('update', '检测到新版本并已广播', b);
+  return true;
+}
+setInterval(()=>{ try{ checkBuildChange(); }catch(e){ } }, 5000);
+
 /* ── 在线会话：account → session ── */
 const sessions = new Map();      // account -> session
 const bySocket = new Map();      // socket -> session
@@ -179,7 +213,25 @@ class FrameParser {
    HTTP → WebSocket 升级
    ══════════════════════════════════════════════════════ */
 const server = http.createServer((req, res) => {
-  if (req.url === '/health') {
+  const path = String(req.url || '').split('?')[0];
+  /* 当前线上构建标记（客户端兜底轮询用；nginx 把 /alex-garage/ws/build 代理到这里，
+     所以路径可能带前缀，用 endsWith 匹配） */
+  if (path.endsWith('/build')) {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({ build: currentBuild(), ts: Date.now() }));
+    return;
+  }
+  /* 部署脚本上传完立刻调它：新版本马上推给所有在线设备，不用等 5 秒轮询 */
+  if (path.endsWith('/notify-update')) {
+    const b = currentBuild();
+    if (b) broadcastAll({ t: 'update', build: b, changed: true, ts: Date.now() });
+    log('update', '手动广播当前版本', b);
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({ ok: true, build: b, ts: Date.now() }));
+    return;
+  }
+  /* nginx 代理过来时路径带 /alex-garage/ws 前缀，所以用 endsWith 匹配 */
+  if (path.endsWith('/health')) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       ok: true,
@@ -215,6 +267,7 @@ server.on('upgrade', (req, socket) => {
    ══════════════════════════════════════════════════════ */
 function handleConn(socket) {
   let session = null;
+  allSockets.add(socket);
 
   function send(obj) {
     if (socket.destroyed) return;
@@ -256,6 +309,7 @@ function handleConn(socket) {
   socket.on('close', () => cleanup());
 
   function cleanup() {
+    allSockets.delete(socket);
     if (!session) { try { socket.destroy(); } catch (e) { } return; }
     const s = session; session = null;
     if (sessions.get(s.account) === s) sessions.delete(s.account);
