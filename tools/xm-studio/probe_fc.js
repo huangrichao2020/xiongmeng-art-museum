@@ -1,0 +1,22 @@
+const { chromium } = require('playwright-core');
+const path = require('path'), os = require('os');
+const EXE = path.join(os.homedir(), "Library/Caches/ms-playwright/chromium-1248/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing");
+const URL_ = 'https://preview.ai10088.com/alex-garage/';
+(async () => {
+  const b = await chromium.launch({ executablePath: EXE, args: ['--use-gl=angle', '--use-angle=metal', '--enable-gpu'] });
+  const pg = await (await b.newContext({ viewport: { width: 900, height: 640 } })).newPage();
+  pg.on('pageerror', e => console.log('[err]', String(e).slice(0, 140)));
+  await pg.goto(URL_, { waitUntil: 'load', timeout: 120000 });
+  await pg.waitForFunction(() => window.MP, { timeout: 120000 });
+  await pg.waitForTimeout(7000);
+  await pg.evaluate(() => { const w = document.getElementById('mp-login'); if (w) w.style.display = 'none'; });
+  const r0 = await pg.evaluate(() => ({ has: typeof MP.freezeCam, cam: window.diorama.cam() }));
+  console.log('before', JSON.stringify(r0));
+  const r1 = await pg.evaluate(() => { MP.freezeCam(-28, 30, -6, -33.5, 0, -11.5); return window.diorama.cam(); });
+  console.log('right after freezeCam', JSON.stringify(r1));
+  await pg.waitForTimeout(1500);
+  const r2 = await pg.evaluate(() => window.diorama.cam());
+  console.log('after 1.5s', JSON.stringify(r2));
+  await pg.screenshot({ path: '/tmp/fc_test.png' });
+  await b.close();
+})();

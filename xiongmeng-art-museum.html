@@ -9536,6 +9536,339 @@ addNpc([[-31.2,0,-10.6],[-29.0,0,-10.6],[-26.8,0,-10.6],[-24.6,0,-10.6]],0xc9945
 addNpc([[-30.4,0,-11.2],[-26.4,0,-11.2],[-22.5,0,-11.2],[-30.4,0,-11.2]],0x8f3a68,0xfbe2cf,.46,false,{scale:.86,acc:'headphone'});
 addNpc([[-33.1,0,-9.9],[-31.8,0,-10.4],[-29.0,0,-9.8],[-33.1,0,-9.9]],0x7a4a2c,0xfbe2cf,.48,false,{scale:.9,acc:'camera'});
 
+/* ══════════════════════════════════════════════════════════════════════
+   集市西南角 · 圣诞钢琴广场
+   ──────────────────────────────────────────────────────────────────────
+   「姜饼甜点」那间摊位的背后原本是一整片空雪地（从市集拐角绕过去才看得到），
+   现在铺成一个圆广场：一台大钢琴（走近按 E 能弹）、两棵圣诞树、
+   地面转光带 + 灯串 + 琴键发光 —— 晚上就是一个小灯光秀。
+   位置：圆心 (-40.4,-10.4) 半径 3.85m；石板路从市集拐角 (-33.9,-13.0) 接进来。
+   ══════════════════════════════════════════════════════════════════════ */
+const pianoPlaza={
+  x:-40.4,z:-10.4,px:-39.5,pz:-10.6,
+  g:null,pg:null,white:null,black:null,wMidi:null,bMidi:null,
+  wglow:null,bglow:null,sweep:null,sweepMat:null,light:null,flash:0
+};
+{
+  const PX=pianoPlaza.x,PZ=pianoPlaza.z;
+  const plaza=new THREE.Group();plaza.userData.tag='market';scene.add(plaza);
+  pianoPlaza.g=plaza;
+
+  const paveM=M(0xe4eaf0,{roughness:.93});
+  const paveD=M(0xc9d3de,{roughness:.94});
+  const goldM=M(0xe8b653,{roughness:.26,metalness:.84});
+  const lacqM=M(0x1a1d25,{roughness:.12,metalness:.52,envMapIntensity:1.8});
+  const brassM=M(0xd9a441,{roughness:.30,metalness:.86,emissive:0xff9c3a,emissiveIntensity:.55});
+  const velvetM=M(0x7d1f2c,{roughness:.86,metalness:.02});
+  const keyM=new THREE.MeshStandardMaterial({color:0xe8e2d4,roughness:.38,metalness:.02});
+  const bkeyM=new THREE.MeshStandardMaterial({color:0x0a0b0e,roughness:.26,metalness:.12});
+
+  /* ── 广场铺装：外圈大盘 + 内圈舞台 + 放射石缝 + 描金圈 ── */
+  const disc=add(plaza,new THREE.CylinderGeometry(3.85,3.95,.09,64),paveM,PX,.045,PZ);disc.castShadow=false;
+  const inner=add(plaza,new THREE.CylinderGeometry(2.55,2.55,.05,48),M(0x2b3340,{roughness:.86}),PX,.105,PZ);inner.castShadow=false;
+  addNS(plaza,new THREE.TorusGeometry(3.82,.055,8,72),goldM,PX,.10,PZ).rotation.x=Math.PI/2;
+  addNS(plaza,new THREE.TorusGeometry(2.53,.045,8,56),goldM,PX,.135,PZ).rotation.x=Math.PI/2;
+  for(let i=0;i<12;i++){
+    const a=i/12*Math.PI*2;
+    const s=add(plaza,BX(1.26,.022,.07),paveD,PX+Math.cos(a)*3.20,.115,PZ+Math.sin(a)*3.20);
+    s.rotation.y=-a;s.castShadow=false;
+  }
+  /* ── 石板路：从市集拐角铺装接进来（绕过「姜饼甜点」摊位南侧） ── */
+  {
+    const road=add(plaza,BX(4.9,.08,1.7),paveM,-36.3,.04,-13.0);road.castShadow=false;
+    const k1=add(plaza,BX(4.9,.10,.12),paveD,-36.3,.045,-13.85);k1.castShadow=false;
+    const k2=add(plaza,BX(4.9,.10,.12),paveD,-36.3,.045,-12.15);k2.castShadow=false;
+  }
+  /* ── 两棵圣诞树（分列广场西北 / 西南角） ── */
+  const TREE_SC=[.86,.70];
+  const treePos=[[PX-2.25,PZ+2.15],[PX-1.95,PZ-2.55]];
+  const treeBulbGrp=[];
+  for(let ti=0;ti<2;ti++){
+    const t=buildChristmasTree({scale:TREE_SC[ti],layers:6,gifts:true});
+    t.position.set(treePos[ti][0],0,treePos[ti][1]);
+    t.rotation.y=ti*.7;
+    t.userData.keep=true;              // 树会随风摇摆，不能被合批冻住
+    plaza.add(t);
+    /* 树身上的彩灯：单独一组再合批，四个材质 → 四个 mesh */
+    const bg=new THREE.Group();
+    t.add(bg);
+    const sc=TREE_SC[ti];
+    for(let i=0;i<16;i++){
+      const u=i/15, a=u*Math.PI*6+ti*1.3, rr=(1.25-u*.60)*sc, y=(.75+u*2.85)*sc;
+      addNS(bg,new THREE.SphereGeometry(.048,7,6),getBulbMat([0xff4d4d,0xffe078,0x48e58b,0xfff2cc][i%4],i),
+        Math.cos(a)*rr,y,Math.sin(a)*rr);
+    }
+    mergeStatic(bg);
+    treeBulbGrp.push(t);
+    /* 树脚一盏小暖光：树是深绿锥体，夜里不给光就是一团黑影 */
+    const tl2=new THREE.PointLight(0xffd39a,5.5,5.4,2.0);
+    tl2.position.set(treePos[ti][0],1.55,treePos[ti][1]);
+    scene.add(tl2);
+  }
+  /* ── 灯串：两棵树之间拉一条，中间下垂 ── */
+  /* 灯串必须有电线：没有线就是一串浮在半空的球，看着像bug */
+  const cableM=M(0x23282e,{roughness:.85,metalness:.10});
+  function lightCable(pts){
+    for(let i=0;i<pts.length-1;i++){
+      const a=pts[i],b=pts[i+1];
+      const len=Math.hypot(b.x-a.x,b.y-a.y,b.z-a.z);
+      if(len<.02)continue;
+      const m=add(plaza,BX(.016,.016,len),cableM,(a.x+b.x)/2,(a.y+b.y)/2,(a.z+b.z)/2);
+      m.lookAt(b.x,b.y,b.z);
+      m.castShadow=false;
+    }
+  }
+  {
+    const A=new THREE.Vector3(treePos[0][0],3.45*TREE_SC[0]+.25,treePos[0][1]);
+    const B=new THREE.Vector3(treePos[1][0],3.45*TREE_SC[1]+.25,treePos[1][1]);
+    const pts=[];
+    for(let i=0;i<=24;i++){
+      const u=i/24, p=new THREE.Vector3().lerpVectors(A,B,u);
+      p.y-=Math.sin(u*Math.PI)*1.55;
+      pts.push(p);
+    }
+    for(let i=1;i<24;i++)
+      addNS(plaza,new THREE.SphereGeometry(.052,8,6),
+        getBulbMat([0xff4d4d,0xffe078,0x48e58b,0xfff2cc][i%4],i),pts[i].x,pts[i].y,pts[i].z);
+    lightCable(pts);
+    /* 小径上的灯柱 + 灯串：从小径拐进广场这段路也有光 */
+    const posts=[[-37.6,-14.25],[-35.2,-11.75]];
+    for(const q of posts){
+      add(plaza,new THREE.CylinderGeometry(.055,.075,2.9,8),M(0x2c333c,{roughness:.7,metalness:.5}),q[0],1.45,q[1]);
+      addNS(plaza,new THREE.SphereGeometry(.085,10,8),getBulbMat(0xffe6a8,0),q[0],3.02,q[1]);
+    }
+    const p0=new THREE.Vector3(posts[0][0],2.95,posts[0][1]);
+    const p1=new THREE.Vector3(posts[1][0],2.95,posts[1][1]);
+    const pps=[];
+    for(let i=0;i<=10;i++){
+      const u=i/10,p=new THREE.Vector3().lerpVectors(p0,p1,u);
+      p.y-=Math.sin(u*Math.PI)*.45;
+      pps.push(p);
+    }
+    for(let i=1;i<10;i++)
+      addNS(plaza,new THREE.SphereGeometry(.046,8,6),
+        getBulbMat([0xffd28a,0xff8fa3,0x8fd4ff][i%3],i),pps[i].x,pps[i].y,pps[i].z);
+    lightCable(pps);
+  }
+  /* ── 广场四角的矮灯柱：夜里给广场一圈轮廓 ── */
+  {
+    const haloM=new THREE.MeshBasicMaterial({map:glowTex,color:0xffca86,transparent:true,opacity:.30,
+      blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
+    for(let i=0;i<4;i++){
+      const a=Math.PI/4+i*Math.PI/2;
+      const lx=PX+Math.cos(a)*3.42, lz=PZ+Math.sin(a)*3.42;
+      add(plaza,new THREE.CylinderGeometry(.055,.085,.95,8),M(0x2c333c,{roughness:.62,metalness:.55}),lx,.475,lz);
+      addNS(plaza,new THREE.SphereGeometry(.075,10,8),getBulbMat(0xffe0a0,i),lx,1.03,lz);
+      const halo=new THREE.Mesh(new THREE.PlaneGeometry(1.6,1.6),haloM);
+      halo.rotation.x=-Math.PI/2;halo.position.set(lx,.13,lz);
+      halo.renderOrder=2;halo.userData.noReflect=true;
+      plaza.add(halo);
+    }
+  }
+  /* ── 地面扫光：一条贴地的旋转扇形光带（不是半透明锥体，不会给全场加雾光） ── */
+  {
+    const sm=new THREE.MeshBasicMaterial({color:0xffd9a4,transparent:true,opacity:.16,
+      blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
+    const sw=new THREE.Mesh(new THREE.RingGeometry(2.62,3.80,30,1,0,1.05),sm);
+    sw.rotation.x=-Math.PI/2;
+    sw.position.set(PX,.132,PZ);
+    sw.renderOrder=2;sw.userData.noReflect=true;sw.userData.keep=true;
+    plaza.add(sw);
+    pianoPlaza.sweep=sw;pianoPlaza.sweepMat=sm;
+  }
+  /* ── 大钢琴 ──────────────────────────────────────────────────────
+     真实三角钢琴比例：长 2.4m / 宽 1.5m / 键盘高 0.75m
+     掀开 28° 的琴盖 + 内部音板琴弦 + 描金边 + 88 键 + 琴凳 + 踏板 */
+  const pg=new THREE.Group();
+  pg.position.set(PX+.9,0,PZ-.2);
+  pg.rotation.y=2.42;                    // 键盘朝东南，正对着从小径进来的方向
+  plaza.add(pg);
+  pianoPlaza.pg=pg;
+  {
+    /* 琴腿 */
+    for(const q of [[-.60,.92],[.60,.92],[0,-.92]])
+      add(pg,new THREE.CylinderGeometry(.055,.078,.66,10),lacqM,q[0],.33,q[1]);
+    /* 琴身做成「空壳」：底板 + 侧板 + 前后挡板。
+       掀开琴盖能看见里面的金色音板和琴弦 —— 做成实心黑盒子就只是一块方块。 */
+    add(pg,BX(1.44,.05,1.40),lacqM,0,.685,.35);            // 宽段底板
+    add(pg,BX(.96,.05,.91),lacqM,0,.685,-.805);             // 尾段底板
+    add(pg,BX(.06,.30,1.40),lacqM,-.69,.82,.35);           // 宽段左侧板
+    add(pg,BX(.06,.30,1.40),lacqM,.69,.82,.35);            // 宽段右侧板
+    add(pg,BX(1.44,.30,.06),lacqM,0,.82,1.02);             // 键盘下方前挡板
+    add(pg,BX(1.44,.30,.06),lacqM,0,.82,-.32);             // 中段挡板
+    add(pg,BX(.06,.30,.91),lacqM,-.45,.82,-.805);          // 尾段左侧板
+    add(pg,BX(.06,.30,.91),lacqM,.45,.82,-.805);           // 尾段右侧板
+    add(pg,BX(.96,.30,.06),lacqM,0,.82,-1.23);             // 尾端挡板
+    /* 内部：金色音板 + 一排琴弦 + 两根撑柱 */
+    add(pg,BX(1.28,.02,1.30),brassM,0,.78,.35);
+    add(pg,BX(.86,.02,.85),brassM,0,.78,-.80);
+    for(let i=0;i<7;i++)
+      addNS(pg,BX(.012,.012,1.24),M(0xf2dba2,{roughness:.22,metalness:.90,emissive:0xffcf82,emissiveIntensity:.62}),-.42+i*.14,.80,.35);
+    for(let i=0;i<4;i++)
+      addNS(pg,BX(.012,.012,.78),M(0xf2dba2,{roughness:.22,metalness:.90,emissive:0xffcf82,emissiveIntensity:.62}),-.24+i*.16,.80,-.80);
+    add(pg,BX(.05,.10,.05),lacqM,-.52,.80,.20);
+    add(pg,BX(.05,.10,.05),lacqM,.52,.80,.20);
+    add(pg,BX(.05,.10,.05),lacqM,0,.80,-.62);
+    /* 描金边 */
+    addNS(pg,BX(1.46,.014,.035),goldM,0,.972,1.045);
+    addNS(pg,BX(.98,.014,.035),goldM,0,.972,-1.26);
+    addNS(pg,BX(.035,.014,1.40),goldM,.722,.972,.35);
+    addNS(pg,BX(.035,.014,1.40),goldM,-.722,.972,.35);
+    addNS(pg,BX(.035,.014,.91),goldM,.482,.972,-.805);
+    addNS(pg,BX(.035,.014,.91),goldM,-.482,.972,-.805);
+    /* 琴盖（沿低音侧铰链掀开 26°，边缘描金，才像琴盖不像木板） */
+    const hinge=new THREE.Group();
+    hinge.position.set(-.73,.995,-.10);
+    pg.add(hinge);
+    add(hinge,BX(1.54,.09,2.36),lacqM,.75,0,0);
+    addNS(hinge,BX(.035,.11,2.36),goldM,1.52,0,0);
+    hinge.rotation.z=.46;
+    add(pg,new THREE.CylinderGeometry(.014,.014,.52,6),brassM,.28,1.26,-.05);
+    /* 谱架 */
+    const desk=add(pg,BX(.92,.34,.035),lacqM,0,1.02,.86);
+    desk.rotation.x=-.30;
+    /* 键床 */
+    add(pg,BX(1.34,.07,.26),lacqM,0,.70,1.05);
+    /* 88 键：36 白键 + 25 黑键（两个 InstancedMesh，两个 draw call） */
+    const KW=.033,NW=36;
+    const x0=-(NW*KW)/2;
+    const wMidi=new Int16Array(NW),bMidi=[];
+    for(let i=0;i<NW;i++)
+      wMidi[i]=60+12*Math.floor(i/7)+[0,2,4,5,7,9,11][i%7];
+    const tmp=new THREE.Object3D();
+    const white=new THREE.InstancedMesh(new THREE.BoxGeometry(KW*.92,.026,.215),keyM,NW);
+    white.castShadow=false;white.receiveShadow=false;
+    for(let i=0;i<NW;i++){
+      tmp.position.set(x0+(i+.5)*KW,.745,1.06);
+      tmp.rotation.set(0,0,0);tmp.updateMatrix();
+      white.setMatrixAt(i,tmp.matrix);
+      white.setColorAt(i,new THREE.Color(1,1,1));
+    }
+    white.instanceMatrix.needsUpdate=true;
+    white.instanceColor.needsUpdate=true;
+    pg.add(white);
+    const black=new THREE.InstancedMesh(new THREE.BoxGeometry(KW*.60,.030,.128),bkeyM,25);
+    black.castShadow=false;black.receiveShadow=false;
+    let bi=0;
+    for(let i=0;i<NW-1&&bi<25;i++){
+      if([0,1,3,4,5].indexOf(i%7)<0)continue;
+      tmp.position.set(x0+(i+1)*KW,.762,1.022);
+      tmp.rotation.set(0,0,0);tmp.updateMatrix();
+      black.setMatrixAt(bi,tmp.matrix);
+      black.setColorAt(bi,new THREE.Color(1,1,1));
+      bMidi.push(wMidi[i]+1);
+      bi++;
+    }
+    black.instanceMatrix.needsUpdate=true;
+    black.instanceColor.needsUpdate=true;
+    pg.add(black);
+    pianoPlaza.white=white;pianoPlaza.black=black;
+    pianoPlaza.wMidi=wMidi;pianoPlaza.bMidi=bMidi;
+    pianoPlaza.wglow=new Float32Array(NW);
+    pianoPlaza.bglow=new Float32Array(25);
+    /* 琴凳 */
+    const bench=new THREE.Group();
+    bench.position.set(0,0,1.98);
+    pg.add(bench);
+    add(bench,BX(.80,.09,.40),velvetM,0,.48,0);
+    add(bench,BX(.84,.04,.44),lacqM,0,.525,0);
+    for(const q of [[-.32,-.14],[.32,-.14],[-.32,.14],[.32,.14]])
+      add(bench,BX(.06,.44,.06),lacqM,q[0],.22,q[1]);
+    /* 踏板 */
+    add(pg,BX(.20,.30,.10),lacqM,0,.22,1.02);
+    for(const q of [-.06,0,.06])add(pg,BX(.035,.02,.16),brassM,q,.09,1.06);
+  }
+  /* 钢琴脚下的暖光池 */
+  {
+    const pl=new THREE.Mesh(new THREE.CircleGeometry(1,48),new THREE.MeshBasicMaterial({
+      map:glowTex,color:0xffc98a,transparent:true,opacity:.32,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+    pl.rotation.x=-Math.PI/2;
+    pl.position.set(pg.position.x,.13,pg.position.z);
+    pl.scale.setScalar(2.3);
+    pl.renderOrder=2;pl.userData.noReflect=true;
+    plaza.add(pl);
+    /* 一盏小范围暖光，只照钢琴和琴凳，旁边的雪地不吃光 */
+    const lt=new THREE.PointLight(0xffc07a,6.5,7.5,2.1);
+    lt.position.set(pg.position.x,1.45,pg.position.z);
+    scene.add(lt);
+    pianoPlaza.light=lt;
+  }
+  /* ── 广场招牌：告诉路过的人这是什么（挪到广场北侧，不挡钢琴的视线） ── */
+  {
+    const sg=new THREE.Group();
+    sg.position.set(PX+2.60,0,PZ+2.50);
+    sg.rotation.y=2.20;
+    plaza.add(sg);
+    add(sg,new THREE.CylinderGeometry(.07,.09,2.55,8),M(0x4b3322,{roughness:.85}),0,1.27,0);
+    add(sg,BX(2.05,.66,.07),M(0x1b2c48,{roughness:.5}),0,2.34,0);
+    signPanel(sg,1.94,.56,animeSignTex(768,256,'圣诞钢琴广场','CHRISTMAS PIANO PLAZA','#f6d690'),0,2.34,.045,.9);
+  }
+  /* 碰撞：钢琴 / 琴凳 / 两棵树 / 招牌柱 */
+  OUTDOOR_OBS.push([pg.position.x,pg.position.z,1.75]);
+  OUTDOOR_OBS.push([treePos[0][0],treePos[0][1],.85]);
+  OUTDOOR_OBS.push([treePos[1][0],treePos[1][1],.75]);
+  OUTDOOR_OBS.push([PX+3.15,PZ-1.30,.35]);
+}
+
+/* ══ 钢琴弹奏 + 灯光秀驱动 ══ */
+function pianoWhiteIndex(midi){
+  const o=Math.floor((midi-60)/12), s=(midi-60)%12;
+  const p=[0,2,4,5,7,9,11].indexOf(s);
+  return p<0?-1:o*7+p;
+}
+function pianoHit(midi){
+  const pp=pianoPlaza;
+  const wi=pianoWhiteIndex(midi);
+  if(wi>=0&&wi<pp.wglow.length)pp.wglow[wi]=1;
+  for(let i=0;i<pp.bMidi.length;i++)if(pp.bMidi[i]===midi)pp.bglow[i]=1;
+}
+function pianoPlay(){
+  const s=sfx;
+  if(!s||!s.ctx||!s.on)return;
+  const t0=s.ctx.currentTime+.06;
+  /* 一段上行再下行的小夜曲（C E G C E …），每个音点亮一个琴键 */
+  const seq=[60,64,67,72,76,72,67,64,60,67];
+  for(let i=0;i<seq.length;i++){
+    s.playPianoFx(seq[i],t0+i*.235,.62,.17,0);
+    pianoHit(seq[i]);
+  }
+  pianoPlaza.flash=1;
+  s.blip(1046,.10,.05);
+}
+function updatePianoPlaza(dt,t){
+  const pp=pianoPlaza;
+  if(!pp.g)return;
+  /* 琴键发光：按下 → 亮 → 1 秒内熄灭 */
+  const dg=dt*1.9;
+  const c=new THREE.Color();
+  for(let i=0;i<pp.wglow.length;i++){
+    if(pp.wglow[i]>0)pp.wglow[i]=Math.max(0,pp.wglow[i]-dg);
+    const g=pp.wglow[i];
+    c.setRGB(1+g*1.7,1+g*1.05,1-g*.30);
+    pp.white.setColorAt(i,c);
+  }
+  for(let i=0;i<pp.bglow.length;i++){
+    if(pp.bglow[i]>0)pp.bglow[i]=Math.max(0,pp.bglow[i]-dg);
+    const g=pp.bglow[i];
+    c.setRGB(1+g*2.2,1+g*1.2,1-g*.15);
+    pp.black.setColorAt(i,c);
+  }
+  pp.white.instanceColor.needsUpdate=true;
+  pp.black.instanceColor.needsUpdate=true;
+  /* 地面扫光：平时慢转，弹奏时加速 + 提亮 */
+  pp.flash=Math.max(0,pp.flash-dt*.85);
+  if(pp.sweep){
+    pp.sweep.rotation.y+=dt*(.26+pp.flash*1.5);
+    pp.sweepMat.opacity=.14+.11*Math.sin(t*1.7)+pp.flash*.30;
+  }
+  if(pp.light)pp.light.intensity=6.5+pp.flash*8;
+  /* 走近就提示 */
+  if(fp.on&&!wheelSys.riding&&!trainSys.riding&&!balloonSys.riding&&!launchSys.active){
+    const d=Math.hypot(fp.x-pp.px,fp.z-pp.pz);
+    if(d<4.0)hudShow('圣诞大钢琴 · 按 E 弹一段','弹奏 (E)',pianoPlay);
+  }
+}
+
 const SHOPS=[
   /* 北段马路对面（后退至 z=-30.1，完全让开北环路 z=-25.45 并避开北铁轨 z=-35） */
   {x:-14.6,z:-30.1,rot:0,cn:'熊萌咖啡',en:'BEAR CAFE',tint:0,glass:0,fab:2,accent:'#7a4a2c'},
@@ -10927,6 +11260,30 @@ const sfx={
     const playDur=Math.min(this.PIANO_SEG,dur+Math.min(.30,dur*.9));
     this.playBufSample(this.pianoBuf,this.PIANO_MAP[midi],1,t,playDur,vel,pan);
   },
+  /* 场景钢琴独奏（集市钢琴广场用）：
+     走 master 而不是 musicBus —— musicBus 是 BGM 通道，
+     updateBgmMix 会按「馆内/馆外」把它的增益压到 .52 / .30，
+     户外的钢琴声会低到基本听不见。独奏要自己的一条通路。 */
+  playPianoFx(midi,when,dur,vel=.17,pan=0){
+    if(!this.ctx||!this.on)return;
+    const c=this.ctx,t=Math.max(when||c.currentTime,c.currentTime);
+    if(!this.pianoReady||!this.pianoBuf||this.PIANO_MAP[midi]===undefined){
+      this.blip(300+(midi-60)*8,.32,.05);return;
+    }
+    const src=c.createBufferSource();src.buffer=this.pianoBuf;
+    const off=this.PIANO_MAP[midi];
+    const g=c.createGain();
+    const maxD=Math.max(.08,Math.min(this.PIANO_SEG,dur));
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(vel,t+.006);
+    g.gain.setValueAtTime(vel,t+maxD-.025);
+    g.gain.linearRampToValueAtTime(0,t+maxD);
+    src.connect(g);
+    const pn=c.createStereoPanner?c.createStereoPanner():null;
+    if(pn){pn.pan.value=pan;g.connect(pn);pn.connect(this.master);}
+    else g.connect(this.master);
+    src.start(t,off,maxD);
+  },
   /* 装饰颤音：主音与上方半音快速交替 —— 钟琴/八音盒的标志性手法，
      用在乐谱标了 trill 的音上，是"圣诞味"最直接的来源。
      每个颤音音只播 0.09 秒、间隔 0.062 秒，闪而不糊。 */
@@ -11886,9 +12243,17 @@ window.diorama={cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.t
   shadows:(on)=>{renderer.shadowMap.enabled=on;scene.traverse(o=>{if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.needsUpdate=true);else o.material.needsUpdate=true;}});return on;},
   hideRide:(i)=>{if(amusement.dyn[i])amusement.dyn[i].visible=false;return i;},
   showRide:(i)=>{if(amusement.dyn[i])amusement.dyn[i].visible=true;return i;},
+  /* 调试：集市钢琴广场状态（键发光 / 扫光 / 灯强） */
+  piano:()=>({x:pianoPlaza.x,z:pianoPlaza.z,px:pianoPlaza.px,pz:pianoPlaza.pz,
+    wglow:Array.from(pianoPlaza.wglow).map(v=>+v.toFixed(2)),
+    bglow:Array.from(pianoPlaza.bglow).map(v=>+v.toFixed(2)),
+    flash:+pianoPlaza.flash.toFixed(3),
+    sweepY:+pianoPlaza.sweep.rotation.y.toFixed(3),
+    lightI:+pianoPlaza.light.intensity.toFixed(2)}),
+  pianoPlay:()=>pianoPlay(),
   /* 调试：单独关掉某片区域，做性能对照 */
-  hide:(what)=>{const m={market:market,shopRow:shopRow,fair:fair};for(const k in m){if(k===what||what==='all')m[k].visible=false;}return 'hidden';},
-  show:(what)=>{const m={market:market,shopRow:shopRow,fair:fair};for(const k in m){if(k===what||what==='all')m[k].visible=true;}return 'shown';},
+  hide:(what)=>{const m={market:market,shopRow:shopRow,fair:fair,piano:pianoPlaza.g};for(const k in m){if(k===what||what==='all')m[k].visible=false;}return 'hidden';},
+  show:(what)=>{const m={market:market,shopRow:shopRow,fair:fair,piano:pianoPlaza.g};for(const k in m){if(k===what||what==='all')m[k].visible=true;}return 'shown';},
   /* 调试：从 A 朝 B 打一条射线，列出命中的物体和距离
      （查共面 / z-fighting 用：两个命中距离几乎一样 = 在抢深度） */
   ray:(ox,oy,oz,tx,ty,tz)=>{
@@ -13601,12 +13966,17 @@ function updateAerialHaze(dt,t){
       camera.position.lerp = function () { return this; };
       camera.quaternion.slerp = function () { return this; };
       camera.lookAt = function () { return this; };
+      /* OrbitControls 每帧会重算相机位置：极角被 maxPolarAngle 夹住，
+         机位越高越会被顶回去（想要 y=2.4 实际变成 y=7.7）。
+         钉死时直接停掉 controls.update，把 target 也对齐到注视点。 */
+      try { controls.update = function () { }; controls.enabled = false; } catch (e) { }
     }
     camera.position.set(px, py, pz);
     camera.up.set(0, 1, 0);
     const m = new THREE.Matrix4().lookAt(
       camera.position, new THREE.Vector3(tx, ty, tz), camera.up);
     camera.quaternion.setFromRotationMatrix(m);
+    try { controls.target.set(tx, ty, tz); } catch (e) { }
     return MP.debug();
   };
 
@@ -14824,6 +15194,7 @@ function animate(){
   updateWheelRide(dt);
   updateBalloonRide(dt);
   updateLaunchRide(dt);
+  updatePianoPlaza(dt,t);
   updateHelis(dt);
   updateFireworks(dt);
   updateAerialHaze(dt,t);
@@ -16808,6 +17179,7 @@ addEventListener('keydown',e=>{
     if(trainSys.riding){toggleRideTrain();return;}
     if(fp.on&&Math.hypot(fp.x-27,fp.z-36)<10.5){toggleRideWheel(null);return;}
     if(fp.on&&trainCars.some(c=>Math.hypot(fp.x-c.position.x,fp.z-c.position.z)<9.5)){toggleRideTrain();return;}
+    if(fp.on&&Math.hypot(fp.x-pianoPlaza.px,fp.z-pianoPlaza.pz)<4.0){pianoPlay();return;}
   }
 });
 
