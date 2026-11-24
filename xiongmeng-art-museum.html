@@ -257,7 +257,14 @@
     display:flex;flex-direction:column;gap:10px;align-items:center;
   }
   #recpv video{width:100%;max-height:62vh;background:#000;border-radius:3px}
-  #recpv p{font-family:var(--han);font-size:12px;color:#a9c4d8;text-align:center;line-height:1.6}
+  #recpv p{font-family:var(--han);font-size:12px;color:#a9c4d8;text-align:center;line-height:1.7}
+  #recpv p b{color:#ffd9a0;font-weight:600}
+  #recpv .rpv-acts{display:flex;gap:10px;align-items:center}
+  #recpv .rpv-acts .primary{
+    padding:9px 22px;border-radius:20px;cursor:pointer;font-family:var(--han);font-size:13px;
+    background:rgba(255,138,80,.2);border:1px solid rgba(255,170,110,.6);color:#ffe2c4;font-weight:600;
+  }
+  #recpv .rpv-acts .primary:active{background:rgba(255,138,80,.34)}
   #recpv button{
     padding:7px 20px;border-radius:16px;cursor:pointer;font-family:var(--han);font-size:12px;
     background:rgba(104,208,245,.16);border:1px solid rgba(160,220,250,.45);color:#dff2ff;
@@ -617,8 +624,11 @@
 <div id="recpv">
   <div class="rpv-box">
     <video id="recpv-video" controls playsinline></video>
-    <p id="recpv-tip">长按视频 → 存储到「文件」/「照片」</p>
-    <button id="recpv-close">关闭</button>
+    <p id="recpv-tip"></p>
+    <div class="rpv-acts">
+      <button id="recpv-save" class="primary">保存到本机</button>
+      <button id="recpv-close">关闭</button>
+    </div>
   </div>
 </div>
 
@@ -12426,10 +12436,20 @@ async function _recTargetDpr(){
   const w=innerWidth,h=innerHeight;
   const budget=IS_TOUCH_DEV?2.4e6:2.8e6;          // 录制时的像素上限
   const cap=Math.sqrt(budget/(w*h));
-  const fps=await _recProbeFps(16);
-  let dpr=cur;
-  if(fps>=46) dpr=Math.min(cur*1.28,cap);            // 有余量：提 1.28 倍（约 1.6 倍像素）
-  return Math.max(1,Math.min(cap,Math.max(cur,dpr)));
+  /* 掉帧时自适应逻辑会把像素比降到低档。之前降过档的话直接录那个低分辨率，
+     出来的成片是糊的 —— 所以先试着回到画质档应有的分辨率，探一下帧率。
+     只探一次：跑不动就直接用当前分辨率，不再二次探测（省掉一秒等待）。 */
+  const target=Math.min(cap,Math.max(cur,HI_DPR));
+  if(target>cur+0.01){
+    applyDpr(target);
+    const fps=await _recProbeFps(10);
+    if(fps>=24) return target;                       // 画质档跑得动，就用它
+    applyDpr(cur);                                   // 真跑不动，退回当前分辨率
+    return cur;
+  }
+  const fps=await _recProbeFps(10);
+  if(fps>=46) return Math.min(cap,cur*1.28);         // 有余量：提 1.28 倍（约 1.6 倍像素）
+  return cur;
 }
 function _recPreview(url){
   const box=document.getElementById('recpv');
@@ -12454,18 +12474,47 @@ async function _recSave(blob){
       outName=name.replace(/\.webm$/,'.mp4');
     }
   }catch(e){ /* 服务没开就算了，直接存原格式 */ }
-  const url=URL.createObjectURL(outBlob);
-  const file=new File([outBlob],outName,{type:outBlob.type||'video/mp4'});
-  if(_recIsIOS()&&navigator.canShare&&navigator.canShare({files:[file]})){
-    /* iOS 上系统分享面板是唯一可靠的「存到文件/照片」通道；
-       但面板一直挂着不响应时不能把用户晾在这儿 —— 45 秒后自己兜底。 */
-    let done=false;
-    const bail=setTimeout(()=>{ if(!done){done=true;_recSaveFallback(url,outName);} },45000);
-    navigator.share({files:[file],title:outName})
-      .catch(()=>{ if(!done){done=true;clearTimeout(bail);_recSaveFallback(url,outName);} });
+  if(_recIsIOS()){
+    /* iOS 上「保存」必须发生在用户手势里：在录制结束的异步回调里自动下载 /
+       自动弹分享都会被 Safari 静默拦掉，用户什么都看不到。
+       所以这里只弹一张显眼的保存卡片，真正的保存动作交给用户点按钮触发。 */
+    _recSaveCard(outBlob,outName);
     return;
   }
+  const url=URL.createObjectURL(outBlob);
   _recSaveFallback(url,outName);
+}
+/* 手机端保存卡片：视频 + 「保存到本机」按钮 + 明确告诉用户文件会去哪 */
+function _recSaveCard(blob,name){
+  const box=document.getElementById('recpv');
+  const v=document.getElementById('recpv-video');
+  const tip=document.getElementById('recpv-tip');
+  const btn=document.getElementById('recpv-save');
+  if(!box||!v||!btn)return;
+  const url=URL.createObjectURL(blob);
+  box._url=url;
+  v.src=url;
+  tip.innerHTML='点「保存到本机」→ 在系统面板里选 <b>存储到文件</b>，存好后到「文件」App 里找。<br>'
+    +'也可以 <b>长按上面的视频</b> → 存储到照片。<br>'
+    +'（如果是在微信里打开的，请点右上角「…」→ 在 Safari 中打开再录）';
+  btn.textContent='保存到本机';
+  btn.onclick=()=>{
+    const file=new File([blob],name,{type:blob.type||'video/mp4'});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      navigator.share({files:[file],title:name})
+        .then(()=>_recMsg('已保存 · 去「文件」App 里查看'))
+        .catch(()=>_recDl(url,name));
+    }else _recDl(url,name);
+  };
+  box.classList.add('show');
+}
+/* 在用户手势里触发下载（iOS 这时才不会被拦） */
+function _recDl(url,name){
+  const a=document.createElement('a');
+  a.href=url;a.download=name;a.rel='noopener';
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>a.remove(),2000);
+  _recMsg('已开始下载：'+name);
 }
 function _recSizeText(b){
   return b>=1048576?Math.round(b/1048576)+'MB':Math.max(1,Math.round(b/1024))+'KB';
@@ -12480,15 +12529,17 @@ function _recSaveFallback(url,name){
 async function _recStart(){
   if(_rec.on)return;
   if(!window.MediaRecorder){_recMsg('这个浏览器不支持画面录制');return;}
+  const dpr0=renderer.getPixelRatio();                 // 先记下原值，录完还原
+  _recMsg('准备中…正在挑分辨率');
   let dpr=await _recTargetDpr();
   /* H.264 要求宽高都是偶数，浏览器算出来的画布宽度可能是奇数（比如 1843），
      这里把像素比微调到让画布宽度落在偶数上，服务端那边也留了兜底缩放。 */
   const evenW=Math.max(2,Math.round(innerWidth*dpr)&~1);
   dpr=evenW/innerWidth;
-  _rec.dpr0=renderer.getPixelRatio();
+  _rec.dpr0=dpr0;
   _rec.ratio=dpr;
   applyDpr(dpr);
-  await new Promise(r=>setTimeout(r,420));           // 等新画布尺寸稳定再捕获
+  await new Promise(r=>setTimeout(r,320));           // 等新画布尺寸稳定再捕获
   let mime='video/webm';
   if(MediaRecorder.isTypeSupported){
     mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4']
@@ -12547,6 +12598,7 @@ function _recStop(){
     box.classList.remove('show');
     const v=document.getElementById('recpv-video');
     if(v)v.removeAttribute('src');
+    if(box._url){URL.revokeObjectURL(box._url);box._url=null;}
   });
   /* 旋转屏幕 / 改窗口大小会让画布尺寸突变，正在录的视频会花 —— 直接收尾 */
   addEventListener('resize',()=>{ if(_rec.on)setTimeout(_recStop,80); });

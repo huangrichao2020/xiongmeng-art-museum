@@ -1,0 +1,22 @@
+const { chromium } = require('playwright-core');
+const path = require('path'), os = require('os'), fs = require('fs');
+const EXE = path.join(os.homedir(),"Library/Caches/ms-playwright/chromium-1248/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing");
+(async () => {
+  const b = await chromium.launch({ executablePath: EXE, args:['--autoplay-policy=no-user-gesture-required'] });
+  const ctx = await b.newContext({ viewport:{width:1440,height:900}, deviceScaleFactor:2, acceptDownloads:true });
+  const p = await ctx.newPage();
+  await p.goto('https://preview.ai10088.com/alex-garage/', { waitUntil:'load', timeout:90000 });
+  await p.waitForFunction(() => window.XM && window.XM.debug, { timeout:90000 });
+  await p.waitForTimeout(3000);
+  const dl = p.waitForEvent('download', { timeout: 90000 });
+  await p.click('#w-rec');
+  await p.waitForTimeout(5000);
+  await p.click('#w-rec');
+  const d = await dl;
+  const f = '/tmp/rectest/retina_'+d.suggestedFilename();
+  await d.saveAs(f);
+  await p.waitForTimeout(1200);
+  const after = await p.evaluate(() => ({ dpr: window.XM.debug().dpr, msg: document.getElementById('xmsg').textContent }));
+  console.log('Retina 桌面:', JSON.stringify(after));
+  await b.close();
+})();
