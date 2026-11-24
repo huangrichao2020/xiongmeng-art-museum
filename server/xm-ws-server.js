@@ -436,6 +436,17 @@ function handleConn(socket) {
         }
         break;
       }
+      case 'hand_cancel': {     // 发起方取消请求
+        const to = String(msg.to || '').trim().toLowerCase();
+        const other = sessions.get(to);
+        if (other) {
+          other.handReq = null;
+          other.send({ t: 'hand_cancel', from: session.account });
+        }
+        session.handReq = null;
+        log('hand-cancel', session.account, '->', to);
+        break;
+      }
       case 'hand_end': {        // 任何一方松手
         breakPair(session, 'release');
         break;

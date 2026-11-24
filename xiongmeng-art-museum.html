@@ -12749,7 +12749,13 @@ function updateAerialHaze(dt,t){
   MP.handAction = function () {
     if (!MP.connected) return;
     if (MP.hand.role) { MP.handEnd(); return; }
-    if (MP.hand.pendingFrom || MP.hand.pendingTo) return;
+    if (MP.hand.pendingTo) {                 // 等待中 → 取消这次请求
+      MP.send({ t: 'hand_cancel', to: MP.hand.pendingTo });
+      MP.hand.pendingTo = ''; MP.hand.pendingToName = '';
+      handHudHide();
+      return;
+    }
+    if (MP.hand.pendingFrom) return;
     const near = MP.nearestPeer();
     if (!near) { handHud('none', '附近没人', ''); setTimeout(handHudHide, 1700); return; }
     MP.send({ t: 'hand_req', to: near.account });
@@ -12770,6 +12776,18 @@ function updateAerialHaze(dt,t){
     handHudHide();
   };
   /* HUD 刷新：牵手中 / 等待回应 / 收到请求 / 旁边有人 */
+  /* 自愈：配对对象已经不在房间里了（掉线/被踢），把本地配对状态解开。
+     不然玩家会卡在「牵着」状态，界面上一直显示松手按钮，再也发不起新的牵手。 */
+  MP.handSelfHeal = function (dt) {
+    if (!MP.hand.role) return;
+    const peer = MP.peers.get(MP.hand.partner);
+    if (peer) { MP._handMiss = 0; return; }
+    MP._handMiss = (MP._handMiss || 0) + dt;
+    if (MP._handMiss < 4) return;            // 先等几秒，别被一次 players 刷新误伤
+    MP.send({ t: 'hand_end' });
+    MP.handReset();
+    handHudHide();
+  };
   MP.updateHandHud = function () {
     /* 顺序很要紧：已经配对 / 有人在等我回应 / 有人向我发起 —— 这三种提示
        不看是不是沉浸模式，全程都要显示。
@@ -12785,7 +12803,10 @@ function updateAerialHaze(dt,t){
       return;
     }
     if (MP.hand.pendingTo) {
-      handHud('none', '等 ' + MP.hand.pendingToName + ' 回应', '');
+      /* 等对方回应：给一颗「取消」按钮。
+         不然一旦对方那边没弹提示（比如对方在旧版本页面里），
+         这边就永远卡在「等待」状态，再也发不起新的牵手。 */
+      handHud('act', '等 ' + MP.hand.pendingToName + ' 回应', '取消');
       return;
     }
     /* 只有「旁边有人，可以发起」这一条需要行走模式（沙盘里角色不动，没什么可牵的）*/
@@ -12804,12 +12825,26 @@ function updateAerialHaze(dt,t){
     MP._handLink = m;
     return m;
   }
+  /* 领队的朝向（自己算，不看第三人称身体）
+     —— 之前用的是 MP.self.rotation.y，但 MP.self 的位置/朝向只在
+        「第三人称开着」的时候才更新；第一人称下它一直停在世界原点 (0,0,0)。
+        结果被牵的人被画到原点去（离领队 10 米），
+        领队的「附近玩家」搜索找不到人 → 松手后再也牵不上。 */
+  function leaderFacing(dt) {
+    const moving = Math.hypot(fp.vx, fp.vz) > .25;
+    const want = moving ? Math.atan2(fp.vx, fp.vz) : fp.yaw + Math.PI;
+    if (MP._leadTheta === undefined) MP._leadTheta = want;
+    let d = want - MP._leadTheta;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    MP._leadTheta += d * (1 - Math.pow(.0004, dt));
+    return MP._leadTheta;
+  }
   /* 领队的位置 + 朝向：两个人的中间点、谁在前面，都以它为准 */
   MP.handAnchor = function () {
     if (!MP.hand.role) return null;
     if (MP.hand.role === 'leader') {
-      if (!MP.self) return null;
-      return { x: MP.self.position.x, y: fp.y, z: MP.self.position.z, th: MP.self.rotation.y, spd: Math.hypot(fp.vx, fp.vz) };
+      return { x: fp.x, y: fp.y, z: fp.z, th: leaderFacing(0.016), spd: Math.hypot(fp.vx, fp.vz) };
     }
     const ld = MP.peers.get(MP.hand.partner);
     if (!ld) return null;
@@ -12980,6 +13015,11 @@ function updateAerialHaze(dt,t){
         MP.hand.pendingTo = m.to || '';
         MP.hand.pendingToName = m.display || m.to || '';
         handHud('none', '已发出 · 等 ' + MP.hand.pendingToName, '');
+        break;
+      }
+      case 'hand_cancel': {     // 对方取消了请求
+        MP.hand.pendingFrom = ''; MP.hand.pendingName = '';
+        handHudHide();
         break;
       }
       case 'hand_rej': {        // 被拒绝了
@@ -13723,10 +13763,10 @@ function updateAerialHaze(dt,t){
       /* 牵手：我是领队 → 被牵方直接贴在领队右手边，
          位置/朝向/步速全部跟领队（他自己广播的位置有延迟，不用）*/
       let handSide = 0;
-      if (MP.hand.role === 'leader' && p.account === MP.hand.partner && MP.self) {
-        const th = MP.self.rotation.y;
-        p.cur.x = MP.self.position.x - Math.cos(th) * HAND_D;
-        p.cur.z = MP.self.position.z + Math.sin(th) * HAND_D;
+      if (MP.hand.role === 'leader' && p.account === MP.hand.partner) {
+        const th = leaderFacing(dt);
+        p.cur.x = fp.x - Math.cos(th) * HAND_D;
+        p.cur.z = fp.z + Math.sin(th) * HAND_D;
         p.cur.y = fp.y;
         p.cur.yaw = th - Math.PI;
         p.curJy = fp.jumpY; p.targetJy = fp.jumpY; p.curVy = 0;
@@ -13762,7 +13802,7 @@ function updateAerialHaze(dt,t){
 
     /* 牵手 HUD 刷新（8Hz 够了，别每帧动 DOM）*/
     MP._hudT = (MP._hudT || 0) - dt;
-    if (MP._hudT <= 0) { MP._hudT = .12; MP.updateHandHud(); }
+    if (MP._hudT <= 0) { MP._hudT = .12; MP.handSelfHeal(dt); MP.updateHandHud(); }
 
     /* 推本地位置（y 含离地高度，jy 单独给一份让对方能播跳跃动作）*/
     const now2 = performance.now();
