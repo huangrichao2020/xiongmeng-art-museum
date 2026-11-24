@@ -3400,6 +3400,8 @@ const cloudArt=new THREE.Group();cloudArt.position.set(4.6,2.15+F1,-.6);shop1.ad
 
 /* 展厅灯 */
 const shopLights=[];
+/* 龙猫自发光材质登记表（模块级：构建时登记，每帧按昼夜系数缩放 emissiveIntensity） */
+const TOTORO_GLOW=[];
 /* 展厅用轨道射灯：只打作品和地面，天花板不会被烤白（点光源会） */
 function shopSpot(x,z,y,tx,ty,tz,color,inten,delay){
   const l=new THREE.SpotLight(color,inten,20,.62,.78,1.45);
@@ -4748,10 +4750,28 @@ const animePark=new THREE.Group();animePark.userData.tag='park';scene.add(animeP
   // ── 4. 龙猫森林守护神家族（补齐厚实垂肩手臂+爪脚+毛尾+双小龙猫完整肢体） ──
   function buildTotoro(){
     const g=new THREE.Group();
-    const fur=new THREE.MeshPhysicalMaterial({color:0x6d7782,roughness:.58,clearcoat:.18});
-    const belly=M(0xf2e8d2,{roughness:.7,flatShading:false});
-    const dark=M(0x1f2328,{roughness:.3,flatShading:false});
-    const wht=M(0xffffff,{roughness:.15,flatShading:false});
+    /* ── 材质：绒毛 sheen + 克制自发光 ──
+       ① sheen 是 MeshPhysicalMaterial 的绒布特性：边缘起一层柔和绒光，
+          比单纯调 roughness 更像毛绒玩偶（这才是「漫反射好看」的正解）。
+       ② 自发光只让「它自己」微微透亮、暗部不纯黑，不照亮任何邻居 ——
+          和上次那道 12m 加色光幕锥体完全不同（那个是把整个广场罩亮）。
+       ③ belly/dark/wht 原本是全局共享材质，直接加自发光会让别处的雪人、
+          小黄人一起发亮 → 龙猫用专属副本。 */
+    const fur=new THREE.MeshPhysicalMaterial({
+      color:0x6d7782,roughness:.62,clearcoat:.16,
+      sheen:1,sheenColor:0x9fb8d8,sheenRoughness:.86,
+      emissive:0x3a4f68,emissiveIntensity:0});
+    const belly=new THREE.MeshPhysicalMaterial({
+      color:0xf2e8d2,roughness:.70,sheen:1,sheenColor:0xffe0bc,sheenRoughness:.8,
+      emissive:0x6b4a26,emissiveIntensity:0});
+    const dark=M(0x1f2328,{roughness:.3,flatShading:false}).clone();
+    dark.emissive=new THREE.Color(0x1b2836);dark.emissiveIntensity=0;
+    const wht=M(0xffffff,{roughness:.15,flatShading:false}).clone();
+    wht.emissive=new THREE.Color(0x3d4d61);wht.emissiveIntensity=0;
+    /* 自发光基线登记（每帧按昼夜系数缩放：夜里亮、白天几乎不发光） */
+    /* belly 刻意压到 .12：奶白肚皮本身反射就高，再叠自发光会糊成一块白斑，
+       失去毛绒体积感。暖光交给顶光 + 脚下反弹光，这里只留一点点暖调。 */
+    TOTORO_GLOW.push({m:fur,b:.24},{m:belly,b:.12},{m:dark,b:.24},{m:wht,b:.18});
     // 厚实身躯 + 圆润肩颈融合 + 绒毛肚皮
     add(g,new THREE.SphereGeometry(1.16,28,22),fur,0,1.38,0).scale.set(1.02,1.15,.95);
     add(g,new THREE.SphereGeometry(.86,24,18),fur,0,2.08,-.02).scale.set(1.02,.90,.92);
@@ -4790,7 +4810,10 @@ const animePark=new THREE.Group();animePark.userData.tag='park';scene.add(animeP
     // 脚边 2 只小龙猫（补全手臂/耳/脚/尾）
     for(const [mx,mz,mc,ms] of [[-1.25,.68,0x6a9ec9,.42],[1.22,.58,0xf4f2eb,.32]]){
       const mini=new THREE.Group();mini.position.set(mx,0,mz);mini.scale.setScalar(ms);g.add(mini);
-      const mf=M(mc,{roughness:.62,flatShading:false});
+      const mf=M(mc,{roughness:.62,flatShading:false}).clone();
+      mf.sheen=1;mf.sheenColor=0xa8c4e0;mf.sheenRoughness=.85;
+      mf.emissive=new THREE.Color(0x36485e);mf.emissiveIntensity=0;
+      TOTORO_GLOW.push({m:mf,b:.22});
       add(mini,new THREE.SphereGeometry(.86,18,14),mf,0,.95,0).scale.set(1,1.18,.95);
       add(mini,new THREE.SphereGeometry(.62,14,10),belly,0,.85,.35).scale.set(.9,1,.55);
       add(mini,new THREE.SphereGeometry(.32,12,10),mf,0,.32,-.65).scale.set(.9,.8,1.3);
@@ -5230,11 +5253,11 @@ const animePark=new THREE.Group();animePark.userData.tag='park';scene.add(animeP
          旁边的小黄人、哆啦A梦跟着一起变亮，反而看不出谁是 C 位 —— 砍掉。
          现在只有雕塑本身被光打亮、邻居亮度不变（实测龙猫 +27 灰阶，邻居 ±2）。 */
       const sTop=13.2,sBase=.62;
-      const sl=new THREE.SpotLight(0xffd9a0,1000,34,.30,.72,1.55);
+      const sl=new THREE.SpotLight(0xffd9a0,880,34,.30,.72,1.55);
       sl.position.set(PX,sTop,PZ);
       const tgt=new THREE.Object3D();tgt.position.set(PX,2.0,PZ);scene.add(tgt);
       sl.target=tgt;scene.add(sl);
-      shopLights.push({l:sl,base:1000,street:false,delay:1.8});
+      shopLights.push({l:sl,base:880,street:false,delay:1.8});
       /* 底座顶面光池 + 广场地面余光（都是软边贴图，不会出现硬边圆盘） */
       const poolTop=new THREE.Mesh(new THREE.CircleGeometry(1,48),new THREE.MeshBasicMaterial({
         map:glowTex,color:0xffca88,transparent:true,opacity:.30,blending:THREE.AdditiveBlending,
@@ -5246,7 +5269,22 @@ const animePark=new THREE.Group();animePark.userData.tag='park';scene.add(animeP
         depthWrite:false,fog:false}));
       poolGnd.rotation.x=-Math.PI/2;poolGnd.position.set(PX,.16,PZ);poolGnd.scale.setScalar(3.4);
       poolGnd.renderOrder=2;poolGnd.userData.noReflect=true;scene.add(poolGnd);
-      window.__totoroSpot={light:sl,poolTop,poolGnd};
+      /* ── 轮廓光：从后上方勾一道冷白边 ──
+         灰蓝色的身体压在暖色夜景背景里，正面光再亮也会「糊」进去。
+         一盏窄角短距离射灯从后上方打，只勾肩背和耳朵的边，
+         主体立刻从背景里剥出来。距离只有 9m、角度 .22，背景楼只吃到一点点。 */
+      const rim=new THREE.SpotLight(0xa9c9f2,430,9,.20,.85,1.7);
+      rim.position.set(PX-1.5,6.6,PZ-4.4);
+      const rimT=new THREE.Object3D();rimT.position.set(PX,2.2,PZ);scene.add(rimT);
+      rim.target=rimT;scene.add(rim);
+      shopLights.push({l:rim,base:430,street:false,delay:2.2});
+      /* ── 脚下反弹光 ──
+         模拟雪地/底座把顶光反射回来的一层暖色，从下往上托亮下腹和脚掌，
+         雕塑才「站得住」而不是「贴在地上」。距离 2.9m，只照亮脚下这一圈。 */
+      const bounce=new THREE.PointLight(0xffb877,18,2.6,2.0);
+      bounce.position.set(PX,.42,PZ+1.1);scene.add(bounce);
+      shopLights.push({l:bounce,base:18,street:false,delay:2.0});
+      window.__totoroSpot={light:sl,poolTop,poolGnd,rim,bounce};
     }else if(fn===buildDoraemon){
       const dh=buildSantaHat(.36,.72);dh.position.set(0,2.68,0);fig.add(dh);
     }else if(fn===buildPikachu){
@@ -11720,6 +11758,11 @@ function animate(){
     if(intro.active&&!s.street)k*=Math.max(0,Math.min(1,(intro.t-s.delay)/.9));
     s.l.intensity=s.base*k;
   });
+  /* 龙猫自发光：跟同一套昼夜/入场系数走 —— 夜里从暗部里透出来，白天几乎不发光 */
+  {
+    const gK=lampK*(intro.active?Math.max(0,Math.min(1,(intro.t-2.4)/1.2)):1);
+    for(const it of TOTORO_GLOW) it.m.emissiveIntensity=it.b*gK;
+  }
   signMat.emissiveIntensity=(state.lights?(night?1.55:.42):.08)*(intro.active?Math.max(0,Math.min(1,(intro.t-1.9)/1.2)):1);
   winGlow.material.opacity=state.lights?(night?.07:.02):0;
 
