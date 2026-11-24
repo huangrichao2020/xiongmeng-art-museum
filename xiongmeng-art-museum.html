@@ -8466,171 +8466,787 @@ addNpc([[23.8,.16,3.8],[29.2,.16,3.8],[29.2,.16,5.8],[23.8,.16,5.8]],0xd97724,0x
 /* ════════════════════════════════════════════════════════════
    圣诞市集摊位街（西侧喷泉花园外围 L 形环廊）+ 北侧街边小店
    ════════════════════════════════════════════════════════════ */
-const market=new THREE.Group();market.userData.tag='market';scene.add(market);
-const shopRow=new THREE.Group();shopRow.userData.tag='shops';scene.add(shopRow);
-const stallWood=M(0x6d4a30,{roughness:.85});
-const stallWood2=M(0x8a5f3d,{roughness:.8});
-const stallIceM=new THREE.MeshPhysicalMaterial({color:0xdff0f8,transparent:true,opacity:.5,roughness:.1,metalness:.05});
-const stallBulbM=new THREE.MeshBasicMaterial({color:0xffd89a});
-const stallSignTex=(cn,en)=>animeSignTex(512,96,cn,en);
-/* 竖版高挑招牌（统一新海诚靛蓝暖金贴膜质感） */
-const stallSignTexV=(cn,en)=>{
-  const c=cv(256,420)[0],x=c.getContext('2d');
-  const g=x.createLinearGradient(0,0,256,420);
-  g.addColorStop(0,'#0f1e36');g.addColorStop(1,'#1b3154');
-  x.fillStyle=g;x.fillRect(0,0,256,420);
-  const rg=x.createRadialGradient(200,70,4,200,70,180);
-  rg.addColorStop(0,'rgba(255,204,136,.20)');rg.addColorStop(1,'rgba(255,204,136,0)');
-  x.fillStyle=rg;x.fillRect(0,0,256,420);
-  x.strokeStyle='rgba(246,214,144,.72)';x.lineWidth=4;x.strokeRect(10,10,236,400);
-  x.fillStyle='#fff4dc';x.font='700 50px '+HK;x.textAlign='center';
-  cn.split('').forEach((t,i)=>x.fillText(t,128,86+i*58));
-  x.fillStyle='#a8d8ff';x.font='600 16px '+HK;
-  x.fillText(en,128,388);
-  return ctex(c);
+/* ══════════════════════════════════════════════════════════════════
+   教堂级店铺构件库 · SK
+   ── 为什么要重做 ────────────────────────────────────────────────
+   原来的马路小店 / 集市摊位 / 游乐园小吃摊全是「纯色大方盒 + 纯色板」：
+     · 墙面零贴图，一整块死黑
+     · 窗是纯色发光矩形，没有窗框窗棂
+     · 屋顶是盖满整面的白色大板，看不出瓦片
+     · 招牌被屋檐压掉上半截，竖招牌还被支撑杆横穿（中文糊成一团就是这么来的）
+   现在的标准全部对齐哥特大教堂：
+     · 墙体上砂岩细砖贴图（512 画布 / mipmap / 各向异性 8）
+     · 勒脚 + 三层檐口线脚 + 转角壁柱（教堂的层次感）
+     · 尖拱盲拱 + 木框窗 + 暖光玻璃（带窗棂贴图，不再是纯色块）
+     · 石板瓦屋面 + 檐板 + 封檐板 + 屋脊压条 + 厚雪（雪只盖坡面，露石板边）
+     · 招牌走图集（29 块横招牌 + 9 块竖招牌只占 2 个 draw call），
+       并且挂到绝不会被屋檐吃掉的位置，背面文字用镜像 UV 修正
+   ══════════════════════════════════════════════════════════════════ */
+const SK={};
+
+/* ── UV 重映射到图集格子（flipU 用于背面文字不镜像）── */
+SK.uvCell=(geo,col,row,cols,rows,flipU)=>{
+  const uv=geo.attributes.uv;if(!uv)return geo;
+  const u0=col/cols,u1=(col+1)/cols,v0=1-(row+1)/rows,v1=1-row/rows;
+  for(let i=0;i<uv.count;i++){
+    const u=uv.getX(i),v=uv.getY(i);
+    uv.setXY(i,flipU?(u0+u1-(u0+u)):(u0+u*(u1-u0)),v0+v*(v1-v0));
+  }
+  uv.needsUpdate=true;return geo;
 };
-/* 摊位：地台 + 四柱 + 斜顶积雪 + 檐口冰柱 + 台面围布 + 招牌 + 灯泡 + 地面暖光池 */
-function buildStall(parent,x,z,rot,kind,cn,en){
-  const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=rot;parent.add(g);
-  const H=kind.h||2.3;                       // 顶棚高度，各摊错落
-  add(g,BX(2.9,.16,2.2),M(0xdfe6ec,{roughness:.9}),0,.08,0).castShadow=false;
-  for(const sx of [-1,1])for(const sz of [-1,1])
-    add(g,BX(.11,H,.11),stallWood,sx*1.22,H/2,sz*.92);
-  add(g,BX(2.5,H*.66,.08),stallWood2,0,H*.33,-.9);
-  /* 背面也做内容：从另一头看不能是一块光板 */
-  add(g,BX(2.5,.1,.12),stallWood,0,H*.78,-.85);
-  for(let i=0;i<4;i++){
-    const hg=add(g,BX(.24,.32,.18),M(kind.hang[i%kind.hang.length],{roughness:.78}),-.9+i*.6,H*.68,-.81);
-    hg.castShadow=false;
-    const hd2=add(g,BX(.04,.1,.04),M(0x8a5f3d,{roughness:.8}),-.9+i*.6,H*.89,-.81);hd2.castShadow=false;
+
+/* ── 砂岩细砖（教堂同源，砖块更细一档）── */
+SK.brickTex=(()=>{
+  const [c,x]=cv(512,512);
+  x.fillStyle='#b6ab99';x.fillRect(0,0,512,512);                     // 灰缝底
+  for(let r=0;r<16;r++){
+    const y=r*32,off=(r%2)*32;
+    for(let i=-1;i<9;i++){
+      const bx=i*64+off,sh=208+((r*37+i*53)%24);
+      x.fillStyle=`rgb(${sh},${sh-13},${sh-34})`;
+      x.fillRect(bx+1.5,y+1.5,61,29);
+      x.fillStyle='rgba(255,252,244,.17)';x.fillRect(bx+1.5,y+1.5,61,2);
+      x.fillStyle='rgba(58,40,24,.13)';x.fillRect(bx+1.5,y+28,61,2.5);
+    }
   }
-  /* 背面招牌同样写名字，从另一头走过来也认得出这是哪摊 */
-  const btex=stallSignTexV(cn,en,kind.bg);
-  const backSign=new THREE.Mesh(new THREE.PlaneGeometry(.5,.82),new THREE.MeshStandardMaterial({
-    map:btex,emissiveMap:btex,emissive:0xffffff,emissiveIntensity:.85,roughness:.4}));
-  backSign.position.set(0,H*.62,-.95);backSign.rotation.y=Math.PI;g.add(backSign);
-  for(let i=0;i<5;i++){
-    const bb=add(g,new THREE.SphereGeometry(.07,8,6),stallBulbM,-1+i*.5,H*.8,-.93);bb.castShadow=false;
+  for(let i=0;i<4200;i++){
+    x.fillStyle=`rgba(70,52,34,${Math.random()*.05})`;
+    x.fillRect(Math.random()*512,Math.random()*512,1.5,1.5);
   }
-  /* 背面一排三角彩旗 */
-  for(let i=0;i<6;i++){
-    const fg=add(g,new THREE.ConeGeometry(.14,.26,3),M([0xd23b32,0xe8c24a,0x2f8f6b,0x3f6ba8,0xf2f0e6,0xd23b32][i],{roughness:.75}),
-      -1.05+i*.42,H*.72,-.86);
-    fg.rotation.z=-Math.PI/2;fg.castShadow=false;
+  return ctex(c,[3,3]);
+})();
+
+/* ── 灰泥抹面（线脚 / 勒脚 / 装饰件用，替代纯色塑料感）── */
+SK.plasterTex=(()=>{
+  const [c,x]=cv(256,256);
+  x.fillStyle='#e9e3d7';x.fillRect(0,0,256,256);
+  for(let i=0;i<2800;i++){
+    const r=198+Math.random()*56;
+    x.fillStyle=`rgba(${r|0},${(r*.97)|0},${(r*.90)|0},.30)`;
+    const s=1+Math.random()*3;
+    x.fillRect(Math.random()*256,Math.random()*256,s,s);
   }
+  return ctex(c,[2,2]);
+})();
+
+/* ── 木板纹（竖向 / 横向两套）── */
+const skWoodCanvas=(vert)=>{
+  const [c,x]=cv(256,256);
+  x.fillStyle='#43291a';x.fillRect(0,0,256,256);
+  const n=8,w=256/n;
+  for(let i=0;i<n;i++){
+    const sh=94+((i*37)%26);
+    x.fillStyle=`rgb(${sh+28},${sh},${sh-40})`;
+    if(vert)x.fillRect(i*w,0,w-2,256);else x.fillRect(0,i*w,256,w-2);
+    for(let g=0;g<10;g++){
+      x.strokeStyle=`rgba(52,30,14,${.06+Math.random()*.10})`;
+      x.lineWidth=.6+Math.random()*.9;
+      x.beginPath();
+      if(vert){const gx=i*w+3+Math.random()*(w-8);x.moveTo(gx,0);for(let y=0;y<=256;y+=24)x.lineTo(gx+Math.sin(y*.06+i)*1.4,y);}
+      else{const gy=i*w+3+Math.random()*(w-8);x.moveTo(0,gy);for(let xx=0;xx<=256;xx+=24)x.lineTo(xx,gy+Math.sin(xx*.06+i)*1.4);}
+      x.stroke();
+    }
+    x.fillStyle='rgba(24,13,5,.44)';
+    if(vert)x.fillRect(i*w+w-2,0,2,256);else x.fillRect(0,i*w+w-2,256,2);
+  }
+  return c;
+};
+SK.woodTexV=ctex(skWoodCanvas(true),[1,1]);
+SK.woodTexH=ctex(skWoodCanvas(false),[1,1]);
+
+/* ── 石板瓦屋面 ── */
+SK.slateTex=(()=>{
+  const [c,x]=cv(256,256);
+  x.fillStyle='#28303c';x.fillRect(0,0,256,256);
+  for(let r=0;r<8;r++){
+    const y=r*32,off=(r%2)*16;
+    for(let i=-1;i<9;i++){
+      const bx=i*32+off,sh=50+((r*17+i*29)%18);
+      x.fillStyle=`rgb(${sh},${sh+7},${sh+18})`;
+      x.fillRect(bx,y,30,29);
+      x.fillStyle='rgba(214,228,244,.12)';x.fillRect(bx,y,30,1.6);
+      x.fillStyle='rgba(0,0,0,.28)';x.fillRect(bx,y+27,30,2);
+    }
+  }
+  return ctex(c,[4,4]);
+})();
+
+/* ── 条纹篷布图集（4×4 = 16 色，UV 分格共用一张贴图）── */
+SK.fabTex=(()=>{
+  const [c,x]=cv(512,512);
+  const cols=[['#b4453c','#f4efe2'],['#2f6b5a','#f4efe2'],['#7a2f26','#f4efe2'],['#3f6ba8','#f4efe2'],
+              ['#d8a13c','#f7f2e6'],['#8f3a68','#f4efe2'],['#1f4034','#f4efe2'],['#b87333','#f7f2e6'],
+              ['#2f8f6b','#f4efe2'],['#d23b32','#f4efe2'],['#3f4a54','#f4efe2'],['#7a4a8c','#f4efe2'],
+              ['#c4813c','#f7f2e6'],['#2f6b5a','#f4efe2'],['#d07a9a','#f4efe2'],['#523724','#f4efe2']];
+  cols.forEach((pr,i)=>{
+    const cx=(i%4)*128,cy=((i/4)|0)*128;
+    x.save();x.translate(cx,cy);x.beginPath();x.rect(0,0,128,128);x.clip();
+    x.fillStyle=pr[1];x.fillRect(0,0,128,128);
+    x.fillStyle=pr[0];
+    for(let k=0;k<4;k++)x.fillRect(k*32,0,16,128);
+    x.fillStyle='rgba(0,0,0,.055)';
+    for(let k=0;k<128;k+=3)x.fillRect(0,k,128,1);
+    x.restore();
+  });
+  return ctex(c);
+})();
+
+/* ── 雪面颗粒（纯白雪板最像低模， 加一层细颗粒立刻有质感）── */
+SK.snowTex=(()=>{
+  const [c,x]=cv(256,256);
+  x.fillStyle='#f2f7fd';x.fillRect(0,0,256,256);
+  for(let i=0;i<5200;i++){
+    const v=206+Math.random()*49;
+    x.fillStyle=`rgba(${v|0},${(v+4)|0},255,${.22+Math.random()*.5})`;
+    x.fillRect(Math.random()*256,Math.random()*256,1.2+Math.random()*3.0,1+Math.random()*1.8);
+  }
+  /* 风吹雪脊：几道淡影，破掉纯白板感 */
+  for(let i=0;i<14;i++){
+    x.strokeStyle=`rgba(150,175,205,${.10+Math.random()*.14})`;
+    x.lineWidth=2+Math.random()*5;
+    x.beginPath();
+    const y0=Math.random()*256;
+    x.moveTo(0,y0);
+    for(let xx=0;xx<=256;xx+=32)x.lineTo(xx,y0+Math.sin(xx*.05+i)*4);
+    x.stroke();
+  }
+  return ctex(c,[3,3]);
+})();
+
+/* ── 窗玻璃：暖光渐变 + 窗棂 + 室内剪影（替代纯色发光方块）── */
+SK.glassTex=(()=>{
+  const [c,x]=cv(256,256);
+  const g=x.createLinearGradient(0,0,0,256);
+  g.addColorStop(0,'#fff7e4');g.addColorStop(.40,'#ffdfae');
+  g.addColorStop(.76,'#e2a462');g.addColorStop(1,'#8f5527');
+  x.fillStyle=g;x.fillRect(0,0,256,256);
+  x.fillStyle='rgba(255,255,255,.13)';
+  x.beginPath();x.moveTo(30,0);x.lineTo(96,0);x.lineTo(40,256);x.lineTo(0,256);x.closePath();x.fill();
+  x.fillStyle='rgba(96,48,16,.20)';                       // 室内剪影
+  x.fillRect(24,160,44,90);x.fillRect(188,174,38,76);
+  x.fillStyle='rgba(60,28,10,.28)';x.fillRect(112,198,28,52);
+  x.strokeStyle='rgba(50,28,15,.92)';x.lineWidth=11;x.strokeRect(5.5,5.5,245,245);
+  x.lineWidth=8;x.beginPath();x.moveTo(128,6);x.lineTo(128,250);x.stroke();
+  x.lineWidth=7;x.beginPath();x.moveTo(6,134);x.lineTo(250,134);x.stroke();
+  return ctex(c);
+})();
+
+/* ── 招牌图集：横版 4×8（512×128）/ 竖版 4×4（256×420）── */
+const SIGN_ATLAS=(()=>{
+  const mk=(cols,rows,cw,ch)=>{
+    const [c,x]=cv(cols*cw,rows*ch);
+    const t=new THREE.CanvasTexture(c);
+    t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;
+    t.minFilter=THREE.LinearMipmapLinearFilter;t.magFilter=THREE.LinearFilter;
+    return {c,x,t,cols,rows,cw,ch,n:0};
+  };
+  const H=mk(4,8,512,128),V=mk(4,4,256,420);
+  const fit=(x,t,maxW,s)=>{let k=s;x.font='700 '+k+'px '+HK;
+    while(x.measureText(t).width>maxW&&k>9){k-=1;x.font='700 '+k+'px '+HK;}return k;};
+  const bgPaint=(x,w,h)=>{
+    const g=x.createLinearGradient(0,0,0,h);
+    g.addColorStop(0,'#0e1c33');g.addColorStop(.52,'#16294a');g.addColorStop(1,'#0a1526');
+    x.fillStyle=g;x.fillRect(0,0,w,h);
+    const rg=x.createRadialGradient(w*.76,h*.24,4,w*.76,h*.24,w*.62);
+    rg.addColorStop(0,'rgba(255,206,140,.24)');rg.addColorStop(1,'rgba(255,206,140,0)');
+    x.fillStyle=rg;x.fillRect(0,0,w,h);
+    x.fillStyle='rgba(255,255,255,.02)';
+    for(let i=0;i<h;i+=2)x.fillRect(0,i,w,1);
+    x.strokeStyle='rgba(246,214,144,.88)';x.lineWidth=4;x.strokeRect(8,8,w-16,h-16);
+    x.strokeStyle='rgba(246,214,144,.36)';x.lineWidth=2;x.strokeRect(15,15,w-30,h-30);
+    x.fillStyle='rgba(246,214,144,.8)';
+    for(const px of [17,w-17])for(const py of [17,h-17]){
+      x.beginPath();x.moveTo(px,py-6);x.lineTo(px+6,py);x.lineTo(px,py+6);x.lineTo(px-6,py);x.closePath();x.fill();
+    }
+  };
+  const drawH=(cn,en,accent)=>{
+    if(H.n>=H.cols*H.rows)return 0;
+    const i=H.n++,col=i%H.cols,row=(i/H.cols)|0,w=H.cw,h=H.ch;
+    H.x.save();H.x.translate(col*w,row*h);
+    bgPaint(H.x,w,h);
+    if(accent){H.x.fillStyle=accent;H.x.fillRect(17,h-22,w-34,6);}
+    H.x.textAlign='center';
+    const fs=fit(H.x,cn,w*.78,Math.round(h*.40));
+    H.x.font='700 '+fs+'px '+HK;
+    H.x.shadowColor='rgba(0,0,0,.6)';H.x.shadowBlur=7;H.x.shadowOffsetY=2;
+    H.x.fillStyle='#fff6e2';H.x.fillText(cn,w/2,Math.round(h*.50));
+    H.x.shadowBlur=0;H.x.shadowOffsetY=0;
+    H.x.fillStyle='rgba(246,214,144,.5)';H.x.fillRect(w*.33,h*.585,w*.34,2);
+    H.x.fillStyle='#a8d8ff';H.x.font='600 '+Math.round(h*.15)+'px '+HK;
+    H.x.fillText(en,w/2,Math.round(h*.79));
+    H.x.restore();return i;
+  };
+  const drawV=(cn,en,accent)=>{
+    if(V.n>=V.cols*V.rows)return 0;
+    const i=V.n++,col=i%V.cols,row=(i/V.cols)|0,w=V.cw,h=V.ch;
+    V.x.save();V.x.translate(col*w,row*h);
+    bgPaint(V.x,w,h);
+    if(accent){V.x.fillStyle=accent;V.x.fillRect(17,h-30,w-34,8);}
+    V.x.textAlign='center';
+    const chs=cn.split('');
+    const fs=Math.max(26,Math.min(58,Math.floor(h*.66/Math.max(1,chs.length)/1.16)));
+    const step=fs*1.18,block=chs.length*step,top=(h*.70-block)/2+fs*.78;
+    V.x.font='700 '+fs+'px '+HK;
+    chs.forEach((c2,i2)=>{
+      V.x.shadowColor='rgba(0,0,0,.6)';V.x.shadowBlur=6;V.x.shadowOffsetY=2;
+      V.x.fillStyle='#fff6e2';V.x.fillText(c2,w/2,Math.round(top+i2*step));
+    });
+    V.x.shadowBlur=0;V.x.shadowOffsetY=0;
+    V.x.fillStyle='#a8d8ff';V.x.font='600 16px '+HK;
+    V.x.fillText(en,w/2,h-48);
+    V.x.restore();return i;
+  };
+  return {H,V,drawH,drawV,flush(){H.t.needsUpdate=true;V.t.needsUpdate=true;}};
+})();
+
+/* ── 材质 ── */
+SK.M={};
+SK.M.trim    =new THREE.MeshStandardMaterial({color:0xd9cfba,map:SK.plasterTex,roughness:.88,metalness:.02,envMapIntensity:.16,
+  emissiveMap:SK.plasterTex,emissive:0x6b4f2e,emissiveIntensity:.75});
+SK.M.trimDark=new THREE.MeshStandardMaterial({color:0x9e917c,map:SK.plasterTex,roughness:.90,metalness:.02,envMapIntensity:.14,
+  emissiveMap:SK.plasterTex,emissive:0x5a4226,emissiveIntensity:.70});
+SK.M.stone  =new THREE.MeshStandardMaterial({color:0xb2ab9c,map:SK.plasterTex,roughness:.93,metalness:.02,envMapIntensity:.13,
+  emissiveMap:SK.plasterTex,emissive:0x63512f,emissiveIntensity:.70});
+SK.M.wood   =new THREE.MeshStandardMaterial({color:0x94643c,map:SK.woodTexV,roughness:.84,metalness:.02,envMapIntensity:.14,
+  emissiveMap:SK.woodTexV,emissive:0x6b4622,emissiveIntensity:.72});
+SK.M.woodH  =new THREE.MeshStandardMaterial({color:0x94643c,map:SK.woodTexH,roughness:.84,metalness:.02,envMapIntensity:.14,
+  emissiveMap:SK.woodTexH,emissive:0x6b4622,emissiveIntensity:.72});
+SK.M.woodDark =new THREE.MeshStandardMaterial({color:0x573823,map:SK.woodTexV,roughness:.86,metalness:.02,envMapIntensity:.13,
+  emissiveMap:SK.woodTexV,emissive:0x4d3118,emissiveIntensity:.68});
+SK.M.woodLight=new THREE.MeshStandardMaterial({color:0xbc8d58,map:SK.woodTexV,roughness:.80,metalness:.02,envMapIntensity:.16,
+  emissiveMap:SK.woodTexV,emissive:0x7d5528,emissiveIntensity:.72});
+SK.M.slate  =new THREE.MeshStandardMaterial({color:0x3b4859,map:SK.slateTex,roughness:.82,metalness:.08,envMapIntensity:.10,emissive:0x111823,emissiveIntensity:.55});
+SK.M.gold   =M(0xe0b24c,{roughness:.28,metalness:.82});
+SK.M.iron   =M(0x262d35,{roughness:.45,metalness:.72});
+SK.M.fabric =new THREE.MeshStandardMaterial({map:SK.fabTex,roughness:.88,metalness:0,side:THREE.DoubleSide,envMapIntensity:.12,
+  emissiveMap:SK.fabTex,emissive:0x6b5334,emissiveIntensity:.70});
+SK.M.snow  =new THREE.MeshStandardMaterial({color:0xf4f9ff,map:SK.snowTex,roughness:.90,metalness:0,
+  envMapIntensity:.08,emissive:0x445c80,emissiveIntensity:1.45});
+SK.M.signH  =new THREE.MeshStandardMaterial({map:SIGN_ATLAS.H.t,emissiveMap:SIGN_ATLAS.H.t,emissive:0xffffff,emissiveIntensity:.52,roughness:.34});
+SK.M.signV  =new THREE.MeshStandardMaterial({map:SIGN_ATLAS.V.t,emissiveMap:SIGN_ATLAS.V.t,emissive:0xffffff,emissiveIntensity:.58,roughness:.34});
+const skGlass=(hex,int)=>new THREE.MeshStandardMaterial({
+  color:0x141b22,map:SK.glassTex,emissiveMap:SK.glassTex,emissive:hex,
+  emissiveIntensity:int,roughness:.16,metalness:.06});
+SK.M.glass=[skGlass(0xffcf8f,1.05),skGlass(0xa8d8ff,1.00),skGlass(0xffb8d8,1.00),skGlass(0xffe9b5,1.12)];
+
+/* 墙面砖色：5 档浅色漆面砖，夜里柔和不刺眼 */
+SK.WALL_TINTS=[0xf1e8da,0xdde7ee,0xefdcd4,0xdde6d8,0xe7e0ee];
+SK.wallCache=new Map();
+SK.wallMat=(tint)=>{
+  let m=SK.wallCache.get(tint);
+  if(!m){
+    m=new THREE.MeshStandardMaterial({color:tint,map:SK.brickTex,roughness:.90,metalness:.02,envMapIntensity:.14,
+      emissiveMap:SK.brickTex,emissive:0x7a5a33,emissiveIntensity:.85});
+    SK.wallCache.set(tint,m);
+  }
+  return m;
+};
+
+/* ── 尖拱 / 圆拱轮廓（教堂同款）── */
+SK.archPath=(path,w,h,pt)=>{
+  path.moveTo(-w/2,0);
+  if(pt){path.lineTo(-w/2,h*.56);path.quadraticCurveTo(-w*.36,h*.90,0,h);
+          path.quadraticCurveTo(w*.36,h*.90,w/2,h*.56);}
+  else{path.lineTo(-w/2,h-w/2);path.absarc(0,h-w/2,w/2,Math.PI,0,true);}
+  path.lineTo(w/2,0);path.closePath();return path;
+};
+/* 拱形浮雕（实心尖拱，用作「国王长廊」式盲拱）*/
+SK.archGeo=(w,h,d,pt)=>{
+  const sh=new THREE.Shape();SK.archPath(sh,w,h,pt);
+  const g=new THREE.ExtrudeGeometry(sh,{depth:d,bevelEnabled:false});
+  g.translate(0,0,-d/2);return g;
+};
+
+/* ── 坡屋顶：石板瓦 + 厚雪（雪只盖坡面）+ 檐板 + 屋脊压条 ── */
+SK.pitchedRoof=(parent,o)=>{
+  const W=o.w,D=o.d,rise=o.rise,eaveY=o.y,over=o.over===undefined?.26:o.over;
+  const slate=o.slate||SK.M.slate,trim=o.trim||SK.M.trim;
+  const slopeZ=D/2+over,ang=Math.atan2(rise,slopeZ),L=Math.hypot(rise,slopeZ);
+  const ny=Math.cos(ang),nzu=-Math.sin(ang);      // 坡面法线（上坡法向）
+  const upY=Math.sin(ang),upZ=ang;                  // 上坡方向
   for(const sz of [-1,1]){
-    const r=add(g,BX(3.0,.09,1.35),kind.roof,0,H+.12,sz*.44);r.rotation.x=sz*.3;
-    const sn=add(g,BX(3.05,.08,1.4),snowCapM,0,H+.24,sz*.44);sn.rotation.x=sz*.3;
+    const r=add(parent,BX(W+.06,.20,L),slate,0,eaveY+rise/2+.06,sz*slopeZ/2);
+    r.rotation.x=sz*ang;
+    /* 雪：贴着瓦面（法向抬 0.155 = 瓦半厚 0.10 + 雪半厚 0.045 + 1cm 缝），
+       再沿坡面往上收 0.12m，于是檐口露出一条深色石板边 */
+    const off=0.155,inset=0.12;
+    const sn=addNS(parent,BX(W-.12,.09,L-inset*2),SK.M.snow,
+      0,eaveY+rise/2+.06+ny*off+upY*inset,
+      sz*slopeZ/2+sz*nzu*off+sz*Math.cos(ang)*inset);
+    sn.rotation.x=sz*ang;
+    /* 竖向檐板：封住斜面板端面（消灭所有毛边），
+       用瓦色而不是米色 —— 米色板在夜里会变成一条抢眼的大黄带子 */
+    add(parent,BX(W+.10,.17,.09),slate,0,eaveY+.01,sz*(slopeZ+.05));
   }
-  add(g,BX(3.06,.12,.22),stallWood,0,H+.34,0);
+  /* 屋脊压条 + 脊雪 */
+  add(parent,BX(W+.10,.15,.34),trim,0,eaveY+rise+.15,0);
+  addNS(parent,BX(W-.10,.09,.22),SK.M.snow,0,eaveY+rise+.27,0);
+  return {ang,L,slopeZ};
+};
+
+/* ── 拱窗：木框 + 暖光玻璃 + 盲拱 + 窗台 ── */
+SK.window=(parent,x,y,z,gi,w,h)=>{
+  const gm=SK.M.glass[gi%SK.M.glass.length],trim=SK.M.trim,t=.10;
+  add(parent,BX(w,h,.06),gm,x,y+h/2,z+.03);
+  add(parent,BX(w+t*2,t,.15),trim,x,y-t/2,z+.08);
+  add(parent,BX(t,h+t,.15),trim,x-w/2-t/2,y+h/2,z+.08);
+  add(parent,BX(t,h+t,.15),trim,x+w/2+t/2,y+h/2,z+.08);
+  add(parent,BX(w+t*2,t,.15),trim,x,y+h+t/2,z+.08);
+  const ah=Math.max(.32,w*.40);
+  const a=add(parent,SK.archGeo(w+t*2.6,ah,.13,true),trim,x,y+h+t+.05,z+.045);
+  a.castShadow=false;
+  add(parent,BX(.13,.20,.18),SK.M.trimDark,x,y+h+t+ah-.08,z+.09);
+};
+
+/* ── 门：门扇线脚 + 门套 + 三角门楣 + 铜把手 + 门槛 ── */
+SK.door=(parent,x,y,z,woodMat)=>{
+  const w=1.12,h=1.92,trim=SK.M.trim;
+  add(parent,BX(w,h,.10),woodMat,x,y+h/2,z+.05);
+  add(parent,BX(w-.32,h*.40,.04),SK.M.woodDark,x,y+h*.27,z+.10);
+  add(parent,BX(w-.32,h*.28,.04),SK.M.woodDark,x,y+h*.73,z+.10);
+  add(parent,BX(.13,h+.18,.19),trim,x-w/2-.07,y+h/2,z+.10);
+  add(parent,BX(.13,h+.18,.19),trim,x+w/2+.07,y+h/2,z+.10);
+  add(parent,BX(w+.36,.16,.21),trim,x,y+h+.09,z+.11);
+  add(parent,new THREE.SphereGeometry(.05,10,8),SK.M.gold,x+.38,y+h*.48,z+.13);
+  add(parent,BX(w+.22,.10,.32),SK.M.stone,x,y+.05,z+.13);
+};
+
+/* ── 雨篷：条纹篷布 + 波浪垂帘 + 锻铁托架 ── */
+SK.awning=(parent,x,y,z,w,d,cell,valance=true)=>{
+  const geo=new THREE.BoxGeometry(w,.07,d);
+  SK.uvCell(geo,cell%4,(cell/4)|0,4,4);
+  const slab=new THREE.Mesh(geo,SK.M.fabric);
+  slab.position.set(x,y,z+d/2+.02);slab.rotation.x=-.16;
+  slab.castShadow=false;slab.receiveShadow=true;parent.add(slab);
+  if(valance){
+    const vg=new THREE.BoxGeometry(w,.26,.05);
+    SK.uvCell(vg,cell%4,(cell/4)|0,4,4);
+    const v=new THREE.Mesh(vg,SK.M.fabric);
+    v.position.set(x,y-.16,z+d+.05);v.castShadow=false;parent.add(v);
+    const n=Math.max(5,Math.round(w/.24));
+    for(let i=0;i<n;i++){
+      const s=new THREE.Mesh(new THREE.SphereGeometry(w/n*.52,10,7),SK.M.fabric);
+      SK.uvCell(s.geometry,cell%4,(cell/4)|0,4,4);
+      s.position.set(x-w/2+(i+.5)*(w/n),y-.28,z+d+.05);
+      s.scale.set(1,.62,1);s.castShadow=false;parent.add(s);
+    }
+  }
+  for(const s of [-1,1]){
+    const br=add(parent,BX(.05,.05,.42),SK.M.iron,x+s*(w/2-.16),y-.14,z+d*.5+.02);
+    br.rotation.x=-.9;
+  }
+};
+
+/* ── 招牌板：正面 + 背面（背面 U 镜像，文字不会反）── */
+SK.signBoard=(parent,w,h,idx,x,y,z,vert)=>{
+  const A=vert?SIGN_ATLAS.V:SIGN_ATLAS.H;
+  const mk=(back)=>{
+    const g=new THREE.PlaneGeometry(w,h);
+    SK.uvCell(g,idx%A.cols,(idx/A.cols)|0,A.cols,A.rows,back);
+    const m=new THREE.Mesh(g,vert?SK.M.signV:SK.M.signH);
+    m.position.set(x,y,z+(back?-.022:.022));
+    if(back)m.rotation.y=Math.PI;
+    m.castShadow=false;parent.add(m);
+  };
+  mk(false);mk(true);
+};
+
+
+/* ── 街边小店（北街 / 西段 / 东段）：教堂级立面 ── */
+SK.shopHouse=(parent,o)=>{
+  const g=new THREE.Group();
+  g.position.set(o.x,0,o.z);g.rotation.y=o.rot||0;parent.add(g);
+  const W=4.40,D=3.60,PL=.32,WH=2.88;
+  const wallTop=PL+WH, corn=.32, eaveY=wallTop+corn, rise=.98;
+  const wallM=SK.wallMat(SK.WALL_TINTS[o.tint%SK.WALL_TINTS.length]);
+  const trim=SK.M.trim,trimD=SK.M.trimDark;
+  const face=D/2;
+
+  /* 勒脚（两层线脚，替代原来的单层薄板）*/
+  add(g,BX(W+.18,PL,D+.18),SK.M.stone,0,PL/2,0);
+  add(g,BX(W+.26,.08,D+.26),trimD,0,PL+.04,0);
+  /* 主体砂岩砖墙 */
+  add(g,BX(W,WH,D),wallM,0,PL+WH/2,0);
+  /* 转角壁柱（教堂的竖向分割，破掉大平面）*/
+  for(const sx of [-1,1])for(const sz of [-1,1])
+    add(g,BX(.26,WH-.08,.26),trim,sx*(W/2-.11),PL+(WH-.08)/2,sz*(D/2-.11));
+  /* 檐口三层递收线脚 */
+  add(g,BX(W+.10,.10,D+.10),trimD,0,wallTop+.05,0);
+  add(g,BX(W+.24,.12,D+.24),trim,0,wallTop+.16,0);
+  add(g,BX(W+.12,.10,D+.12),trimD,0,wallTop+.27,0);
+  /* 屋顶 */
+  SK.pitchedRoof(g,{w:W,d:D,y:eaveY,rise:rise});
+  /* 两端山墙（实体尖拱 + 封檐板 + 小圆窗）*/
   {
-    const gs=new THREE.Shape();
-    gs.moveTo(-1.08,H-.02);gs.lineTo(1.08,H-.02);gs.lineTo(0,H+.33);gs.closePath();
-    const gg=new THREE.ExtrudeGeometry(gs,{depth:.08,bevelEnabled:false});
+    const gw=D/2+.06,gh=rise-.04;
+    const sh=new THREE.Shape();
+    sh.moveTo(-gw,0);sh.lineTo(gw,0);sh.lineTo(0,gh);sh.closePath();
+    const gg=new THREE.ExtrudeGeometry(sh,{depth:.22,bevelEnabled:false});
     gg.rotateY(Math.PI/2);
+    const ang=Math.atan2(rise,D/2+.26),L=Math.hypot(rise,D/2+.26);
     for(const sx of [-1,1]){
-      const gm=new THREE.Mesh(gg,stallWood2);
-      gm.position.set(sx*1.22-.04,0,0);gm.castShadow=true;g.add(gm);
+      const gm=new THREE.Mesh(gg,wallM);
+      gm.position.set(sx*(W/2-.11),eaveY-.02,0);
+      gm.castShadow=true;gm.receiveShadow=true;g.add(gm);
+      /* 封檐板：盖住山墙与瓦面的接缝 */
+      for(const sz of [-1,1]){
+        const bb=add(g,BX(.12,.26,L),trim,sx*(W/2+.03),eaveY+rise/2,sz*(D/2+.26)/2);
+        bb.rotation.x=sz*ang;
+      }
+      /* 山墙小圆窗 */
+      const rw=addNS(g,new THREE.CylinderGeometry(.26,.26,.10,16),SK.M.glass[o.glass%4],sx*(W/2+.04),eaveY+rise*.52,0);
+      rw.rotation.z=Math.PI/2;
+      add(g,new THREE.TorusGeometry(.28,.05,6,18),trim,sx*(W/2+.07),eaveY+rise*.52,0).rotation.y=Math.PI/2;
     }
   }
+  /* 烟囱（带顶帽与积雪）*/
+  {
+    add(g,BX(.50,.92,.50),wallM,1.26,eaveY+rise*.55,-.55);
+    add(g,BX(.62,.12,.62),trim,1.26,eaveY+rise*.55+.50,-.55);
+    addNS(g,BX(.58,.08,.58),snowCapM,1.26,eaveY+rise*.55+.60,-.55);
+    for(let i=0;i<3;i++){
+      const sm=addNS(g,new THREE.SphereGeometry(.13,8,6),M(0xffffff,{roughness:.9,transparent:true,opacity:.14}),
+        1.26+ (i-1)*.05,eaveY+rise*.55+.85+i*.22,-.5);
+      sm.scale.set(1,1.4,1);
+    }
+  }
+
+  /* ── 正面（+Z）立面 ── */
+  SK.window(g,-1.50,0.92,face,o.glass,.96,1.00);
+  SK.window(g, 1.50,0.92,face,o.glass,.96,1.00);
+  SK.door(g,0,PL,face,SK.M.wood);
+  /* 门廊雨篷（只罩门，不遮两侧窗）*/
+  SK.awning(g,0,2.38,face+.04,2.05,.66,o.fab);
+  /* 台阶 */
+  add(g,BX(1.9,.10,.55),SK.M.stone,0,.22,face+.30);
+  add(g,BX(2.3,.09,.85),SK.M.stone,0,.11,face+.55);
+  /* 招牌：4:1 画幅配 4:1 图集格（绝不拉伸），挂在雨篷上方、檐口正下方 */
+  {
+    const si=SIGN_ATLAS.drawH(o.cn,o.en,o.accent);
+    SK.signBoard(g,2.88,.72,si,0,2.84,face+.12,false);
+    add(g,BX(3.02,.08,.12),trimD,0,3.21,face+.14);
+    add(g,BX(3.02,.08,.12),trimD,0,2.47,face+.14);
+  }
+  /* 雨篷前沿一串彩灯 */
   for(let i=0;i<7;i++){
-    const len=R(.18,.42);
-    const ic=add(g,new THREE.CylinderGeometry(.028,.028,len,5),stallIceM,-1.05+i*.35,H-.1-len/2,1.05);
-    ic.castShadow=false;
+    const b=addNS(g,new THREE.SphereGeometry(.075,8,6),getBulbMat([0xff4d4d,0xffe078,0x48e58b,0xfff2cc][i%4],i),
+      -0.85+i*.28,2.28,face+.72);
   }
-  /* 顶上一块竖挑的双面招牌：高 1.1 米，比屋顶高一头 */
-  const vtex=stallSignTexV(cn,en,kind.bg);
-  const vmat=new THREE.MeshStandardMaterial({map:vtex,emissiveMap:vtex,emissive:0xffffff,emissiveIntensity:.9,roughness:.4});
-  add(g,BX(.07,1.5,.07),M(0x6d4a30,{roughness:.85}),-.95,H+.62,-.15);
-  const vboard=new THREE.Mesh(new THREE.PlaneGeometry(.66,1.1),vmat);
-  vboard.position.set(-.95,H+1.12,-.19);g.add(vboard);
-  const vboard2=new THREE.Mesh(new THREE.PlaneGeometry(.66,1.1),vmat);
-  vboard2.position.set(-.95,H+1.12,-.11);vboard2.rotation.y=Math.PI;g.add(vboard2);
-  /* 顶上一面三角旗 + 旗杆（从哪个方向都认得出是市集） */
-  const flagCol=[0xd23b32,0xe8c24a,0x2f8f6b,0x3f6ba8][Math.abs(Math.round(x*3+z))%4];
-  add(g,BX(.05,1.1,.05),M(0x8a5f3d,{roughness:.8}),1.3,H+.72,-.7);
-  const flag=add(g,new THREE.ConeGeometry(.26,.44,3),M(flagCol,{roughness:.75}),1.3,H+1.05,-.7);
-  flag.rotation.z=-Math.PI/2;flag.castShadow=false;
-  add(g,BX(2.4,.1,.75),stallWood2,0,.95,.42);
-  add(g,BX(2.44,.36,.05),M(kind.cloth,{roughness:.8}),0,.78,.78);
-  const tex=stallSignTex(cn,en,kind.bg);
-  signPanel(g,2.1,.4,tex,0,H-.28,1.04,.85);
-  for(let i=0;i<3;i++){
-    const b=add(g,new THREE.SphereGeometry(.09,8,6),stallBulbM,-.7+i*.7,H-.12,.55);
-    b.castShadow=false;
+  /* 立面柔光贴片：假装窗光洒在砖墙上（不占点光源预算）*/
+  {
+    const gl=new THREE.Mesh(new THREE.PlaneGeometry(4.6,3.0),new THREE.MeshBasicMaterial({
+      map:glowTex,color:0xffc98a,transparent:true,opacity:.30,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+    gl.position.set(0,1.75,face+.04);gl.castShadow=false;g.add(gl);
+    /* 雨篷下的暖光带：让门脸有「店里透出来的光」 */
+    const st=new THREE.Mesh(new THREE.PlaneGeometry(4.1,1.1),new THREE.MeshBasicMaterial({
+      map:glowTex,color:0xffbe7a,transparent:true,opacity:.22,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+    st.rotation.x=-Math.PI/2;st.position.set(0,.04,face+1.0);st.castShadow=false;g.add(st);
   }
-  /* 摊位地面光池：同样换成软边渐变（原来是实心硬边圆盘） */
-  const pool=new THREE.Mesh(new THREE.PlaneGeometry(3.6,3.6),new THREE.MeshBasicMaterial({
-    map:glowTex,color:0xffb765,transparent:true,opacity:.13,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
-  pool.rotation.x=-Math.PI/2;pool.position.set(0,.17,0);pool.castShadow=false;g.add(pool);
-  /* 货物 */
-  const gy=1.02;
-  if(kind.goods==='wine'){
-    add(g,new THREE.CylinderGeometry(.24,.2,.3,16),M(0xb87333,{roughness:.35,metalness:.75}),0,gy+.15,.3);
-    const rim=add(g,new THREE.TorusGeometry(.24,.03,6,18),M(0xd9a05a,{roughness:.3,metalness:.7}),0,gy+.31,.3);rim.rotation.x=Math.PI/2;
-    for(let i=0;i<4;i++)add(g,new THREE.CylinderGeometry(.055,.045,.12,9),M(0xd94f3d,{roughness:.55}),-.85+i*.56,gy+.06,.56);
-    for(let i=0;i<4;i++){
-      const st=add(g,new THREE.SphereGeometry(.1,7,6),M(0xffffff,{roughness:.9,transparent:true,opacity:.2}),(i-1.5)*.05,gy+.42,.3);
-      st.scale.set(1,1.5,1);st.castShadow=false;
-    }
-  }else if(kind.goods==='nuts'){
-    add(g,new THREE.CylinderGeometry(.3,.26,.36,14),M(0x4a5158,{roughness:.6,metalness:.5}),0,gy+.18,.28);
-    const rim=add(g,new THREE.TorusGeometry(.3,.035,6,16),M(0x6d767e,{roughness:.45,metalness:.6}),0,gy+.37,.28);rim.rotation.x=Math.PI/2;
-    for(let i=0;i<9;i++){
-      const n=add(g,new THREE.IcosahedronGeometry(.07,0),M(0x8a5a34,{roughness:.9}),-.2+((i*37)%9)*.05,gy+.4,.2+((i*23)%7)*.03);
-      n.castShadow=false;
-    }
-    for(let i=0;i<3;i++){
-      const sm2=add(g,new THREE.SphereGeometry(.11,7,6),M(0xffffff,{roughness:.9,transparent:true,opacity:.18}),(i-1)*.09,gy+.58,.28);
-      sm2.scale.set(1,1.4,1);sm2.castShadow=false;
-    }
-  }else if(kind.goods==='house'){
-    const hb=add(g,BX(.62,.5,.5),M(0xd9a05a,{roughness:.85}),0,gy+.25,.3);
-    const hr=add(g,new THREE.ConeGeometry(.5,.42,4),M(0xc4813c,{roughness:.85}),0,gy+.7,.3);hr.rotation.y=Math.PI/4;
-    for(let i=0;i<3;i++){
-      const ic=add(g,new THREE.CylinderGeometry(.03,.03,.16,6),M(0xf2f7fc,{roughness:.7}),-.16+i*.16,gy+.5,.05);
-      ic.castShadow=false;
-    }
-    const door=add(g,BX(.16,.26,.04),M(0xf2f7fc,{roughness:.7}),0,gy+.13,.05);door.castShadow=false;
-  }else if(kind.goods==='cane'){
-    for(let i=0;i<7;i++){
-      const c=add(g,new THREE.CylinderGeometry(.035,.035,.62,7),M(i%2?0xf4f4f4:0xd23b32,{roughness:.5}),-1+i*.33,gy+.31,.42);
-      c.rotation.z=.18;c.castShadow=false;
-      const hook=add(g,new THREE.TorusGeometry(.07,.022,5,10),M(i%2?0xf4f4f4:0xd23b32,{roughness:.5}),-1+i*.33+.07,gy+.62,.42);
-      hook.castShadow=false;
-    }
-  }else if(kind.goods==='gift'){
-    const cols=[0xd23b32,0x2f8f6b,0x3f6ba8,0xe0a33c];
+  /* 门两侧壁灯（铁艺挑臂 + 暖光玻璃罩，夜里让门口有光）*/
+  for(const sx of [-1,1]){
+    const X=sx*.86;
+    add(g,BX(.09,.09,.30),SK.M.iron,X,2.16,face+.16);
+    const lant=addNS(g,new THREE.CylinderGeometry(.13,.16,.26,10),SK.M.glass[3],X,1.98,face+.32);
+    add(g,BX(.20,.05,.20),SK.M.iron,X,2.13,face+.32);
+    const halo=new THREE.Mesh(new THREE.PlaneGeometry(1.0,1.0),new THREE.MeshBasicMaterial({
+      map:glowTex,color:0xffc98a,transparent:true,opacity:.34,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+    halo.position.set(X,1.96,face+.36);halo.castShadow=false;g.add(halo);
+  }
+  /* 门口的暖光带 */
+  {
+    const dg=new THREE.Mesh(new THREE.PlaneGeometry(1.5,2.2),new THREE.MeshBasicMaterial({
+      map:glowTex,color:0xffbe7a,transparent:true,opacity:.26,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+    dg.position.set(0,1.30,face+.12);dg.castShadow=false;g.add(dg);
+  }
+  /* 门前石槽花箱 */
+  {
+    add(g,BX(.70,.30,.34),SK.M.woodDark,-1.44,.55,face+.42);
+    add(g,BX(.64,.06,.30),SK.M.stone,-1.44,.72,face+.42);
     for(let i=0;i<5;i++){
-      const bx=add(g,BX(.34,.3,.34),M(cols[i%4],{roughness:.72}),-.9+i*.45,gy+.15,.42);
-      const rb=add(g,BX(.36,.05,.36),M(0xf2f0e6,{roughness:.6}),-.9+i*.45,gy+.31,.42);rb.castShadow=false;
-      const bw=add(g,BX(.05,.32,.36),M(0xf2f0e6,{roughness:.6}),-.9+i*.45,gy+.16,.42);bw.castShadow=false;
+      const f=addNS(g,new THREE.SphereGeometry(.10,8,6),M(i%2?0xd23b32:0x2f8f6b,{roughness:.8}),
+        -1.44-.24+i*.12,.80,face+.42);
+      f.scale.set(1,.8,1);
     }
-  }else if(kind.goods==='hotdog'){
-    add(g,BX(1.5,.05,.62),M(0x3a4149,{roughness:.55,metalness:.55}),0,gy+.03,.42);
-    for(let i=0;i<3;i++){
-      const hd=add(g,new THREE.CylinderGeometry(.075,.075,.44,10),M(0xc4713c,{roughness:.8}),-.45+i*.45,gy+.12,.42);
-      hd.rotation.z=Math.PI/2;hd.rotation.y=.1;
+    add(g,BX(.70,.30,.34),SK.M.woodDark,1.44,.55,face+.42);
+    add(g,BX(.64,.06,.30),SK.M.stone,1.44,.72,face+.42);
+    for(let i=0;i<5;i++){
+      const f=addNS(g,new THREE.SphereGeometry(.10,8,6),M(i%2?0xffb8d8:0xd8a13c,{roughness:.8}),
+        1.44-.24+i*.12,.80,face+.42);
+      f.scale.set(1,.8,1);
     }
-    add(g,BX(.5,.06,.42),M(0xe8c24a,{roughness:.8}),-.7,gy+.19,.42).castShadow=false;
-  }else if(kind.goods==='cookie'){
-    for(let i=0;i<3;i++){
-      const body=add(g,BX(.26,.4,.04),M(0xc99456,{roughness:.85}),-.5+i*.5,gy+.22,.44);
-      const head=add(g,new THREE.SphereGeometry(.13,10,8),M(0xc99456,{roughness:.85}),-.5+i*.5,gy+.52,.44);head.scale.set(1,.92,.35);
-      const eye=add(g,new THREE.SphereGeometry(.022,6,5),M(0xf4f0e2,{roughness:.7}),-.5+i*.5-.05,gy+.55,.47);eye.castShadow=false;
-      const eye2=add(g,new THREE.SphereGeometry(.022,6,5),M(0xf4f0e2,{roughness:.7}),-.5+i*.5+.05,gy+.55,.47);eye2.castShadow=false;
-      const arm=add(g,BX(.2,.05,.04),M(0xc99456,{roughness:.85}),-.5+i*.5,gy+.3,.44);arm.rotation.z=.3;arm.castShadow=false;
+  }
+  /* 背面（-Z）也要有脸：两窗一门 + 小壁灯 */
+  {
+    const bz=-face;
+    SK.window(g,-1.20,1.05,bz,o.glass,.86,1.00);
+    SK.window(g, 1.20,1.05,bz,o.glass,.86,1.00);
+    add(g,BX(.90,1.86,.10),SK.M.woodDark,.30,.93+.0,bz+.02);
+    add(g,BX(1.04,.14,.18),trim,.30,1.90,bz+.06);
+    for(const sx of [-1,1]){
+      const arm=add(g,BX(.10,.10,.34),SK.M.iron,sx*1.72,2.42,bz-.16);
+      addNS(g,new THREE.SphereGeometry(.13,10,8),SK.M.glass[o.glass%4],sx*1.72,2.28,bz-.30);
     }
-  }else if(kind.goods==='cotton'){
-    for(let i=0;i<4;i++){
-      const st=add(g,new THREE.CylinderGeometry(.022,.022,.6,6),M(0xd8cdb4,{roughness:.85}),-.8+i*.5,gy+.3,.42);
-      st.castShadow=false;
-      const cc=add(g,new THREE.SphereGeometry(.17,10,8),M(0xffc2d8,{roughness:.9}),-.8+i*.5,gy+.62,.42);
-      cc.scale.set(1,.9,1);cc.castShadow=false;
-    }
+  }
+  /* 侧面（±X）小窗 */
+  for(const sx of [-1,1])for(const sz of [-.6,.6])
+    SK.window(g,sx*W/2,1.30,sz,o.glass,.62,.80);
+  /* 店里透出来的暖光落在雪地上 */
+  {
+    const spill=new THREE.Mesh(new THREE.PlaneGeometry(5.4,4.4),new THREE.MeshBasicMaterial({
+      color:0xffc98a,transparent:true,opacity:.11,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+    spill.rotation.x=-Math.PI/2;spill.position.set(0,.03,face+.9);spill.castShadow=false;g.add(spill);
   }
   return g;
-}
+};
+
+/* ── 集市摊位 / 游乐园小吃摊：教堂级木构 ── */
+SK.stallHouse=(parent,o)=>{
+  const g=new THREE.Group();
+  g.position.set(o.x,0,o.z);g.rotation.y=o.rot||0;parent.add(g);
+  const W=o.w||3.00,D=o.d||2.20,H=o.h||2.35;
+  const wood=SK.M.wood,woodD=SK.M.woodDark,woodL=SK.M.woodLight;
+  const px=W/2-.17,pz=D/2-.17;
+
+  /* 石台基 + 线脚 */
+  add(g,BX(W+.24,.16,D+.20),SK.M.stone,0,.08,0);
+  add(g,BX(W+.32,.07,D+.28),SK.M.trimDark,0,.175,0);
+  /* 四根车削木柱：柱础盘 + 柱身 + 柱头 + 顶球 */
+  const postH=H-.46;
+  for(const sx of [-1,1])for(const sz of [-1,1]){
+    const X=sx*px,Z=sz*pz;
+    add(g,new THREE.CylinderGeometry(.15,.18,.13,12),SK.M.stone,X,.27,Z);
+    add(g,new THREE.CylinderGeometry(.085,.10,postH,12),wood,X,.20+postH/2,Z);
+    add(g,BX(.26,.13,.26),woodL,X,H-.24,Z);
+    add(g,new THREE.SphereGeometry(.095,12,9),woodL,X,H-.12,Z);
+  }
+  /* 后背木板墙 + 两层搁板 + 横向压条（背板要够高，站在摊前看不穿到后面的街景）*/
+  const backH=Math.min(H-.42,2.34);
+  add(g,BX(W-.24,backH,.10),wood,0,.20+backH/2,-(D/2-.12));
+  for(let i=0;i<3;i++)add(g,BX(W-.24,.07,.13),woodL,0,.20+.26+i*((backH-.5)/2),-(D/2-.17));
+  add(g,BX(W-.24,.09,.14),woodL,0,1.36,-(D/2-.16));
+  add(g,BX(W-.24,.09,.14),woodL,0,1.74,-(D/2-.16));
+  /* 侧板 + 上方竖棂（镂空，挡不住视线但有细节）*/
+  for(const sx of [-1,1]){
+    add(g,BX(.09,.92,D-.30),wood,sx*(W/2-.12),.20+.46,0);
+    const slatH=Math.max(.4,H-.30-1.12);
+    for(let i=0;i<5;i++)
+      add(g,BX(.05,slatH,.05),woodL,sx*(W/2-.12),1.12+slatH/2,-(D/2-.34)+i*((D-.68)/4));
+  }
+  /* 柜台：台面 + 前挡板 + 线脚 + 腿 */
+  const cw=W-.34;
+  add(g,BX(cw,.12,.88),SK.M.woodH,0,1.00,.46);
+  add(g,BX(cw,.72,.09),SK.M.woodH,0,.58,.86);
+  add(g,BX(cw-.04,.07,.15),woodL,0,.93,.90);
+  add(g,BX(cw,.06,.13),woodD,0,.26,.88);
+  for(const sx of [-1,1])add(g,BX(.12,.92,.12),woodD,sx*(cw/2-.14),.60,.86);
+
+  /* 屋顶：石板瓦 + 厚雪 + 檐板 + 屋脊压条 */
+  SK.pitchedRoof(g,{w:W,d:D,y:H,rise:.52,over:.20});
+  /* 两端山墙 + 封檐板 */
+  {
+    const gw=D/2+.04,gh=.50;
+    const sh=new THREE.Shape();
+    sh.moveTo(-gw,0);sh.lineTo(gw,0);sh.lineTo(0,gh);sh.closePath();
+    const gg=new THREE.ExtrudeGeometry(sh,{depth:.20,bevelEnabled:false});
+    gg.rotateY(Math.PI/2);
+    const ang=Math.atan2(.52,D/2+.20),L=Math.hypot(.52,D/2+.20);
+    for(const sx of [-1,1]){
+      const gm=new THREE.Mesh(gg,wood);
+      gm.position.set(sx*(W/2-.10),H-.02,0);gm.castShadow=true;gm.receiveShadow=true;g.add(gm);
+      for(const sz of [-1,1]){
+        const bb=add(g,BX(.10,.22,L),woodL,sx*(W/2+.02),H+.26,sz*(D/2+.20)/2);
+        bb.rotation.x=sz*ang;
+      }
+    }
+  }
+  /* 前檐波浪垂帘 */
+  {
+    const cell=o.fab;
+    const vg=new THREE.BoxGeometry(W+.10,.26,.05);
+    SK.uvCell(vg,cell%4,(cell/4)|0,4,4);
+    const v=new THREE.Mesh(vg,SK.M.fabric);
+    v.position.set(0,H-.13,D/2+.22);v.castShadow=false;g.add(v);
+    const n=Math.max(7,Math.round(W/.26));
+    for(let i=0;i<n;i++){
+      const s=new THREE.Mesh(new THREE.SphereGeometry((W+.10)/n*.52,10,7),SK.M.fabric);
+      SK.uvCell(s.geometry,cell%4,(cell/4)|0,4,4);
+      s.position.set(-(W+.10)/2+(i+.5)*((W+.10)/n),H-.25,D/2+.22);
+      s.scale.set(1,.6,1);s.castShadow=false;g.add(s);
+    }
+  }
+  /* 竖挑双面招牌（牌面架在立柱顶，绝不被杆子横穿）*/
+  {
+    const vi=SIGN_ATLAS.drawV(o.cn,o.en,o.accent);
+    add(g,BX(.12,.52,.12),woodL,0,H+.52,0);
+    SK.signBoard(g,.66,1.06,vi,0,H+1.31,.02,true);
+    add(g,BX(.74,.09,.14),woodL,0,H+.78,.02);
+    const fin=add(g,new THREE.ConeGeometry(.09,.26,6),SK.M.gold,0,H+1.93,.02);
+    fin.castShadow=false;
+  }
+  /* 正面横匾（挂在垂帘上方）*/
+  {
+    const hi=SIGN_ATLAS.drawH(o.cn,o.en,o.accent);
+    SK.signBoard(g,2.10,.525,hi,0,H-.26,D/2+.30,false);
+    add(g,BX(2.24,.08,.12),woodD,0,H+.02,D/2+.32);
+    for(const s of [-1,1])add(g,BX(.04,.14,.04),SK.M.iron,s*.9,H-.44,D/2+.31);
+  }
+  /* 檐下彩灯串 */
+  for(let i=0;i<8;i++)
+    addNS(g,new THREE.SphereGeometry(.075,8,6),getBulbMat([0xff4d4d,0xffe078,0x48e58b,0xfff2cc][i%4],i),
+      -1.1+i*.315,H-.32,D/2+.26);
+  /* 冰柱 */
+  for(let i=0;i<7;i++){
+    const len=.16+((i*37)%5)*.055;
+    const ic=addNS(g,new THREE.CylinderGeometry(.028,.028,len,6),SK.M.ice,
+      -1.05+i*.35,H-.30-len/2,D/2+.24);
+    ic.castShadow=false;
+  }
+  /* 角落三角旗 */
+  {
+    const flagCol=[0xd23b32,0xe8c24a,0x2f8f6b,0x3f6ba8][Math.abs(Math.round(o.x*3+o.z))%4];
+    add(g,BX(.05,1.05,.05),woodL,W/2+.02,H+.55,-(D/2-.2));
+    const fl=add(g,new THREE.ConeGeometry(.24,.42,3),M(flagCol,{roughness:.75}),W/2+.24,H+.86,-(D/2-.2));
+    fl.rotation.z=-Math.PI/2;fl.castShadow=false;
+  }
+  /* 货物 */
+  SK.goods(g,o.goods,1.06,o.hang,o.cell);
+  /* 地面暖光池 */
+  {
+    const pool=new THREE.Mesh(new THREE.PlaneGeometry(W+1.4,W+1.4),new THREE.MeshBasicMaterial({
+      map:glowTex,color:0xffb765,transparent:true,opacity:.11,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+    pool.rotation.x=-Math.PI/2;pool.position.set(0,.21,0);pool.castShadow=false;g.add(pool);
+  }
+  return g;
+};
+
+
+/* 冰柱材质 */
+SK.M.ice=new THREE.MeshPhysicalMaterial({color:0xdff0f8,transparent:true,opacity:.55,roughness:.08,metalness:.05});
+
+/* ── 摊位货物：热红酒 / 烤栗子 / 棉花糖 / 热狗 / 糖果手杖 / 姜饼屋 / 圣诞礼物 / 姜饼甜点 ── */
+SK.goods=(g,kind,gy,hang,cell)=>{
+  /* 后背板挂货 */
+  if(hang&&hang.length){
+    for(let i=0;i<4;i++){
+      const hg=add(g,BX(.24,.32,.18),M(hang[i%hang.length],{roughness:.78}),-.9+i*.6,1.52,-(1.02)+.10);
+      hg.castShadow=false;
+      const hd=add(g,BX(.04,.12,.04),SK.M.woodDark,-.9+i*.6,1.73,-.92);
+      hd.castShadow=false;
+    }
+  }
+  if(kind==='wine'){
+    const pot=add(g,new THREE.CylinderGeometry(.24,.20,.30,18),M(0xb87333,{roughness:.32,metalness:.78}),0,gy+.15,.32);
+    const rim=add(g,new THREE.TorusGeometry(.24,.03,8,20),M(0xd9a05a,{roughness:.28,metalness:.72}),0,gy+.31,.32);rim.rotation.x=Math.PI/2;
+    for(let i=0;i<4;i++)add(g,new THREE.CylinderGeometry(.055,.045,.13,10),M(0xd94f3d,{roughness:.55}),-.82+i*.55,gy+.07,.58);
+    for(let i=0;i<4;i++){
+      const st=addNS(g,new THREE.SphereGeometry(.10,9,7),M(0xffffff,{roughness:.9,transparent:true,opacity:.20}),(i-1.5)*.05,gy+.44,.32);
+      st.scale.set(1,1.5,1);
+    }
+  }else if(kind==='nuts'){
+    add(g,new THREE.CylinderGeometry(.30,.26,.36,16),M(0x4a5158,{roughness:.58,metalness:.52}),0,gy+.18,.30);
+    const rim=add(g,new THREE.TorusGeometry(.30,.035,8,18),M(0x6d767e,{roughness:.44,metalness:.62}),0,gy+.37,.30);rim.rotation.x=Math.PI/2;
+    for(let i=0;i<9;i++){
+      const n=addNS(g,new THREE.IcosahedronGeometry(.07,0),M(0x8a5a34,{roughness:.9}),-.2+((i*37)%9)*.05,gy+.42,.22+((i*23)%7)*.03);
+    }
+    for(let i=0;i<3;i++){
+      const sm2=addNS(g,new THREE.SphereGeometry(.11,9,7),M(0xffffff,{roughness:.9,transparent:true,opacity:.18}),(i-1)*.09,gy+.60,.30);
+      sm2.scale.set(1,1.4,1);
+    }
+  }else if(kind==='house'){
+    const hb=add(g,BX(.62,.50,.50),M(0xd9a05a,{roughness:.85}),0,gy+.25,.30);
+    const hr=add(g,new THREE.ConeGeometry(.50,.42,4),M(0xc4813c,{roughness:.85}),0,gy+.70,.30);hr.rotation.y=Math.PI/4;
+    for(let i=0;i<3;i++){
+      const ic=addNS(g,new THREE.CylinderGeometry(.03,.03,.16,6),M(0xf2f7fc,{roughness:.7}),-.16+i*.16,gy+.50,.05);
+    }
+    addNS(g,BX(.16,.26,.04),M(0xf2f7fc,{roughness:.7}),0,gy+.13,.05);
+  }else if(kind==='cane'){
+    for(let i=0;i<7;i++){
+      const c=add(g,new THREE.CylinderGeometry(.035,.035,.62,8),M(i%2?0xf4f4f4:0xd23b32,{roughness:.5}),-1+i*.33,gy+.31,.44);
+      c.rotation.z=.18;c.castShadow=false;
+      const hook=add(g,new THREE.TorusGeometry(.07,.022,6,12),M(i%2?0xf4f4f4:0xd23b32,{roughness:.5}),-1+i*.33+.07,gy+.62,.44);
+      hook.castShadow=false;
+    }
+  }else if(kind==='gift'){
+    const cols=[0xd23b32,0x2f8f6b,0x3f6ba8,0xe0a33c];
+    for(let i=0;i<5;i++){
+      add(g,BX(.34,.30,.34),M(cols[i%4],{roughness:.72}),-.9+i*.45,gy+.15,.44);
+      addNS(g,BX(.36,.05,.36),M(0xf2f0e6,{roughness:.6}),-.9+i*.45,gy+.31,.44);
+      addNS(g,BX(.05,.32,.36),M(0xf2f0e6,{roughness:.6}),-.9+i*.45,gy+.16,.44);
+    }
+  }else if(kind==='hotdog'){
+    add(g,BX(1.5,.05,.62),M(0x3a4149,{roughness:.55,metalness:.55}),0,gy+.03,.44);
+    for(let i=0;i<3;i++){
+      const hd=add(g,new THREE.CylinderGeometry(.075,.075,.44,12),M(0xc4713c,{roughness:.8}),-.45+i*.45,gy+.12,.44);
+      hd.rotation.z=Math.PI/2;hd.rotation.y=.1;
+    }
+    addNS(g,BX(.5,.06,.42),M(0xe8c24a,{roughness:.8}),-.7,gy+.19,.44);
+  }else if(kind==='cookie'){
+    for(let i=0;i<3;i++){
+      add(g,BX(.26,.40,.04),M(0xc99456,{roughness:.85}),-.5+i*.5,gy+.22,.46);
+      const head=add(g,new THREE.SphereGeometry(.13,12,9),M(0xc99456,{roughness:.85}),-.5+i*.5,gy+.52,.46);head.scale.set(1,.92,.35);
+      addNS(g,new THREE.SphereGeometry(.022,7,6),M(0xf4f0e2,{roughness:.7}),-.5+i*.5-.05,gy+.55,.49);
+      addNS(g,new THREE.SphereGeometry(.022,7,6),M(0xf4f0e2,{roughness:.7}),-.5+i*.5+.05,gy+.55,.49);
+      const arm=addNS(g,BX(.20,.05,.04),M(0xc99456,{roughness:.85}),-.5+i*.5,gy+.30,.46);arm.rotation.z=.3;
+    }
+  }else if(kind==='cotton'){
+    for(let i=0;i<4;i++){
+      addNS(g,new THREE.CylinderGeometry(.022,.022,.6,7),M(0xd8cdb4,{roughness:.85}),-.8+i*.5,gy+.30,.44);
+      const cc=addNS(g,new THREE.SphereGeometry(.17,12,9),M(0xffc2d8,{roughness:.9}),-.8+i*.5,gy+.62,.44);
+      cc.scale.set(1,.9,1);
+    }
+  }
+};
+
+/* ── 游乐园小吃摊专属道具（爆米花机 / 热巧克力铜壶 / 烤炉 / 糖果罐 / 铜锅）── */
+SK.fairProp=(g,kind,gy,xo)=>{
+  if(kind==='popcorn'){
+    add(g,BX(.66,.86,.52),M(0xd23b32,{roughness:.42,metalness:.25}),xo,gy+.43,.42);
+    add(g,BX(.56,.34,.46),SK.M.glass[3],xo,gy+1.02,.42);
+    add(g,BX(.62,.10,.54),M(0x8a1f26,{roughness:.5}),xo,gy+1.22,.42);
+    for(let i=0;i<5;i++)
+      addNS(g,new THREE.SphereGeometry(.05,8,6),M(0xffe9b5,{roughness:.9}),.72+(i%3)*.11,gy+1.00,.30+(i%2)*.2);
+    for(let i=0;i<3;i++){
+      const sm=addNS(g,new THREE.SphereGeometry(.09,8,6),M(0xffffff,{roughness:.9,transparent:true,opacity:.15}),xo,gy+1.34+i*.10,.42);
+      sm.scale.set(1,1.3,1);
+    }
+  }else if(kind==='choc'){
+    add(g,new THREE.CylinderGeometry(.20,.24,.62,16),M(0xc08a3e,{roughness:.30,metalness:.80}),xo,gy+.31,.42);
+    add(g,new THREE.TorusGeometry(.21,.025,8,18),M(0xe0b24c,{roughness:.26,metalness:.82}),xo,gy+.62,.42).rotation.x=Math.PI/2;
+    add(g,new THREE.CylinderGeometry(.05,.05,.18,8),M(0xe0b24c,{roughness:.3,metalness:.8}),xo,gy+.72,.42);
+    for(let i=0;i<3;i++){
+      const sm=addNS(g,new THREE.SphereGeometry(.10,9,7),M(0xffffff,{roughness:.9,transparent:true,opacity:.13}),xo,gy+.88+i*.11,.42);
+      sm.scale.set(1,1.35,1);
+    }
+  }else if(kind==='grill'){
+    add(g,BX(.86,.42,.52),M(0x3a4149,{roughness:.5,metalness:.6}),xo,gy+.21,.42);
+    add(g,BX(.78,.06,.44),M(0xff7a2a,{roughness:.6,emissive:0xff5a10,emissiveIntensity:.9}),xo,gy+.44,.42);
+    for(let i=0;i<3;i++){
+      const sk=add(g,new THREE.CylinderGeometry(.03,.03,.5,6),M(0xb9c0c6,{roughness:.3,metalness:.85}),.62+i*.22,gy+.56,.42);
+      sk.rotation.z=Math.PI/2;sk.rotation.y=.08;
+    }
+    for(let i=0;i<2;i++){
+      const sm=addNS(g,new THREE.SphereGeometry(.11,9,7),M(0xffffff,{roughness:.9,transparent:true,opacity:.12}),xo,gy+.74+i*.13,.42);
+      sm.scale.set(1,1.4,1);
+    }
+  }else if(kind==='candy'){
+    for(let i=0;i<3;i++){
+      add(g,new THREE.CylinderGeometry(.13,.13,.30,14),M(0xffffff,{roughness:.28,transparent:true,opacity:.55}),.62+i*.30,gy+.15,.42);
+      add(g,new THREE.CylinderGeometry(.135,.135,.06,14),M([0xd23b32,0x2f8f6b,0x3f6ba8][i],{roughness:.5}),.62+i*.30,gy+.30,.42);
+      for(let k=0;k<5;k++)
+        addNS(g,new THREE.SphereGeometry(.045,8,6),M([0xe0a33c,0xffb8d8,0xa8d8ff][k%3],{roughness:.4}),.62+i*.30-.06+(k%3)*.06,gy+.34,.42);
+    }
+  }else if(kind==='wine'){
+    const pot=add(g,new THREE.CylinderGeometry(.28,.24,.40,18),M(0xb87333,{roughness:.30,metalness:.80}),xo,gy+.20,.42);
+    add(g,new THREE.TorusGeometry(.28,.03,8,20),M(0xe0b24c,{roughness:.26,metalness:.82}),xo,gy+.40,.42).rotation.x=Math.PI/2;
+    for(let i=0;i<2;i++){
+      const sm=addNS(g,new THREE.SphereGeometry(.12,9,7),M(0xffffff,{roughness:.9,transparent:true,opacity:.13}),xo,gy+.56+i*.13,.42);
+      sm.scale.set(1,1.4,1);
+    }
+  }
+};
+
+const market=new THREE.Group();market.userData.tag='market';scene.add(market);
+const shopRow=new THREE.Group();shopRow.userData.tag='shops';scene.add(shopRow);
 /* 摊位间垂挂灯串 */
 function stallString(parent,a,b,n,sag,y){
   for(let i=1;i<n;i++){
@@ -8642,18 +9258,18 @@ function stallString(parent,a,b,n,sag,y){
 }
 /* ── 九个摊位：西侧一列（面东）+ 北侧一排（面南）+ 西南拐角 ── */
 const STALLS=[
-  {x:-35.5,z: 6.4,rot:Math.PI/2,cn:'热红酒',en:'MULLED WINE',bg:'#3a1e18',cloth:0x7a2f26,roof:M(0xb4453c,{roughness:.7}),goods:'wine',h:2.35,light:1,hang:[0x7a2f26,0xd8a13c,0x2f6b5a,0xd23b32]},
-  {x:-35.5,z: 3.1,rot:Math.PI/2,cn:'烤栗子',en:'CHESTNUTS',bg:'#332214',cloth:0x8a5a2c,roof:M(0x8a5f3d,{roughness:.78}),goods:'nuts',h:2.6,light:0,hang:[0x8a5a2c,0xc4713c,0x7a2f26,0xd8a13c]},
-  {x:-35.5,z:-0.2,rot:Math.PI/2,cn:'棉花糖',en:'COTTON CANDY',bg:'#2b1c2e',cloth:0xd07a9a,roof:M(0x8f3a68,{roughness:.7}),goods:'cotton',h:2.3,light:0,hang:[0xffc2d8,0xd07a9a,0xf2f0e6,0xffc2d8]},
-  {x:-35.5,z:-3.5,rot:Math.PI/2,cn:'热狗',en:'HOT DOG',bg:'#2e2318',cloth:0xb4453c,roof:M(0x2f6b5a,{roughness:.72}),goods:'hotdog',h:2.55,light:1,hang:[0xb4453c,0xe8c24a,0x2f6b5a,0xd23b32]},
-  {x:-35.5,z:-6.8,rot:Math.PI/2,cn:'糖果手杖',en:'CANDY CANES',bg:'#3a1a1a',cloth:0xd23b32,roof:M(0xb4453c,{roughness:.7}),goods:'cane',h:2.4,light:0,hang:[0xd23b32,0xf4f4f4,0xd23b32,0xf4f4f4]},
-  {x:-35.5,z:-10.1,rot:Math.PI/2,cn:'姜饼甜点',en:'GINGERBREAD',bg:'#332214',cloth:0x8a5f3d,roof:M(0x2f6b5a,{roughness:.72}),goods:'cookie',h:2.7,light:0,hang:[0xc99456,0xf4f0e2,0xc99456,0xe8c24a]},
-  {x:-30.6,z:-12.4,rot:0,cn:'姜饼屋',en:'GINGERBREAD HOUSE',bg:'#3a2418',cloth:0xc4813c,roof:M(0xb4453c,{roughness:.7}),goods:'house',h:2.35,light:1,hang:[0xc4813c,0xf2f7fc,0xd8a13c,0xf2f7fc]},
-  {x:-27.2,z:-12.4,rot:0,cn:'圣诞礼物',en:'XM GIFTS',bg:'#1e2a36',cloth:0x2f8f6b,roof:M(0x2f6b5a,{roughness:.72}),goods:'gift',h:2.5,light:0,hang:[0xd23b32,0x2f8f6b,0x3f6ba8,0xe0a33c]},
-  {x:-23.8,z:-12.4,rot:0,cn:'雪地咖啡',en:'SNOW CAFE',bg:'#232b34',cloth:0xd23b32,roof:M(0xb4453c,{roughness:.7}),goods:'wine',h:2.3,light:0,hang:[0xb87333,0xd23b32,0x7a4a2c,0xd8a13c]}
+  {x:-35.5,z: 6.4,rot:Math.PI/2,cn:'热红酒',en:'MULLED WINE',goods:'wine',h:2.35,light:1,hang:[0x7a2f26,0xd8a13c,0x2f6b5a,0xd23b32],fab:2,accent:'#7a2f26'},
+  {x:-35.5,z: 3.1,rot:Math.PI/2,cn:'烤栗子',en:'CHESTNUTS',goods:'nuts',h:2.60,light:0,hang:[0x8a5a2c,0xc4713c,0x7a2f26,0xd8a13c],fab:12,accent:'#c4813c'},
+  {x:-35.5,z:-0.2,rot:Math.PI/2,cn:'棉花糖',en:'COTTON CANDY',goods:'cotton',h:2.30,light:0,hang:[0xffc2d8,0xd07a9a,0xf2f0e6,0xffc2d8],fab:14,accent:'#d07a9a'},
+  {x:-35.5,z:-3.5,rot:Math.PI/2,cn:'热狗',en:'HOT DOG',goods:'hotdog',h:2.55,light:1,hang:[0xb4453c,0xe8c24a,0x2f6b5a,0xd23b32],fab:0,accent:'#b4453c'},
+  {x:-35.5,z:-6.8,rot:Math.PI/2,cn:'糖果手杖',en:'CANDY CANES',goods:'cane',h:2.40,light:0,hang:[0xd23b32,0xf4f4f4,0xd23b32,0xf4f4f4],fab:9,accent:'#d23b32'},
+  {x:-35.5,z:-10.1,rot:Math.PI/2,cn:'姜饼甜点',en:'GINGERBREAD',goods:'cookie',h:2.70,light:0,hang:[0xc99456,0xf4f0e2,0xc99456,0xe8c24a],fab:13,accent:'#c4813c'},
+  {x:-30.6,z:-12.4,rot:0,cn:'姜饼屋',en:'GINGERBREAD HOUSE',goods:'house',h:2.35,light:1,hang:[0xc4813c,0xf2f7fc,0xd8a13c,0xf2f7fc],fab:5,accent:'#c4813c'},
+  {x:-27.2,z:-12.4,rot:0,cn:'圣诞礼物',en:'XM GIFTS',goods:'gift',h:2.50,light:0,hang:[0xd23b32,0x2f8f6b,0x3f6ba8,0xe0a33c],fab:8,accent:'#2f8f6b'},
+  {x:-23.8,z:-12.4,rot:0,cn:'雪地咖啡',en:'SNOW CAFE',goods:'wine',h:2.30,light:0,hang:[0xb87333,0xd23b32,0x7a4a2c,0xd8a13c],fab:1,accent:'#7a4a2c'}
 ];
 for(const st of STALLS){
-  buildStall(market,st.x,st.z,st.rot,st,st.cn,st.en);
+  SK.stallHouse(market,st);
   OUTDOOR_OBS.push([st.x,st.z,1.25]);
 }
 /* 摊位间灯串（西侧链 + 北侧链 + 拐角） */
@@ -8691,86 +9307,27 @@ addNpc([[-31.2,0,-10.6],[-29.0,0,-10.6],[-26.8,0,-10.6],[-24.6,0,-10.6]],0xc9945
 addNpc([[-30.4,0,-11.2],[-26.4,0,-11.2],[-22.5,0,-11.2],[-30.4,0,-11.2]],0x8f3a68,0xfbe2cf,.46,false,{scale:.86,acc:'headphone'});
 addNpc([[-33.1,0,-9.9],[-31.8,0,-10.4],[-29.0,0,-9.8],[-33.1,0,-9.9]],0x7a4a2c,0xfbe2cf,.48,false,{scale:.9,acc:'camera'});
 
-/* ══ 北侧马路对面 · 街边小店一条 ══ */
 const SHOPS=[
   /* 北段马路对面（后退至 z=-30.1，完全让开北环路 z=-25.45 并避开北铁轨 z=-35） */
-  {x:-14.6,z:-30.1,rot:0,lit:0,cn:'熊萌咖啡',en:'BEAR CAFE',bg:'#3a2418',cloth:0x7a4a2c,win:0xffcf8f},
-  {x:-9.0,z:-30.1,rot:0,cn:'熊萌文创',en:'XM STUDIO',bg:'#1e2a36',cloth:0x2f6b5a,win:0xa8d8ff},
-  {x:-3.4,z:-30.1,rot:0,lit:1,cn:'姜饼甜品屋',en:'GINGERBREAD',bg:'#3d2429',cloth:0xb4453c,win:0xffd0a8},
-  {x:2.2,z:-30.1,rot:0,cn:'特展票务处',en:'TICKETS',bg:'#232b34',cloth:0x3f4a54,win:0xffe9b5},
-  {x:7.8,z:-30.1,rot:0,cn:'熊萌花店',en:'BEAR FLORIST',bg:'#2a2432',cloth:0x7a4a8c,win:0xffb8d8},
-  {x:13.4,z:-30.1,rot:0,cn:'圣诞邮局',en:'SANTA POST',bg:'#2b1f1c',cloth:0xd23b32,win:0xffd89a},
+  {x:-14.6,z:-30.1,rot:0,cn:'熊萌咖啡',en:'BEAR CAFE',tint:0,glass:0,fab:2,accent:'#7a4a2c'},
+  {x:-9.0,z:-30.1,rot:0,cn:'熊萌文创',en:'XM STUDIO',tint:1,glass:1,fab:6,accent:'#2f6b5a'},
+  {x:-3.4,z:-30.1,rot:0,cn:'姜饼甜品屋',en:'GINGERBREAD',tint:2,glass:3,fab:0,accent:'#b4453c'},
+  {x:2.2,z:-30.1,rot:0,cn:'特展票务处',en:'TICKETS',tint:4,glass:3,fab:10,accent:'#3f4a54'},
+  {x:7.8,z:-30.1,rot:0,cn:'熊萌花店',en:'BEAR FLORIST',tint:0,glass:2,fab:11,accent:'#7a4a8c'},
+  {x:13.4,z:-30.1,rot:0,cn:'圣诞邮局',en:'SANTA POST',tint:2,glass:0,fab:9,accent:'#d23b32'},
   /* 西段马路外侧（后退至 x=-63.1，正面朝东，完全让开西环路 x=-58.45） */
-  {x:-63.1,z:-9.5,rot:Math.PI/2,cn:'熊萌书店',en:'BEAR BOOKS',bg:'#232b34',cloth:0x3f4a54,win:0xffe9b5},
-  {x:-63.1,z:-5.0,rot:Math.PI/2,lit:0,cn:'熊萌玩具铺',en:'TOY SHOP',bg:'#1e2a36',cloth:0x2f8f6b,win:0xa8d8ff},
-  {x:-63.1,z:-0.5,rot:Math.PI/2,cn:'特展纪念品',en:'MEMORABILIA',bg:'#3a2418',cloth:0xd23b32,win:0xffcf8f},
-  {x:-63.1,z:4.0,rot:Math.PI/2,cn:'熊萌披萨',en:'BEAR PIZZA',bg:'#332214',cloth:0xc4813c,win:0xffd0a8},
+  {x:-63.1,z:-9.5,rot:Math.PI/2,cn:'熊萌书店',en:'BEAR BOOKS',tint:4,glass:1,fab:10,accent:'#3f4a54'},
+  {x:-63.1,z:-5.0,rot:Math.PI/2,cn:'熊萌玩具铺',en:'TOY SHOP',tint:1,glass:1,fab:8,accent:'#2f8f6b'},
+  {x:-63.1,z:-0.5,rot:Math.PI/2,cn:'特展纪念品',en:'MEMORABILIA',tint:0,glass:0,fab:9,accent:'#d23b32'},
+  {x:-63.1,z:4.0,rot:Math.PI/2,cn:'熊萌披萨',en:'BEAR PIZZA',tint:3,glass:3,fab:12,accent:'#c4813c'},
   /* 东段马路外侧（后退至 x=63.1，正面朝西，完全让开东环路 x=58.45） */
-  {x:63.1,z:-9.5,rot:-Math.PI/2,cn:'熊萌杂货铺',en:'GROCERY',bg:'#2b1f1c',cloth:0x7a4a2c,win:0xffd89a},
-  {x:63.1,z:-5.0,rot:-Math.PI/2,lit:0,cn:'熊萌甜筒',en:'ICE CREAM',bg:'#2b1c2e',cloth:0xd07a9a,win:0xffc2d8},
-  {x:63.1,z:-0.5,rot:-Math.PI/2,cn:'圣诞明信片',en:'POSTCARDS',bg:'#1e2a36',cloth:0x3f6ba8,win:0xa8d8ff},
-  {x:63.1,z:4.0,rot:-Math.PI/2,cn:'熊萌画廊',en:'BEAR GALLERY',bg:'#232b34',cloth:0x7a4a8c,win:0xffb8d8}
+  {x:63.1,z:-9.5,rot:-Math.PI/2,cn:'熊萌杂货铺',en:'GROCERY',tint:3,glass:0,fab:1,accent:'#7a4a2c'},
+  {x:63.1,z:-5.0,rot:-Math.PI/2,cn:'熊萌甜筒',en:'ICE CREAM',tint:2,glass:2,fab:14,accent:'#d07a9a'},
+  {x:63.1,z:-0.5,rot:-Math.PI/2,cn:'圣诞明信片',en:'POSTCARDS',tint:1,glass:1,fab:3,accent:'#3f6ba8'},
+  {x:63.1,z:4.0,rot:-Math.PI/2,cn:'熊萌画廊',en:'BEAR GALLERY',tint:4,glass:2,fab:5,accent:'#7a4a8c'}
 ];
 for(const sp of SHOPS){
-  const g=new THREE.Group();g.position.set(sp.x,0,sp.z);g.rotation.y=sp.rot;shopRow.add(g);
-  const shopWallM=M(0x2a3138,{roughness:.86});
-  const shopTrimM=M(0x4a5158,{roughness:.8});
-  const shopRoofM=M(0x8a3b34,{roughness:.78});
-  add(g,BX(4.4,3.0,3.6),shopWallM,0,1.5,0);
-  add(g,BX(4.44,.18,3.64),M(0x3c444c,{roughness:.8}),0,.1,0);
-  // 檐口横梁收边 + 人字坡屋顶（修正原先正负号倒置的倒V形屋顶与错向屋脊）
-  add(g,BX(4.56,.14,3.74),shopTrimM,0,2.98,0);
-  const shAng=Math.atan2(.76,1.86);
-  const shSpan=2.36;
-  const shZ=(shSpan/2)*Math.cos(shAng);
-  const shY=3.74-(shSpan/2)*Math.sin(shAng);
-  for(const s of [-1,1]){
-    const r=add(g,BX(5.05,.16,shSpan),shopRoofM,0,shY,s*shZ);r.rotation.x=s*shAng;
-    const sn=add(g,BX(5.10,.12,shSpan-.04),snowCapM,0,shY+.12*Math.cos(shAng),s*(shZ+.12*Math.sin(shAng)));sn.rotation.x=s*shAng;
-  }
-  // 沿 X 轴贯通屋脊的脊瓦 + 积雪脊条
-  add(g,BX(5.14,.18,.28),shopTrimM,0,3.76,0);
-  add(g,BX(5.16,.10,.22),snowCapM,0,3.88,0);
-  // 封闭左右两侧 (±X) 三角形山墙并加木质封檐条
-  {
-    const gSh=new THREE.Shape();
-    gSh.moveTo(-1.82,2.96);gSh.lineTo(1.82,2.96);gSh.lineTo(0,3.74);gSh.closePath();
-    const gGeo=new THREE.ExtrudeGeometry(gSh,{depth:.16,bevelEnabled:false});
-    gGeo.rotateY(Math.PI/2);
-    for(const sx of [-1,1]){
-      const gm=new THREE.Mesh(gGeo,shopWallM);
-      gm.position.set(sx*2.12-.08,0,0);gm.castShadow=true;gm.receiveShadow=true;g.add(gm);
-    }
-  }
-  const chim=add(g,BX(.5,1.05,.5),shopTrimM,1.3,3.92,-.45);
-  for(let i=0;i<3;i++){
-    const sm=add(g,new THREE.SphereGeometry(.13,7,6),M(0xffffff,{roughness:.9,transparent:true,opacity:.16}),1.3+i*.05,4.6+i*.22,-.4);
-    sm.scale.set(1,1.4,1);sm.castShadow=false;
-  }
-  /* 门 + 窗 */
-  const doorM=new THREE.MeshStandardMaterial({color:0x7a4a2c,roughness:.7,emissive:sp.win,emissiveIntensity:.12});
-  add(g,BX(1.0,2.0,.12),doorM,0,1.0,1.82);
-  const winM=new THREE.MeshStandardMaterial({color:0x1b232b,roughness:.15,metalness:.1,emissive:sp.win,emissiveIntensity:1.15});
-  for(const s of [-1,1])add(g,BX(1.15,.95,.1),winM,s*1.5,1.6,1.82);
-  /* 背面同样开窗挂招牌，街两边都得有脸 */
-  for(const s of [-1,1])add(g,BX(1.15,.95,.1),winM,s*1.5,1.6,-1.82);
-  add(g,BX(.9,1.9,.12),doorM,.9,1.0,-1.82);
-  /* 招牌（正反两面，统一新海诚冬夜暖金灯箱质感） */
-  signPanel(g,3.6,.68,animeSignTex(512,96,sp.cn,sp.en),0,2.72,1.84,.68);
-  /* 门廊：柱 + 顶 + 暖光 */
-  for(const s of [-1,1])add(g,BX(.16,2.3,.16),stallWood,s*1.9,1.15,2.2);
-  const aw=add(g,BX(4.1,.14,1.5),M(sp.cloth,{roughness:.8}),0,2.35,2.1);aw.rotation.x=.12;
-  /* 店里透出来的暖光落在雪地上（贴片，不占光源预算） */
-  const spill=new THREE.Mesh(new THREE.PlaneGeometry(5.2,4.6),new THREE.MeshBasicMaterial({
-    color:sp.win,transparent:true,opacity:.13,blending:THREE.AdditiveBlending,depthWrite:false}));
-  spill.rotation.x=-Math.PI/2;spill.position.set(0,.03,2.6);spill.castShadow=false;g.add(spill);
-  /* 檐下一串彩灯 */
-  for(let i=0;i<5;i++){
-    const b=add(g,new THREE.SphereGeometry(.075,8,6),stallBulbM,-1.2+i*.6,2.18,2.08);b.castShadow=false;
-  }
-  /* 台阶 + 门前人行道（已移除店前木条长椅） */
-  add(g,BX(4.2,.12,1.0),M(0xdfe6ec,{roughness:.9}),0,.06,2.55).castShadow=false;
-  add(g,BX(3.6,.2,.8),M(0xcfd7dd,{roughness:.9}),0,.1,3.3).castShadow=false;
+  SK.shopHouse(shopRow,sp);
   OUTDOOR_OBS.push([sp.x,sp.z,2.5]);
 }
 /* ══ 艺术馆正门对面 · 圣诞游乐园（76m × 38m） ══
@@ -8943,47 +9500,24 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
 
   /* ── 西北广场已腾空，供海盗船进驻与云霄飞车大展区 ── */
 
-  /* ── 小吃一条街：六摊连排 ── */
+  /* ── 小吃一条街：六摊连排（教堂级木构 + 专属道具）── */
   {
     const kinds=[
-      {cn:'爆米花',en:'POPCORN',bg:'#3a2418',cloth:0xd23b32,roof:M(0xb4453c,{roughness:.7})},
-      {cn:'棉花糖',en:'COTTON CANDY',bg:'#2b1c2e',cloth:0xd07a9a,roof:M(0x8f3a68,{roughness:.7})},
-      {cn:'热巧克力',en:'HOT CHOCOLATE',bg:'#2b1f1c',cloth:0x7a4a2c,roof:M(0x8a5f3d,{roughness:.78})},
-      {cn:'烤香肠',en:'GRILL SAUSAGE',bg:'#332214',cloth:0xc4813c,roof:M(0x2f6b5a,{roughness:.72})},
-      {cn:'圣诞糖果',en:'CANDY',bg:'#1e2a36',cloth:0x3f6ba8,roof:M(0xb4453c,{roughness:.7})},
-      {cn:'热红酒',en:'MULLED WINE',bg:'#3a1e18',cloth:0x7a2f26,roof:M(0x2f6b5a,{roughness:.72})}
+      {cn:'爆米花',en:'POPCORN',fab:0,accent:'#b4453c',goods:null,prop:'popcorn'},
+      {cn:'棉花糖',en:'COTTON CANDY',fab:14,accent:'#d07a9a',goods:'cotton',prop:null},
+      {cn:'热巧克力',en:'HOT CHOCOLATE',fab:12,accent:'#c4813c',goods:null,prop:'choc'},
+      {cn:'烤香肠',en:'GRILL SAUSAGE',fab:13,accent:'#2f6b5a',goods:'hotdog',prop:'grill'},
+      {cn:'圣诞糖果',en:'CANDY',fab:3,accent:'#3f6ba8',goods:'gift',prop:'candy'},
+      {cn:'热红酒',en:'MULLED WINE',fab:2,accent:'#7a2f26',goods:null,prop:'wine'}
     ];
     kinds.forEach((k,i)=>{
       const x=13+i*4.8,z=22;
-      const g=new THREE.Group();g.position.set(x,0,z);fair.add(g);
-      add(g,BX(3.8,.16,2.8),M(0xdfe6ec,{roughness:.9}),0,.08,0).castShadow=false;
-      for(const sx of [-1,1])for(const sz of [-1,1])
-        add(g,BX(.14,2.9,.14),M(0x6d4a30,{roughness:.85}),sx*1.6,1.45,sz*1.2);
-      add(g,BX(3.2,2.1,.10),M(0x523724,{roughness:.86}),0,1.05,-1.2); // 后档背板，不再四面透风
-      for(const sz of [-1,1]){
-        const r=add(g,BX(4.1,.12,1.65),k.roof,0,2.98,sz*.62);r.rotation.x=sz*.32;
-        const sn=add(g,BX(4.14,.10,1.62),snowM,0,3.08,sz*.64);sn.rotation.x=sz*.32;
-      }
-      add(g,BX(4.16,.14,.24),M(0x6d4a30,{roughness:.85}),0,3.26,0);   // 屋脊压条
-      {
-        const gs=new THREE.Shape();
-        gs.moveTo(-1.35,2.78);gs.lineTo(1.35,2.78);gs.lineTo(0,3.24);gs.closePath();
-        const gg=new THREE.ExtrudeGeometry(gs,{depth:.10,bevelEnabled:false});
-        gg.rotateY(Math.PI/2);
-        for(const sx of [-1,1]){
-          const gm=new THREE.Mesh(gg,M(0x6d4a30,{roughness:.85}));
-          gm.position.set(sx*1.60-.05,0,0);gm.castShadow=true;g.add(gm);
-        }
-      }
-      add(g,BX(3.1,.11,.9),M(0x8a5f3d,{roughness:.8}),0,1.15,.55);
-      add(g,BX(3.15,.44,.07),M(k.cloth,{roughness:.8}),0,.92,1.05);
-      signPanel(g,2.7,.56,animeSignTex(384,80,k.cn,k.en),0,2.45,1.4,.68);
-      for(let b=0;b<5;b++)bulb(g,-1.4+b*.7,2.3,1.18,.12,b+i);
-      pool(g,2.2,.17,.14);
+      const g=SK.stallHouse(fair,{x,z,rot:0,cn:k.cn,en:k.en,h:2.85,w:4.05,d:2.55,
+        goods:k.goods,fab:k.fab,accent:k.accent,hang:null});
+      if(k.prop)SK.fairProp(g,k.prop,1.06,1.28);
       OUTDOOR_OBS.push([x,z,1.8]);
     });
   }
-
   /* ── 真实双轮观景摩天轮：轮径 27 米，前后双 A 字支架(z=±1.75) + 双轮圈(z=±1.0) + 20 个净空敞篷吊篮 ── */
   {
     const g=new THREE.Group();g.position.set(27,0,36);fair.add(g);
@@ -9672,18 +10206,34 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       scene.add(fl);
       shopLights.push({l:fl,base:inten,street:true});
     }
-    /* ── 游乐园大门内侧正中 · 游客留言信箱亭（一进门正前方就能看见） ── */
+    /* ── 游乐园大门内侧正中 · 游客留言信箱亭（一进门正前方就能看见）
+         按教堂标准重做：石台座 + 四根石柱 + 三层檐口线脚 + 人字雪顶 + 鎏金邮筒 ── */
     {
       const gb=new THREE.Group();gb.position.set(4.0,0,24.5);gb.rotation.y=Math.PI;fair.add(gb);
-      const woodM=M(0x1f4034,{roughness:.55,metalness:.3});
       const redBoxM=M(0xb8292f,{roughness:.45,metalness:.2});
       const gilt2M=M(0xe8b653,{roughness:.3,metalness:.8});
-      // 宽大石材底座台（2.0m × 1.25m，稳稳承托立柱与前方邮筒，无悬空无穿模）
-      add(gb,BX(2.0,.20,1.25),gilt2M,0,.10,0);
-      for(const s of [-1,1])add(gb,BX(.14,2.45,.14),woodM,s*.78,1.32,-.24);
-      add(gb,BX(1.82,1.18,.12),gilt2M,0,1.98,-.24);
-      add(gb,BX(1.98,.14,.32),snowM,0,2.62,-.24);
-      // Canvas 发光牌面（贴于金框前后表面 z = -0.175 / -0.305，不重面不闪烁）
+      /* 石台座 + 两层线脚 */
+      add(gb,BX(2.36,.28,1.52),SK.M.stone,0,.14,0);
+      add(gb,BX(2.52,.09,1.68),SK.M.trimDark,0,.32,0);
+      add(gb,BX(2.30,.07,1.46),SK.M.trim,0,.40,0);
+      /* 四根石柱（柱础 + 柱身 + 柱头） */
+      for(const sx of [-1,1])for(const sz of [-1,1]){
+        const X=sx*.98,Z=sz*.50;
+        add(gb,BX(.26,.12,.26),SK.M.stone,X,.50,Z);
+        add(gb,BX(.17,2.10,.17),SK.M.trim,X,1.61,Z);
+        add(gb,BX(.26,.12,.26),SK.M.trimDark,X,2.71,Z);
+        add(gb,BX(.22,.08,.22),SK.M.trim,X,2.81,Z);
+      }
+      /* 三层檐口线脚 */
+      add(gb,BX(2.44,.11,1.56),SK.M.trimDark,0,2.92,0);
+      add(gb,BX(2.70,.13,1.82),SK.M.trim,0,3.04,0);
+      add(gb,BX(2.38,.10,1.50),SK.M.trimDark,0,3.15,0);
+      /* 人字雪顶（与市集摊位同一套屋面做法，瓦 + 雪 + 脊瓦） */
+      SK.pitchedRoof(gb,{w:2.44,d:1.56,y:3.20,rise:.62,over:.24});
+      /* 顶脊小金饰 */
+      const fin=add(gb,new THREE.ConeGeometry(.10,.34,8),gilt2M,0,3.20+.62+.42,0);
+      fin.castShadow=false;
+      /* Canvas 发光牌面（贴在金框前后表面 z = -0.175 / -0.305，不重面不闪烁） */
       const gc=cv(512,320)[0],gx=gc.getContext('2d');
       gx.fillStyle='#192836';gx.fillRect(0,0,512,320);
       gx.strokeStyle='#e8b653';gx.lineWidth=10;gx.strokeRect(10,10,492,300);
@@ -9694,20 +10244,25 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       gx.fillStyle='#f4c56a';gx.font='700 18px monospace';
       gx.fillText('GUESTBOOK MAILBOX · MAX 30 CHARS',256,244);
       const gtex=ctex(gc);
-      signPanel(gb,1.62,1.00,gtex,0,1.98,-.17,.92);
-      // 红色圣诞邮筒（稳立于底座前侧 z=+0.26，拱顶沿 Z 轴正确对齐箱体）
-      add(gb,BX(.46,.88,.42),redBoxM,0,.64,.26);
-      const mTop=add(gb,new THREE.CylinderGeometry(.23,.23,.42,14,1,false,0,Math.PI),redBoxM,0,1.08,.26);
+      signPanel(gb,1.62,1.00,gtex,0,2.05,-.17,.92);
+      /* 红色圣诞邮筒（稳立于底座前侧 z=+0.26，拱顶沿 Z 轴正确对齐箱体） */
+      add(gb,BX(.46,.88,.42),redBoxM,0,.98,.26);
+      const mTop=add(gb,new THREE.CylinderGeometry(.23,.23,.42,14,1,false,0,Math.PI),redBoxM,0,1.42,.26);
       mTop.rotation.x=Math.PI/2;
-      add(gb,BX(.30,.06,.05),M(0x141a1f,{roughness:.4}),0,.94,.48);
-      add(gb,BX(.26,.18,.04),gilt2M,0,.66,.48);
-      for(let i=0;i<7;i++)bulb(gb,-.78+i*.26,2.54,-.10,.06,i*2);
-      pool(gb,2.2,.03,.24,0xffd68a);
+      add(gb,BX(.30,.06,.05),M(0x141a1f,{roughness:.4}),0,1.28,.48);
+      add(gb,BX(.26,.18,.04),gilt2M,0,1.00,.48);
+      /* 檐下灯串 */
+      for(let i=0;i<9;i++)addNS(gb,new THREE.SphereGeometry(.07,8,6),getBulbMat([0xff4d4d,0xffe078,0x48e58b][i%3],i),-1.0+i*.25,2.86,.30);
+      /* 地面光池 */
+      const gpool=new THREE.Mesh(new THREE.PlaneGeometry(3.6,3.6),new THREE.MeshBasicMaterial({
+        map:glowTex,color:0xffd68a,transparent:true,opacity:.13,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+      gpool.rotation.x=-Math.PI/2;gpool.position.set(0,.45,.2);gpool.castShadow=false;gb.add(gpool);
       gb.userData.keep=true;
       gb.userData.physObj={type:'guestbook',ref:gb};
       amusement.dyn.add(gb);
       OUTDOOR_OBS.push([4.0,24.5,1.1]);
     }
+
   }
 }
 /* 游乐园里的人：排队、围观、吃小吃、到处溜达（约 75 人热闹逛园） */
@@ -9845,6 +10400,8 @@ mergeStatic(fair,amusement.dyn);
 for(const d of amusement.dyn)mergeStatic(d);
 /* 店铺街全是静态的：合批 */
 mergeStatic(shopRow);
+/* 招牌图集：所有招牌画完后统一上传（否则第一次渲染拿到的是空画布）*/
+SIGN_ATLAS.flush();
 mergeStatic(roofExpo);
 mergeStatic(animePark);
 mergeStatic(street);
