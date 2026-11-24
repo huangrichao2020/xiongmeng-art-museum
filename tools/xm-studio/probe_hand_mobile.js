@@ -37,15 +37,16 @@ const rect = (pg, sel) => pg.evaluate(s => {
   await D.evaluate(() => window.diorama.fp.set(0, 0, 11, 0, 0));
   await M.waitForTimeout(1600);
   console.log('[手机 摇杆]', JSON.stringify(await rect(M, '#joystick')));
-  console.log('[手机 牵手条]', JSON.stringify(await rect(M, '#hand-hud')));
   console.log('[手机 牵手按钮]', JSON.stringify(await rect(M, '#hand-act')));
-  console.log('[手机 提示文案]', JSON.stringify(await M.evaluate(() => document.querySelector('#hand-msg').textContent)));
+  console.log('[手机 小字条]', JSON.stringify(await rect(M, '#hand-name')));
+  console.log('[手机 跳按钮]', JSON.stringify(await rect(M, '#w-run')));
+  console.log('[手机 提示文案]', JSON.stringify(await M.evaluate(() => document.querySelector('#hand-name').textContent)));
   await M.screenshot({ path: '/tmp/mp_hand_mobile.png' });
 
   /* 手机上点「牵手」按钮 → 桌面端应收到请求 */
   await M.click('#hand-act');
   await M.waitForTimeout(900);
-  console.log('[桌面 收到请求]', JSON.stringify(await D.evaluate(() => ({ pFrom: MP.hand.pendingFrom, msg: document.querySelector('#hand-msg').textContent, btns: document.querySelector('#hand-btns').style.display }))));
+  console.log('[桌面 收到请求]', JSON.stringify(await D.evaluate(() => ({ pFrom: MP.hand.pendingFrom, msg: document.querySelector('#hand-name').textContent, btns: document.querySelector('#hand-btns').className }))));
   console.log('[桌面 同意按钮]', JSON.stringify(await rect(D, '#hand-yes')));
   await D.screenshot({ path: '/tmp/mp_hand_ask.png' });
   /* 点同意 */

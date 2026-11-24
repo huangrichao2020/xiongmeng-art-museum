@@ -14,7 +14,7 @@ const login = async (pg, acc) => {
 };
 const handState = pg => pg.evaluate(() => ({
   role: MP.hand.role, partner: MP.hand.partner, pTo: MP.hand.pendingTo, pFrom: MP.hand.pendingFrom,
-  hud: (() => { const h = document.getElementById('hand-hud'); return { on: !!(h && h.classList.contains('show')), msg: h ? h.querySelector('#hand-msg').textContent : '', btns: h ? h.querySelector('#hand-btns').style.display : '', act: h ? h.querySelector('#hand-act').style.display : '' }; })(),
+  hud: (() => { const h = document.getElementById('hand-hud'); return { on: !!(h && h.classList.contains('show')), msg: h ? h.querySelector('#hand-name').textContent : '', btns: h ? h.querySelector('#hand-btns').style.display : '', act: h ? h.querySelector('#hand-act').style.display : '' }; })(),
 }));
 const walk = async pg => {
   await pg.evaluate(() => { if (!window.diorama.fp.get().on) document.getElementById('t-fp').click(); });

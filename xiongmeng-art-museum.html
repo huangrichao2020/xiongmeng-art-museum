@@ -8,6 +8,10 @@
 <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png" />
 <meta name="theme-color" content="#060c14" />
+<!--构建标记：部署脚本会把它替换成这一版独有的串。
+    客户端拿它跟服务端当前在线版本的标记比对，
+    一旦不一致就说明「这个标签页打开的是旧版本」，弹提示让用户刷新。-->
+<meta name="xm-build" content="__XM_BUILD__" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -294,10 +298,10 @@
   /* 触屏：右下「跳」按钮更靠边、更好按 */
   body.touch #w-run{right:max(18px,env(safe-area-inset-right));bottom:max(28px,env(safe-area-inset-bottom));width:72px;height:72px}
   body.touch #joystick{left:max(14px,env(safe-area-inset-left));bottom:max(20px,env(safe-area-inset-bottom));width:134px;height:134px}
-  /* 牵手条抬到摇杆上方，别跟左下角的虚拟摇杆叠在一起 */
-  body.touch #hand-hud{bottom:max(168px,calc(env(safe-area-inset-bottom) + 156px))}
-  /* 手机上按钮做大一档，方便拇指点（36px 高 → 46px 高）*/
-  body.touch #hand-hud button{padding:12px 22px;font-size:14px;border-radius:18px}
+  /* 牵手按钮贴右边、压在「跳」按钮上方，别跟左下角的虚拟摇杆叠在一起 */
+  body.touch #hand-hud{right:max(14px,env(safe-area-inset-right));bottom:max(116px,calc(env(safe-area-inset-bottom) + 108px))}
+  /* 手机上按钮做大一档，方便拇指点 */
+  body.touch #hand-hud button{padding:12px 18px;font-size:14px}
   #cross{
     position:fixed;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;z-index:26;
     pointer-events:none;opacity:0;transition:opacity .2s;
@@ -498,28 +502,48 @@
     font-weight:700;font-size:12px;cursor:pointer;
   }
   #train-btn:hover{background:#ffd275}
-  /* ---------- 牵手 HUD（蛋仔派对的糖果圆润风） ---------- */
+  /* ---------- 牵手 HUD ----------
+     不要横在屏幕中间的大字条：它挡住画面正中，玩家一眼就看到一坨字。
+     改成贴右边缘的一颗小按钮，只有必要的字（小号名字条）才出现。 */
   #hand-hud{
-    position:fixed;bottom:132px;left:50%;transform:translateX(-50%);z-index:29;
-    display:none;align-items:center;gap:10px;padding:8px 13px;border-radius:22px;
-    background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(238,244,255,.93));
-    border:3px solid #fff;color:#2b3242;font-size:13px;font-weight:800;
+    position:fixed;right:14px;bottom:118px;z-index:29;
+    display:none;flex-direction:column;align-items:flex-end;gap:8px;
+    user-select:none;
     font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
-    box-shadow:0 10px 26px rgba(20,40,80,.30),0 3px 0 rgba(255,255,255,.9) inset;
-    user-select:none;max-width:90vw;
   }
   #hand-hud.show{display:flex}
-  #hand-msg{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  #hand-btns{display:inline-flex;gap:8px}
+  #hand-name{
+    display:none;max-width:132px;padding:4px 10px;border-radius:12px;
+    background:rgba(16,26,40,.88);border:1px solid rgba(244,197,106,.45);
+    color:#fff3d1;font-size:11px;font-weight:700;line-height:1.4;text-align:right;
+  }
+  #hand-name.on{display:block}
+  #hand-btns{display:none;flex-direction:column;gap:8px;align-items:flex-end}
+  #hand-btns.on{display:flex}
   #hand-hud button{
-    border:none;border-radius:16px;padding:9px 18px;font-size:13px;font-weight:800;
-    cursor:pointer;color:#fff;flex:none;
-    font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    border:none;border-radius:22px;padding:10px 16px;font-size:13px;font-weight:800;
+    cursor:pointer;color:#fff;
   }
   #hand-hud button:active{transform:translateY(1.5px)}
+  #hand-act{background:linear-gradient(180deg,#ffb35c,#f09230);box-shadow:0 3px 0 #c96f1c;font-size:14px;padding:11px 18px}
   #hand-yes{background:linear-gradient(180deg,#8ee8b4,#43c47c);box-shadow:0 3px 0 #2e9a5f}
   #hand-no{background:linear-gradient(180deg,#ff9db4,#f2708f);box-shadow:0 3px 0 #cf5271}
-  #hand-act{background:linear-gradient(180deg,#ffb35c,#f09230);box-shadow:0 3px 0 #c96f1c}
+  /* ---------- 版本过期提示（这个标签页打开的是旧页面）---------- */
+  #xm-upd{
+    position:fixed;right:12px;top:12px;z-index:9100;
+    display:none;align-items:center;gap:7px;padding:5px 6px 5px 11px;border-radius:18px;
+    background:linear-gradient(180deg,#ffd9a0,#ffb35c);color:#4a2c06;
+    font-size:11.5px;font-weight:800;
+    font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    box-shadow:0 6px 18px rgba(20,40,80,.30),0 2px 0 rgba(255,255,255,.55) inset;
+    user-select:none;white-space:nowrap;
+  }
+  #xm-upd.on{display:flex}
+  #xm-upd button{
+    border:none;border-radius:14px;padding:5px 11px;font-size:11px;font-weight:800;cursor:pointer;
+    background:#fff;color:#a8570c;box-shadow:0 2px 0 rgba(0,0,0,.12);
+  }
+  #xm-upd button:active{transform:translateY(1px)}
   /* ---------- FPV 穿越机特技模式 OSD 抬头显示 ---------- */
   #fpv-osd{
     position:fixed;inset:0;z-index:26;pointer-events:none;display:none;
@@ -782,7 +806,7 @@
   </div>
 </div>
 <div id="train-hud"><span id="train-msg">圣诞观光小火车运行中</span><button id="train-btn">上车</button></div>
-<div id="hand-hud"><span id="hand-msg"></span><span id="hand-btns" style="display:none"><button id="hand-yes">同意</button><button id="hand-no">拒绝</button></span><button id="hand-act" style="display:none">牵手</button></div>
+<div id="hand-hud"><span id="hand-name"></span><span id="hand-btns"><button id="hand-yes">同意</button><button id="hand-no">拒绝</button></span><button id="hand-act"></button></div>
 <div id="gift-modal" aria-hidden="true">
   <div id="gift-card">
     <div id="gift-rarity" class="SSR">SSR</div>
@@ -12536,6 +12560,28 @@ function updateAerialHaze(dt,t){
     if (el) el.classList.remove('on');
   }
 
+  /* ── 版本自检：这个标签页是不是旧版本？──
+     服务端登录时把「当前线上版本」的构建标记发过来，
+     跟本页 <meta name="xm-build"> 里的标记比对；
+     不一致 = 这个标签页打开的是部署之前的旧页面，功能会缺
+     （比如新加的牵手提示就收不到）。
+     以前这种事只能靠玩家口头说「怎么没反应」，根本查不到。 */
+  function checkBuild(serverBuild) {
+    const meta = document.querySelector('meta[name="xm-build"]');
+    const mine = meta ? meta.content : '';
+    if (!serverBuild || !mine || mine.indexOf('__') === 0) return;   // 没标记就跳过
+    if (mine === serverBuild) return;
+    let el = document.getElementById('xm-upd');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'xm-upd';
+      el.innerHTML = '<span>旧版本</span><button id="xm-upd-btn">刷新</button>';
+      document.body.appendChild(el);
+      el.querySelector('#xm-upd-btn').onclick = function () { location.reload(); };
+    }
+    el.classList.add('on');
+  }
+
   /* 应用层心跳：每 8 秒 ping 一次，12 秒收不到 pong 就判定连接已经半开
      —— 弱网/手机息屏时 TCP 不会立刻断，浏览器可能几十分钟都不报错，
         只能靠应用层心跳自己发现，然后主动断开重连 */
@@ -12658,26 +12704,28 @@ function updateAerialHaze(dt,t){
     if (!h) {
       h = document.createElement('div');
       h.id = 'hand-hud';
-      h.innerHTML = '<span id="hand-msg"></span>' +
-        '<span id="hand-btns" style="display:none"><button id="hand-yes">同意</button><button id="hand-no">拒绝</button></span>' +
-        '<button id="hand-act" style="display:none">牵手</button>';
+      h.innerHTML = '<span id="hand-name"></span>' +
+        '<span id="hand-btns"><button id="hand-yes">同意</button><button id="hand-no">拒绝</button></span>' +
+        '<button id="hand-act"></button>';
       document.body.appendChild(h);
     }
     if (MP._handUI) return;
-    MP._handUI = { el: h, msg: h.querySelector('#hand-msg'), btns: h.querySelector('#hand-btns'), act: h.querySelector('#hand-act') };
+    MP._handUI = { el: h, name: h.querySelector('#hand-name'), btns: h.querySelector('#hand-btns'), act: h.querySelector('#hand-act') };
     h.querySelector('#hand-yes').onclick = function () { MP.handRespond(true); };
     h.querySelector('#hand-no').onclick = function () { MP.handRespond(false); };
     h.querySelector('#hand-act').onclick = function () { MP.handAction(); };
   }
-  /* mode: 'ask'=同意/拒绝  'act'=单按钮  'none'=只显示一行字 */
-  function handHud(msg, mode, actLabel) {
+  /* mode: 'ask'=同意/拒绝两颗  'act'=一颗主按钮  'none'=只留小字条
+     整块 UI 贴在屏幕右边缘，不占画面正中。 */
+  function handHud(mode, name, actLabel) {
     buildHandUI();
     const u = MP._handUI;
     /* 兜底：UI 绑定失败时直接跳过，绝不能让一个提示条把 MP.update 整段打断
        （MP.update 里还负责推位置广播，一崩整个多人同步就死了）*/
-    if (!u || !u.msg) return;
-    u.msg.textContent = msg || '';
-    u.btns.style.display = (mode === 'ask') ? 'inline-flex' : 'none';
+    if (!u || !u.act) return;
+    u.name.textContent = name || '';
+    u.name.classList.toggle('on', !!name);
+    u.btns.classList.toggle('on', mode === 'ask');
     u.act.style.display = (mode === 'act') ? 'inline-block' : 'none';
     if (actLabel) u.act.textContent = actLabel;
     u.el.classList.add('show');
@@ -12703,11 +12751,11 @@ function updateAerialHaze(dt,t){
     if (MP.hand.role) { MP.handEnd(); return; }
     if (MP.hand.pendingFrom || MP.hand.pendingTo) return;
     const near = MP.nearestPeer();
-    if (!near) { handHud('附近没有别的玩家', 'none'); setTimeout(handHudHide, 1700); return; }
+    if (!near) { handHud('none', '附近没人', ''); setTimeout(handHudHide, 1700); return; }
     MP.send({ t: 'hand_req', to: near.account });
     MP.hand.pendingTo = near.account;
     MP.hand.pendingToName = near.display || near.account;
-    handHud('已向 ' + MP.hand.pendingToName + ' 发出牵手请求', 'none');
+    handHud('none', '已发出 · 等 ' + MP.hand.pendingToName, '');
   };
   MP.handRespond = function (accept) {
     const from = MP.hand.pendingFrom;
@@ -12723,21 +12771,27 @@ function updateAerialHaze(dt,t){
   };
   /* HUD 刷新：牵手中 / 等待回应 / 收到请求 / 旁边有人 */
   MP.updateHandHud = function () {
-    if (!MP.connected || !fp.on) { handHudHide(); return; }
+    /* 顺序很要紧：已经配对 / 有人在等我回应 / 有人向我发起 —— 这三种提示
+       不看是不是沉浸模式，全程都要显示。
+       之前把 !fp.on 的判断放在最前面，结果在沙盘模式收到牵手请求时，
+       提示刚弹出 0.12 秒就被这一句藏掉了 —— 玩家根本看不到「有人要和你牵手」。 */
+    if (!MP.connected) { handHudHide(); return; }
     if (MP.hand.role) {
-      handHud('牵着 ' + (MP.hand.partnerName || MP.hand.partner) + ' 的手', 'act', '松手');
+      handHud('act', MP.hand.partnerName || MP.hand.partner, '松手');
       return;
     }
     if (MP.hand.pendingFrom) {
-      handHud(MP.hand.pendingName + ' 想和你牵手', 'ask');
+      handHud('ask', MP.hand.pendingName + ' 想和你牵手', '');
       return;
     }
     if (MP.hand.pendingTo) {
-      handHud('等 ' + MP.hand.pendingToName + ' 回应…', 'none');
+      handHud('none', '等 ' + MP.hand.pendingToName + ' 回应', '');
       return;
     }
+    /* 只有「旁边有人，可以发起」这一条需要行走模式（沙盘里角色不动，没什么可牵的）*/
+    if (!fp.on) { handHudHide(); return; }
     const near = MP.nearestPeer();
-    if (near) handHud('和 ' + (near.display || near.account) + ' 牵手', 'act', '牵手');
+    if (near) handHud('act', near.display || near.account, '牵手');
     else handHudHide();
   };
   /* 两只手牵在一起的那一小团（把两个人的手接上）*/
@@ -12781,6 +12835,7 @@ function updateAerialHaze(dt,t){
         startBeat();
         /* 显示 ID 存档：服务端记住的那份为准，本地也存一份，下次进去还是它 */
         if (MP.display && MP.display !== MP.account) MP.saveName(MP.display);
+        if (m.build) checkBuild(m.build);
         MP.clearPeers();
         (m.players || []).forEach(pl => {
           if (pl.account !== MP.account) MP.addPeer(pl);
@@ -12884,7 +12939,7 @@ function updateAerialHaze(dt,t){
         if (code === 'handbusy') {
           /* 对方正在牵别人 / 正在被别人牵：只是这次牵手没成，不是登录问题 */
           MP.hand.pendingTo = ''; MP.hand.pendingToName = '';
-          handHud(m.msg || '对方现在不方便牵手', 'none');
+          handHud('none', m.msg || '对方现在不方便', '');
           setTimeout(handHudHide, 2300);
           return;
         }
@@ -12917,18 +12972,19 @@ function updateAerialHaze(dt,t){
       case 'hand_in': {          // 有人向我发起牵手 → 弹同意/拒绝
         MP.hand.pendingFrom = m.from || '';
         MP.hand.pendingName = m.display || m.from || '';
-        handHud(MP.hand.pendingName + ' 想和你牵手', 'ask');
+        handHud('ask', MP.hand.pendingName + ' 想和你牵手', '');
+        try { sfx.blip(988, .16, .10); } catch (e) { }
         break;
       }
       case 'hand_wait': {        // 我的请求已发出，等对方回应
         MP.hand.pendingTo = m.to || '';
         MP.hand.pendingToName = m.display || m.to || '';
-        handHud('已向 ' + MP.hand.pendingToName + ' 发出牵手请求，等 TA 回应', 'none');
+        handHud('none', '已发出 · 等 ' + MP.hand.pendingToName, '');
         break;
       }
       case 'hand_rej': {        // 被拒绝了
         MP.hand.pendingTo = ''; MP.hand.pendingToName = '';
-        handHud((m.display || '对方') + ' 拒绝了牵手请求', 'none');
+        handHud('none', (m.display || '对方') + ' 拒绝了', '');
         setTimeout(handHudHide, 2300);
         break;
       }

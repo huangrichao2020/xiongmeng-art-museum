@@ -13,6 +13,16 @@ elif NEW in src:
 else:
     print('!! importmap pattern not found'); sys.exit(1)
 
+# 注入构建标记：每次构建一个唯一串。
+# 客户端登录时跟服务端下发的「当前线上标记」比对，不一致就说明
+# 这个标签页打开的是旧页面（老开着不刷新的人会一直看不到新功能）。
+if '__XM_BUILD__' in out:
+    token = 'b' + hashlib.md5(out.encode()).hexdigest()[:10]
+    out = out.replace('__XM_BUILD__', token)
+    print('build token', token)
+else:
+    print('!! __XM_BUILD__ placeholder missing')
+
 os.makedirs(W + '/.deploy', exist_ok=True)
 open(W + '/.deploy/index.html', 'w', encoding='utf-8').write(out)
 

@@ -71,6 +71,24 @@ function saveNames() {
 const IDLE_ALIVE_MS = 12000;
 const IDLE_DEAD_MS = 60000;
 
+/* ── 当前线上版本的构建标记 ──
+   客户端登录时把这个标记跟它自己页面里的 <meta name="xm-build"> 比对：
+   不一致 = 那个标签页打开的是部署之前的旧页面（功能会缺，提示也不会弹）。
+   从 index.html 里现读，按 mtime 缓存，不用重启服务也能跟上新的部署。 */
+const INDEX_FILE = '/www/wwwroot/jiaojia-preview/alex-garage/index.html';
+let buildCache = { mtime: 0, tag: '' };
+function currentBuild() {
+  try {
+    const st = fs.statSync(INDEX_FILE);
+    if (st.mtimeMs !== buildCache.mtime) {
+      const html = fs.readFileSync(INDEX_FILE, 'utf8');
+      const m = html.match(/name="xm-build"\s+content="([^"]+)"/);
+      buildCache = { mtime: st.mtimeMs, tag: m ? m[1] : '' };
+    }
+    return buildCache.tag;
+  } catch (e) { return ''; }
+}
+
 /* ── 在线会话：account → session ── */
 const sessions = new Map();      // account -> session
 const bySocket = new Map();      // socket -> session
@@ -344,6 +362,7 @@ function handleConn(socket) {
         you: { account: acc, display: session.display },
         players: roomPlayers(),
         server: os.hostname(),
+        build: currentBuild(),
       });
       broadcastRoom(session.room);
       log('online', acc, 'online=' + sessions.size);
