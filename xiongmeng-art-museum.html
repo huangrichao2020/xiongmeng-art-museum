@@ -8978,7 +8978,7 @@ function updateBalloonRide(dt){
     b.pool.material.opacity=Math.max(.04,.32/(1+h*.15));
   }
   /* 靠近提示：站着不动也能上球 */
-  if(!balloonSys.riding&&fp.on&&!wheelSys.riding&&!trainSys.riding&&!launchSys.active){
+  if(!balloonSys.riding&&fp.on&&!wheelSys.riding&&!trainSys.riding&&!launchSys.active&&!heliSys.riding){
     const i=balloonNearPlayer();
     if(i>=0){
       hudShow('大号热气球 · 按 E 或点击登上吊篮（升空后 W/↑ 上升、S/↓ 下降）','上热气球 (E)',()=>toggleBalloonRide(i));
@@ -9699,23 +9699,34 @@ const ART=[[-4.9,0.4],[0,-7.2],[4.6,-0.6],[-6.2,4.2],[3.3,-1.0]];
 const NPC_ACCS=['headphone','camera','coffee','backpack','cap','beret','santa','beanie','earmuff','bow','antler','gift','honey'];
 /* ── NPC 名字 ──
    每个 NPC 有自己的名字，头顶挂一块小号蛋仔气泡牌。
-   名字池是小熊世界风格的中文昵称 + 一点点搞怪后缀，重复了就加数字。 */
+   名字池是正常的中文名（00 后常见的那种），不用数字后缀：
+   池子有 60 个，pickNpcName 会一直重抽到没被用过的那个，
+   只有池子彻底用光才会退化成加序号。 */
 const NPC_NAME_POOL=[
-  '团子','奶盖','芋圆','布丁','麻薯','奶糖','泡芙','椰果','芋泥','珍珠',
-  '豆花','蛋挞','曲奇','摩卡','拿铁','蛋仔','果冻','芝士','抹茶','可可',
-  '焦糖','草莓','海盐','柠檬','蜜桃','葡萄','蓝莓','樱桃','雪梨','柚子'
+  '林一诺','陈思远','张沐辰','李知遥','王亦然','刘星野','赵可乐','周予安','吴念真','徐嘉禾',
+  '孙可欣','马奕辰','朱语彤','胡清越','郭小满','何景行','高思齐','罗佳宁','郑允诺','梁若安',
+  '谢云舒','宋以宁','唐暮然','韩知许','冯听澜','董星回','袁书瑶','邓清和','许南枝','傅念安',
+  '曾屿然','彭知夏','吕清欢','苏未眠','蔡一诺','贾明澈','丁小满','石亦然','汪星河','田嘉树',
+  '叶南乔','秦昭昭','温以宁','柳时雨','孟长风','夏沐阳','白露','段星辰','顾云帆','江予星',
+  '钟灵毓','邵安然','沈知许','林望舒','崔明野','苏景行','傅云深','楚河洲','尹初见','霍青川',
+  '罗以宁','贺知遥','凌若初','简安然','路星河','游一鸣','常思远','宁知夏','舒窈','岳听雨',
+  '桑晚宁','殷沐辰','葛云舒','祝嘉言','虞清和','关之柔','柯明澈','龚逸然','邢书宁','阎星野',
+  '慕思齐','樊听雪','郅清越','纪南乔','蓝景行','应知予','席云舟','车迟','晏如许'
 ];
 const NPC_NAMES=[];
 function pickNpcName(){
   let nm;
   let guard=0;
   do{ nm=NPC_NAME_POOL[RI(0,NPC_NAME_POOL.length-1)]; guard++; }
-  while(NPC_NAMES.indexOf(nm)>=0&&guard<200);
-  // 名字用完就加序号，保证全场唯一
-  let uniq=nm,k=2;
-  while(NPC_NAMES.indexOf(uniq)>=0){uniq=nm+k;k++;}
-  NPC_NAMES.push(uniq);
-  return uniq;
+  while(NPC_NAMES.indexOf(nm)>=0&&guard<400);
+  // 池子抽完了才退化成加序号，保证全场唯一
+  if(NPC_NAMES.indexOf(nm)>=0){
+    let uniq=nm,k=2;
+    while(NPC_NAMES.indexOf(uniq)>=0){uniq=nm+k;k++;}
+    nm=uniq;
+  }
+  NPC_NAMES.push(nm);
+  return nm;
 }
 /* 小号 NPC 名牌：蛋仔派对那种圆鼓鼓的白色气泡，但比玩家牌小一半多。
    不带头像圆片（NPC 不是真人），只留一个圆角气泡 + 底部小尖角。
@@ -9756,7 +9767,9 @@ function makeNpcTagSprite(text,color){
   const tex=new THREE.CanvasTexture(c);
   tex.colorSpace=THREE.SRGBColorSpace;
   tex.anisotropy=2;
-  const mat=new THREE.SpriteMaterial({map:tex,depthTest:false,transparent:true});
+  /* depthTest 必须开着：关掉的话名牌会无视深度直接画在最上层，
+     NPC 站在墙里、站在房子另一侧，头顶的 ID 照样透出来 —— 玩家看着像穿墙。 */
+  const mat=new THREE.SpriteMaterial({map:tex,depthTest:true,transparent:true});
   const sp=new THREE.Sprite(mat);
   /* 尺寸：宽度约 0.86m —— 10~15m 外能看清名字，又不至于在画面里占地方 */
   sp.scale.set(.86,.296,1);
@@ -9775,7 +9788,7 @@ function addNpc(path,color,skin,speed,indoor,opts={}){
   /* 头顶小号名字牌：挂在小熊身上，跟随移动与压扁弹跳 */
   const nm=pickNpcName();
   const tag=makeNpcTagSprite(nm,'#'+color.toString(16).padStart(6,'0'));
-  tag.position.y=1.30;
+  tag.position.y=1.46;   // 抬到头顶之上：开了深度测试后，名牌不能被自己的脑袋挡掉
   tag.userData.keep=true;
   p.add(tag);
   item.name=nm;item.tag=tag;
@@ -10959,7 +10972,7 @@ function updatePianoPlaza(dt,t){
   if(pp.upl)for(const l of pp.upl)l.intensity=l.userData.base*(1+pp.flash*2.2);
   if(pp.spot)pp.spot.intensity=13+pp.flash*16;
   /* 走近就提示 */
-  if(fp.on&&!wheelSys.riding&&!trainSys.riding&&!balloonSys.riding&&!launchSys.active){
+  if(fp.on&&!wheelSys.riding&&!trainSys.riding&&!balloonSys.riding&&!launchSys.active&&!heliSys.riding){
     const d=Math.hypot(fp.x-pp.px,fp.z-pp.pz);
     if(d<4.8)hudShow('圣诞大钢琴 · 按 E 弹一段','弹奏 (E)',pianoPlay);
   }
@@ -11147,6 +11160,9 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
   /* ── 皇家圣诞旋转木马（移至游乐园正中央迎宾广场，红白条纹双层顶棚 + 8 匹立体切线奔跑木马） ── */
   {
     const g=new THREE.Group();g.position.set(4.0,0,30.0);fair.add(g);
+    /* 整体放大 1.14 倍：整团等比缩放，篷顶/立柱/木马/灯泡的相对关系全不变，
+       只是体量更压得住广场（原底座半径 4.65 → 5.30） */
+    g.scale.setScalar(1.14);
     const giltM=M(0xe8b653,{roughness:.28,metalness:.85});
     const creamM=M(0xfaf4e8,{roughness:.55});
     const woodStepM=M(0x6b4226,{roughness:.78});
@@ -11662,7 +11678,11 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
            · 配色 = 奶油白 / 鹅黄 / 草莓粉 / 薄荷绿，全高饱和糖果色
          ── */
     {
-      const gb=new THREE.Group();gb.position.set(4.0,0,24.5);gb.rotation.y=Math.PI;fair.add(gb);
+      /* 位置：从旋转木马跟前挪到「环路南段马路(z=15)与旋转木马之间」那条空带上，
+         靠马路一侧的空地。原来压在旋转木马底座里（相距 5.5m，底座半径就有 4.65m），
+         两边撞在一起。现在中心 (6.5,22)，距旋转木马中心 8.4m、距马路 7m，
+         旋转木马放大 1.14 倍之后仍然各留 1m 以上空隙。 */
+      const gb=new THREE.Group();gb.position.set(6.5,0,22.0);gb.rotation.y=Math.PI;fair.add(gb);
       const creamM=M(0xfff4e2,{roughness:.62,metalness:0});
       const yolkM=M(0xffd84d,{roughness:.55,metalness:0});
       const strawM=M(0xff8fb4,{roughness:.58,metalness:0});
@@ -11746,7 +11766,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       gb.userData.keep=true;
       gb.userData.physObj={type:'guestbook',ref:gb};
       amusement.dyn.add(gb);
-      OUTDOOR_OBS.push([4.0,24.5,1.1]);
+      OUTDOOR_OBS.push([6.5,22.0,1.1]);
     }
 
   }
@@ -11874,7 +11894,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
      变魔术（礼帽里变出兔子）/ 扔苹果（苹果绕圈循环）/ 杂技（走钢丝 + 吊环）/ 小丑（抛彩球）
    ══════════════════════════════════════════════════════════════════════ */
 const circus={
-  x:50,z:30,R:9.25,
+  x:50,z:30,R:6.94,
   g:null,sweep:null,sweep2:null,sweepMat:null,sweepMat2:null,
   pool:null,light:null,magic:{},jug:{},acro:{},clown:{},aud:[],
   act:0
@@ -11886,7 +11906,12 @@ const CIRCUS_ACTS=[
 ];
 {
   const CX=circus.x,CZ=circus.z;
-  const g=new THREE.Group();g.position.set(CX,0,CZ);
+  /* 整团等比缩小：地基（石板围场 + 拉绳地钉）原来伸到 13.7m，
+     已经压进东南角那段环城马路（马路内沿离场心只有 11.26m）。
+     现在整团缩到 0.75 倍：地基收到 10.3m，让开马路约 1m；
+     篷顶、支柱、拉绳、表演位、观众席一起缩，内部比例完全不变。 */
+  const CS=0.75;
+  const g=new THREE.Group();g.position.set(CX,0,CZ);g.scale.setScalar(CS);
   fair.add(g);circus.g=g;
 
   /* ── 材质：帆布用同一张织纹贴图染红白两种，别的都程序化 ── */
@@ -11952,10 +11977,13 @@ const CIRCUS_ACTS=[
   addNS(g,new THREE.TorusGeometry(5.86,.045,8,96),goldM,0,.10,0).rotation.x=Math.PI/2;
   /* 从游乐园（西侧）引进来的石板路 */
   {
-    const road=add(g,BX(9.4,.06,3.6),M(0xd6dde6,{roughness:.94}),-13.6,.028,0);
-    road.castShadow=false;
-    const k1=add(g,BX(9.4,.10,.14),M(0xbcc6d2,{roughness:.94}),-13.6,.03,-1.75);k1.castShadow=false;
-    const k2=add(g,BX(9.4,.10,.14),M(0xbcc6d2,{roughness:.94}),-13.6,.03,1.75);k2.castShadow=false;
+    /* 石板路：从游乐园引进来的那条。整团缩小后帐篷檐口往里收了 2.3m，
+       这条路在局部坐标里要按 CS 反算加长，z 方向也反算，
+       这样缩小之后它仍然是原来的世界长度和路宽，两端照样接得上。 */
+    const road=add(g,BX(14.8,.06,3.6),M(0xd6dde6,{roughness:.94}),-17.0,.037,0);
+    road.scale.set(1,1/CS,1/CS);road.castShadow=false;
+    const k1=add(g,BX(14.8,.10,.14),M(0xbcc6d2,{roughness:.94}),-17.0,.04,-1.75/CS);k1.scale.set(1,1/CS,1/CS);k1.castShadow=false;
+    const k2=add(g,BX(14.8,.10,.14),M(0xbcc6d2,{roughness:.94}),-17.0,.04,1.75/CS);k2.scale.set(1,1/CS,1/CS);k2.castShadow=false;
   }
 
   /* ── 绳栏：把观众和表演区分开（12 根柱 + 一圈麻绳） ── */
@@ -11964,7 +11992,7 @@ const CIRCUS_ACTS=[
     const px=Math.cos(a)*6.15,pz=Math.sin(a)*6.15;
     add(g,new THREE.CylinderGeometry(.05,.065,1.0,8),poleM,px,.52,pz);
     addNS(g,new THREE.SphereGeometry(.08,8,6),goldM,px,1.05,pz);
-    OUTDOOR_OBS.push([CX+px,CZ+pz,.22]);
+    OUTDOOR_OBS.push([CX+px*CS,CZ+pz*CS,.22]);
   }
   addNS(g,new THREE.TorusGeometry(6.15,.032,6,96),ropeM,0,.86,0).rotation.x=Math.PI/2;
 
@@ -11975,7 +12003,7 @@ const CIRCUS_ACTS=[
     add(g,new THREE.CylinderGeometry(.10,.13,5.15,10),poleM,px,2.575,pz);
     for(let k=0;k<3;k++)add(g,new THREE.CylinderGeometry(.118,.118,.40,10),poleRedM,px,.75+k*1.65,pz);
     add(g,new THREE.CylinderGeometry(.19,.23,.30,10),steelM,px,.15,pz);
-    OUTDOOR_OBS.push([CX+px,CZ+pz,.30]);
+    OUTDOOR_OBS.push([CX+px*CS,CZ+pz*CS,.30]);
   }
 
   /* ── 帆布钟形锥顶：16 片瓜瓣，红白相间 ──
@@ -12068,22 +12096,27 @@ const CIRCUS_ACTS=[
   {
     const lampSpecs=[
       // [x, y, z, 颜色, 强度, 照射距离]
-      [ 0.0, 5.10, 0.0, 0xffd9a0, 210, 17],   // 篷顶下：吊灯同位置，照亮表演区中心
-      [ 0.0, 3.30,-3.2, 0xffcf95, 120, 14],   // 表演区前侧偏低一点，补熊和道具的下半身
-      [ 0.0, 4.20, 5.6, 0xffc98c,  95, 15],   // 观众区后方，把外圈的小熊照出来
+      // 强度是上一版（210/120/95）的 0.62 倍：原来帐篷内夜里平均亮度 167、
+      // 峰值 241，整片糊成白块，属于过曝。降到 130/74/58 后峰值回到 200 上下，
+      // 熊和道具的轮廓才看得出来。
+      [ 0.0, 5.10, 0.0, 0xffd9a0, 130, 17],   // 篷顶下：吊灯同位置，照亮表演区中心
+      [ 0.0, 3.30,-3.2, 0xffcf95,  74, 14],   // 表演区前侧偏低一点，补熊和道具的下半身
+      [ 0.0, 4.20, 5.6, 0xffc98c,  58, 15],   // 观众区后方，把外圈的小熊照出来
     ];
     for(const [lx,ly,lz,col,inten,dist] of lampSpecs){
-      const pl=new THREE.PointLight(col,inten,dist,1.5);
+      /* 整团缩了 CS 倍 → 灯到被照表面的距离也缩了 CS 倍，
+         亮度按 CS² 折算、照射距离按 CS 缩，帐篷内的明暗才不会突变 */
+      const pl=new THREE.PointLight(col,inten*CS*CS,dist*CS,1.5);
       pl.position.set(lx,ly,lz);
       pl.userData.lpFixed=true;      // 常驻，不进灯池
       pl.castShadow=false;
       g.add(pl);
-      shopLights.push({l:pl,base:inten,street:false,delay:1.4});
+      shopLights.push({l:pl,base:inten*CS*CS,street:false,delay:1.4});
     }
     /* 地面暖光池（软边贴图，不是硬边圆盘）：把表演圈的地面提亮一点，
        让人看得见表演区是块平地而不是黑洞 */
     const floorPool=new THREE.Mesh(new THREE.CircleGeometry(1,48),
-      new THREE.MeshBasicMaterial({map:glowTex,color:0xffca88,transparent:true,opacity:.20,
+      new THREE.MeshBasicMaterial({map:glowTex,color:0xffca88,transparent:true,opacity:.13,
         blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
     floorPool.rotation.x=-Math.PI/2;floorPool.position.set(0,.028,0);
     floorPool.scale.set(7.4,7.4,1);floorPool.castShadow=false;
@@ -12188,7 +12221,7 @@ const CIRCUS_ACTS=[
       M(0xe8c26a,{roughness:.3,metalness:.7}),-.05,-.44,.10);
     wand.rotation.x=-.35;
     circus.magic={hat:hatG,rabbit:rabbit,mage:mage,gift:gift};
-    OUTDOOR_OBS.push([CX+Math.cos(135*Math.PI/180)*3.95,CZ+Math.sin(135*Math.PI/180)*3.95,1.85]);
+    OUTDOOR_OBS.push([CX+Math.cos(135*Math.PI/180)*3.95*CS,CZ+Math.sin(135*Math.PI/180)*3.95*CS,1.85]);
   }
 
   /* ── ② 扔苹果整幕已按要求删除 ──
@@ -12226,7 +12259,7 @@ const CIRCUS_ACTS=[
       add(uni,new THREE.CylinderGeometry(.035,.035,.62,8),steelM,0,.32,0);
       add(uni,BX(.24,.06,.34),M(0xd23b32,{roughness:.6}),0,.66,0);
     }
-    OUTDOOR_OBS.push([CX+Math.cos(315*Math.PI/180)*3.95,CZ+Math.sin(315*Math.PI/180)*3.95,1.40]);
+    OUTDOOR_OBS.push([CX+Math.cos(315*Math.PI/180)*3.95*CS,CZ+Math.sin(315*Math.PI/180)*3.95*CS,1.40]);
   }
   /* ── 空中吊环整组已按要求删除 ──
      原来吊环熊用双脚勾在横杆上倒挂在中央旗杆下，
@@ -12266,7 +12299,7 @@ const CIRCUS_ACTS=[
       const g2=buildGiftBox(.36,.30,.36,0x3f6ba8,0xf7d05c);g2.position.set(1.02,.52,.58);g2.rotation.y=.5;st.add(g2);
     }
     circus.clown={bear:clown,balls:balls};
-    OUTDOOR_OBS.push([CX+Math.cos(45*Math.PI/180)*3.95,CZ+Math.sin(45*Math.PI/180)*3.95,1.15]);
+    OUTDOOR_OBS.push([CX+Math.cos(45*Math.PI/180)*3.95*CS,CZ+Math.sin(45*Math.PI/180)*3.95*CS,1.15]);
   }
 
   /* ── 观众：五只站在外圈看表演的小熊 ── */
@@ -12286,12 +12319,12 @@ const CIRCUS_ACTS=[
 
   /* ── 入口招牌：西侧（朝游乐园方向）两根柱 + 一块灯箱 ── */
   {
-    const ent=new THREE.Group();ent.position.set(-10.3,0,0);ent.rotation.y=-Math.PI/2;g.add(ent);
+    const ent=new THREE.Group();ent.position.set(-10.3/CS,0,0);ent.rotation.y=-Math.PI/2;g.add(ent);
     for(const sx of [-1,1]){
       add(ent,new THREE.CylinderGeometry(.11,.15,4.4,10),poleRedM,sx*2.1,2.2,0);
       for(let k=0;k<3;k++)add(ent,new THREE.CylinderGeometry(.125,.125,.36,10),poleM,sx*2.1,.75+k*1.35,0);
       add(ent,new THREE.CylinderGeometry(.22,.26,.30,10),steelM,sx*2.1,.15,0);
-      OUTDOOR_OBS.push([CX-10.3, CZ+sx*2.1, .28]);
+      OUTDOOR_OBS.push([CX-10.3, CZ+sx*2.1*CS, .28]);
     }
     add(ent,BX(4.9,.34,.34),goldM,0,4.30,0);
     for(let i=0;i<7;i++)addNS(ent,new THREE.SphereGeometry(.085,10,8),
@@ -12301,6 +12334,527 @@ const CIRCUS_ACTS=[
       const sm=buildSnowman(.92,{scarf:0xd23b32,hat:'santa',wave:sx<0,tilt:sx*.08});
       sm.position.set(sx*3.3,0,0);sm.rotation.y=Math.atan2(sx,0)*.4;
       ent.add(sm);
+    }
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   直升机停机坪 + 可登乘直升机
+   ──────────────────────────────────────────────────────────────────────
+   · 位置：马戏团南侧、观光铁轨以北的那片空地（原来空着的一块雪地）
+   · 停机坪：程序化沥青贴图（白色边界圈 + 中央 H + 十二个边角标记），
+             12 盏边缘灯（自发光珠，不新增点光源）、风向袋、锥桶
+   · 直升机：写实比例轻型直升机（机身 6.7m、主旋翼直径 9.7m），
+             橙红 + 米白 + 金线涂装，航行灯红左绿右白尾
+   · 玩法：走近按 E 登机 → 视角自动切到机外朝外看 → 旋翼加速 → 起飞 →
+         绕园区飞一圈 → 回到停机坪落地 → 自动下车
+   ══════════════════════════════════════════════════════════════════════ */
+const HELI_PAD={x:52,z:50.5,R:8.0};
+const heliSys={
+  riding:false,phase:'idle',t:0,
+  rotor:0,rotorSpd:0,idleSpd:.055,
+  x:HELI_PAD.x,y:0,z:HELI_PAD.z,yaw:.80,pitch:0,roll:0,
+  dist:0,len:1,fast:false,hud:false,
+  camBase:0,camOff:0,
+  g:null,rotorG:null,tRotor:null,disc:null,shadow:null,sock:null
+};
+
+/* ── 停机坪地面贴图：沥青底 + 白色边界圈 + 中央 H + 十二个边角标记 ── */
+function helipadPadTex(){
+  const S=1024,[c,x]=cv(S,S);
+  const gr=x.createLinearGradient(0,0,S,S);
+  gr.addColorStop(0,'#3e454d');gr.addColorStop(.55,'#31383f');gr.addColorStop(1,'#373e46');
+  x.fillStyle=gr;x.fillRect(0,0,S,S);
+  for(let i=0;i<11000;i++){
+    x.fillStyle=Math.random()>.5?'rgba(255,255,255,.045)':'rgba(0,0,0,.06)';
+    x.fillRect(Math.random()*S,Math.random()*S,1+Math.random()*2.6,1+Math.random()*2.6);
+  }
+  /* 混凝土板缝 */
+  x.strokeStyle='rgba(12,16,22,.28)';x.lineWidth=2.4;
+  for(let i=1;i<=3;i++){x.beginPath();x.arc(S/2,S/2,S*0.135*i,0,Math.PI*2);x.stroke();}
+  /* 白色边界圈（threshold circle） */
+  x.strokeStyle='rgba(236,243,250,.90)';x.lineWidth=14;
+  x.beginPath();x.arc(S/2,S/2,S*.40,0,Math.PI*2);x.stroke();
+  /* 中央 H */
+  x.fillStyle='rgba(242,247,253,.94)';
+  const bw=S*.072,bh=S*.30,gap=S*.118;
+  x.fillRect(S/2-gap-bw,S/2-bh,bw,bh*2);
+  x.fillRect(S/2+gap,S/2-bh,bw,bh*2);
+  x.fillRect(S/2-gap,S/2-bw*.52,gap*2+bw*2,bw*1.04);
+  /* 十二个边角标记 */
+  x.save();x.translate(S/2,S/2);
+  x.fillStyle='rgba(240,196,84,.82)';
+  for(let i=0;i<12;i++){
+    x.save();x.rotate(i/12*Math.PI*2);
+    x.fillRect(S*.452,-15,S*.030,30);
+    x.restore();
+  }
+  x.restore();
+  /* 旧漆磨损痕 */
+  x.strokeStyle='rgba(30,38,46,.16)';x.lineWidth=7;
+  for(let i=0;i<7;i++){
+    const a=Math.random()*Math.PI*2,r0=S*(.12+Math.random()*.2);
+    x.beginPath();
+    x.moveTo(S/2+Math.cos(a)*r0,S/2+Math.sin(a)*r0);
+    x.lineTo(S/2+Math.cos(a+.3)*r0*1.6,S/2+Math.sin(a+.3)*r0*1.6);
+    x.stroke();
+  }
+  return ctex(c);
+}
+/* 机号贴纸：小方块，深色字 + 白边，直接贴在机身侧面 */
+function heliDecalTex(){
+  const W=256,H=112,[c,x]=cv(W,H);
+  x.clearRect(0,0,W,H);
+  x.font='700 62px '+HK;x.textAlign='center';x.textBaseline='middle';
+  x.lineWidth=7;x.strokeStyle='rgba(255,255,255,.85)';
+  x.strokeText('H-01',W/2,H/2+2);
+  x.fillStyle='rgba(58,22,16,.88)';
+  x.fillText('H-01',W/2,H/2+2);
+  return ctex(c);
+}
+function heliSockTex(){
+  const [c,x]=cv(160,32);
+  for(let i=0;i<5;i++){x.fillStyle=i%2?'#f4efe2':'#ef7a2c';x.fillRect(i*32,0,32,32);}
+  return ctex(c);
+}
+/* 机身下方的软阴影（雪地上用 MultiplyBlending，color 纯白，色相全在贴图里） */
+function heliShadowTex(){
+  const S=256,[c,x]=cv(S,S);
+  const gr=x.createRadialGradient(S/2,S/2,4,S/2,S/2,S/2);
+  gr.addColorStop(0,'rgba(86,104,132,1)');
+  gr.addColorStop(.55,'rgba(150,166,190,1)');
+  gr.addColorStop(1,'rgba(255,255,255,1)');
+  x.fillStyle=gr;x.fillRect(0,0,S,S);
+  return ctex(c);
+}
+
+/* ══ 停机坪 ══ */
+function buildHelipad(){
+  const g=new THREE.Group();
+  g.position.set(HELI_PAD.x,0,HELI_PAD.z);
+  scene.add(g);
+  const R=HELI_PAD.R;
+
+  /* 坪面（圆盘 + 程序化贴图） */
+  const pad=add(g,new THREE.CircleGeometry(R,72),
+    new THREE.MeshStandardMaterial({map:helipadPadTex(),roughness:.92,metalness:.03}),
+    0,.022,0);
+  pad.rotation.x=-Math.PI/2;pad.castShadow=false;pad.receiveShadow=true;
+  /* 边缘一圈浅色混凝土路缘 */
+  const kerb=add(g,new THREE.RingGeometry(R,R+.42,72),
+    new THREE.MeshStandardMaterial({color:0x9aa6b2,roughness:.95,metalness:.02}),
+    0,.016,0);
+  kerb.rotation.x=-Math.PI/2;kerb.castShadow=false;kerb.receiveShadow=true;
+
+  /* 边缘灯：12 盏，自发光珠（不吃光照，夜里永远亮），不新增点光源 */
+  const bulbM=new THREE.MeshBasicMaterial({color:0xffc46a});
+  const postM=M(0x59636e,{roughness:.6,metalness:.5});
+  for(let i=0;i<12;i++){
+    const a=i/12*Math.PI*2+Math.PI/12;
+    const px=Math.cos(a)*(R+.72),pz=Math.sin(a)*(R+.72);
+    add(g,new THREE.CylinderGeometry(.045,.06,.52,8),postM,px,.26,pz);
+    addNS(g,new THREE.SphereGeometry(.10,10,8),bulbM,px,.58,pz);
+  }
+  /* 坪面外圈溢到雪地上的暖光（雪地上用 MultiplyBlending，暖色烘进贴图） */
+  const spillTex=(()=>{
+    const S=256,[c,x]=cv(S,S);
+    const gr=x.createRadialGradient(S/2,S/2,S*.30,S/2,S/2,S/2);
+    gr.addColorStop(0,'rgba(255,246,232,1)');
+    gr.addColorStop(.72,'rgba(255,238,214,1)');
+    gr.addColorStop(1,'rgba(255,255,255,1)');
+    x.fillStyle=gr;x.fillRect(0,0,S,S);
+    return ctex(c);
+  })();
+  const spill=add(g,new THREE.PlaneGeometry(1,1),
+    new THREE.MeshBasicMaterial({map:spillTex,color:0xffffff,transparent:true,opacity:.55,
+      blending:THREE.MultiplyBlending,depthWrite:false,fog:false}),
+    0,.012,0);
+  spill.rotation.x=-Math.PI/2;spill.scale.set(R*3.0,R*3.0,1);spill.castShadow=false;
+
+  /* 风向袋（会随风摆动） */
+  {
+    const p=new THREE.Group();p.position.set(R+1.5,0,-R-1.2);g.add(p);
+    p.userData.keep=true;
+    add(p,new THREE.CylinderGeometry(.075,.10,3.3,10),postM,0,1.65,0);
+    add(p,new THREE.CylinderGeometry(.34,.40,.14,12),M(0x8e99a4,{roughness:.8}),0,.07,0);
+    const sock=new THREE.Group();sock.position.set(0,3.15,0);p.add(sock);
+    sock.userData.keep=true;
+    const cone=new THREE.Mesh(new THREE.CylinderGeometry(.24,.17,1.25,14,1,true),
+      new THREE.MeshStandardMaterial({map:heliSockTex(),roughness:.9,side:THREE.DoubleSide}));
+    cone.rotation.z=Math.PI/2;cone.position.x=.62;cone.castShadow=false;
+    sock.add(cone);
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(.24,.028,6,16),M(0x9aa6b2,{roughness:.6,metalness:.5}));
+    ring.rotation.y=Math.PI/2;sock.add(ring);
+    heliSys.sock=sock;
+    OUTDOOR_OBS.push([HELI_PAD.x+R+1.5,HELI_PAD.z-R-1.2,.16]);
+  }
+
+  /* 锥桶 + 设备箱：坪边不能空得像一块贴纸 */
+  {
+    const coneM=M(0xef6a26,{roughness:.72});
+    const coneB=M(0xf2f4f7,{roughness:.7});
+    const spots=[[-R-1.1,-2.2],[-R-1.1,1.4],[2.4,-R-1.0],[R+2.6,3.0]];
+    for(const [px,pz] of spots){
+      const c=new THREE.Group();c.position.set(px,0,pz);c.rotation.y=Math.random()*3;g.add(c);
+      add(c,new THREE.BoxGeometry(.42,.05,.42),M(0x3c434b,{roughness:.9}),0,.03,0);
+      add(c,new THREE.ConeGeometry(.17,.52,12),coneM,0,.30,0);
+      add(c,new THREE.CylinderGeometry(.105,.125,.09,12),coneB,0,.30,0);
+    }
+    /* 设备箱：铁皮工具柜 + 一卷盘起的软管 */
+    const box=new THREE.Group();box.position.set(-R-2.2,0,R*.55);box.rotation.y=.35;g.add(box);
+    add(box,BX(1.30,.86,.72),M(0x5c6b78,{roughness:.62,metalness:.30}),0,.45,0);
+    add(box,BX(1.36,.09,.78),M(0x46525d,{roughness:.55,metalness:.35}),0,.92,0);
+    add(box,BX(.06,.30,.05),M(0xd7dde4,{roughness:.35,metalness:.7}),.42,.62,.38);
+    add(box,new THREE.TorusGeometry(.30,.055,6,18),M(0x2f3841,{roughness:.85}),.95,.14,.10).rotation.x=Math.PI/2;
+    OUTDOOR_OBS.push([HELI_PAD.x-R-2.2,HELI_PAD.z+R*.55,.55]);
+  }
+  return g;
+}
+
+/* ══ 直升机（写实比例轻型直升机，朝 -Z 为机头方向） ══ */
+/* 两点之间架一根细杆（风挡框这类斜向构件，手算旋转矩阵太啰嗦） */
+function strutBetween(parent,mat,a,b,r){
+  const A=new THREE.Vector3(a[0],a[1],a[2]),B=new THREE.Vector3(b[0],b[1],b[2]);
+  const d=B.clone().sub(A),len=d.length();
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,8),mat);
+  m.position.copy(A).add(B).multiplyScalar(.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());
+  m.castShadow=false;m.receiveShadow=false;parent.add(m);
+  return m;
+}
+
+function buildHelicopter(x,z,yaw){
+  const g=new THREE.Group();
+  g.position.set(x,0,z);g.rotation.y=yaw;
+  g.userData.keep=true;            // 会飞：整棵子树不能被合批冻住
+  scene.add(g);
+
+  const bodyM=M(0xe8563c,{roughness:.42,metalness:.16,envMapIntensity:.55});
+  const creamM=M(0xf3e7cf,{roughness:.46,metalness:.08,envMapIntensity:.45});
+  const deepM=M(0x27313f,{roughness:.48,metalness:.30,envMapIntensity:.4});
+  const steelM=M(0xbcc8d6,{roughness:.28,metalness:.80,envMapIntensity:.7});
+  const goldM=M(0xe8c16a,{roughness:.26,metalness:.82,envMapIntensity:.85});
+  /* 玻璃：深蓝高光漆面，不做半透明 ——
+     半透明叠在橙色机身上会透出橘色，整块玻璃变成紫黑色，反而像塑料玩具；
+     卡通渲染里的风挡本来就是一整块深色亮面。 */
+  const glassM=M(0x1c4269,{roughness:.10,metalness:.62,envMapIntensity:1.15});
+  const windM=M(0x1e4a74,{roughness:.09,metalness:.66,envMapIntensity:1.20});
+  windM.side=THREE.DoubleSide;
+  /* 起落架用哑光深灰：亮钢色在雪地里会变成一堆白棍子，喧宾夺主 */
+  const gearM=M(0x6a7482,{roughness:.55,metalness:.45,envMapIntensity:.35});
+  /* 机号贴纸：单独一小块，不靠球体 UV，省得贴图方向猜错 */
+  const decalM=new THREE.MeshBasicMaterial({map:heliDecalTex(),transparent:true,side:THREE.DoubleSide,depthWrite:false});
+
+  /* ① 机身：前窄后宽的锥形舱段 + 锥形机鼻 + 圆鼻头
+       —— 之前机身是个大球，前脸再套个玻璃球，渲染出来就是一颗紫灯泡；
+          真直升机是「锥体机身 + 独立风挡面」，轮廓一眼就认得出。 */
+  const fuse=new THREE.Group();
+  fuse.position.set(0,1.26,0);fuse.scale.set(1,.88,1);   // 压扁一点，肚子才平
+  g.add(fuse);
+  {
+    const cabin=add(fuse,new THREE.CylinderGeometry(.90,.90,.90,24),bodyM,0,0,.25);
+    cabin.rotation.x=-Math.PI/2;                         // 舱段 z -0.20 ~ 0.70
+    const tail=add(fuse,new THREE.CylinderGeometry(.90,.30,.72,24),bodyM,0,0,1.06);
+    tail.rotation.x=-Math.PI/2;                          // 尾部收细 z 0.70 ~ 1.42
+    const nc=add(fuse,new THREE.CylinderGeometry(.40,.90,1.05,24,1,true,Math.PI*.5,Math.PI),bodyM,0,0,-.725);
+    nc.rotation.x=-Math.PI/2;                            // 机鼻下半（橙色）
+    add(fuse,new THREE.SphereGeometry(.40,18,12),bodyM,0,0,-1.25);   // 鼻头圆角
+  }
+  /* ② 奶油色机顶罩：沿舱顶包一整片壳，贴着舱壁的曲率走
+       （之前是一颗压扁的球扣在顶上，远看像机顶扣了顶白球） */
+  {
+    const roof=add(fuse,new THREE.CylinderGeometry(.915,.915,.92,26,1,true,-Math.PI*.28,Math.PI*.56),creamM,0,0,.24);
+    roof.rotation.x=-Math.PI/2;
+  }
+  /* ③ 深色机腹 */
+  add(fuse,new THREE.SphereGeometry(1,20,14),deepM,0,-.58,.20).scale.set(.84,.36,.85);
+  /* ④ 前风挡：罩住机鼻上半的一片壳（贴合锥面），下半留橙色机鼻 */
+  {
+    const glass=add(fuse,new THREE.CylinderGeometry(.43,.81,.80,24,1,true,-Math.PI*.5,Math.PI),windM,0,0,-.85);
+    glass.rotation.x=-Math.PI/2;
+    /* 风挡下沿：两条沿锥面斜向的深色细杆，玻璃与机鼻的接缝靠它收口 */
+    for(const sx of [-1,1])strutBetween(g,deepM,[sx*.40,1.26,-1.25],[sx*.90,1.26,-.20],.030);
+  }
+  /* ⑤ 侧面腰线：贴着舱壁的一道细金条（原版是一圈悬空的环） */
+  for(const sx of [-1,1]){
+    addNS(g,BX(.030,.050,1.15),goldM,sx*.873,1.05,.20);
+  }
+  for(const sx of [-1,1]){
+    /* 圆舱窗：两扇，是「这是直升机」最关键的特征 */
+    for(const wz of [-.02,.52]){
+      const win=addNS(g,new THREE.SphereGeometry(1,14,10),glassM,sx*.872,1.45,wz);
+      win.scale.set(.06,.19,.19);
+    }
+    /* 门把手 + 踏板 */
+    addNS(g,BX(.05,.05,.24),gearM,sx*.855,.92,.58);
+    addNS(g,BX(.26,.045,.22),gearM,sx*.78,.58,.58);
+    /* 机号贴纸 */
+    const dec=new THREE.Mesh(new THREE.PlaneGeometry(.58,.24),decalM);
+    dec.position.set(sx*.868,1.14,.25);dec.rotation.y=sx*Math.PI/2;dec.castShadow=false;
+    g.add(dec);
+    /* 航行灯：红左绿右 */
+    addNS(g,new THREE.SphereGeometry(.07,8,6),new THREE.MeshBasicMaterial({color:sx<0?0xff4d5a:0x4de896}),sx*.60,1.28,-.80);
+    /* 天线 */
+    add(g,new THREE.CylinderGeometry(.016,.022,.52,6),deepM,sx*.28,2.12,.55);
+  }
+  /* ⑦ 发动机整流罩（旋翼后面那块凸起，是直升机最好认的特征之一） */
+  const cowl=add(g,new THREE.SphereGeometry(1,20,14),bodyM,0,1.95,1.00);
+  cowl.scale.set(.42,.26,.52);
+  add(g,BX(.34,.20,.46),creamM,0,1.88,1.34);
+  add(g,new THREE.CylinderGeometry(.085,.10,.30,10),deepM,.26,1.70,1.48).rotation.x=Math.PI/2;
+  /* ⑧ 尾梁：锥形圆柱 + 水平安定翼 + 后掠垂尾 */
+  const boom=add(g,new THREE.CylinderGeometry(.13,.30,3.05,14),creamM,0,1.40,2.95);
+  boom.rotation.x=Math.PI/2;
+  add(g,BX(1.65,.07,.34),creamM,0,1.46,4.18);
+  for(const sx of [-1,1])add(g,BX(.05,.26,.30),creamM,sx*.80,1.52,4.18);
+  const fin=add(g,BX(.11,1.20,.64),bodyM,0,2.02,4.32);fin.rotation.x=-.34;
+  add(g,BX(.14,.22,.52),goldM,0,2.54,4.46);
+  /* ⑨ 涵道尾桨 */
+  const shroud=new THREE.Mesh(new THREE.TorusGeometry(.44,.055,8,20),deepM);
+  shroud.position.set(.30,2.04,4.34);shroud.rotation.y=Math.PI/2;shroud.castShadow=false;g.add(shroud);
+  const tRotor=new THREE.Group();tRotor.position.set(.30,2.04,4.34);g.add(tRotor);
+  tRotor.userData.keep=true;
+  for(let k=0;k<3;k++){
+    const a=new THREE.Group();a.rotation.x=k*Math.PI/3;tRotor.add(a);
+    addNS(a,BX(.055,.60,.13),deepM,0,.32,0);
+    addNS(a,BX(.060,.15,.14),creamM,0,.60,0);
+  }
+  /* ⑩ 主旋翼：四叶 + 变距拉杆 */
+  const rotor=new THREE.Group();rotor.position.set(0,2.26,.28);g.add(rotor);
+  rotor.userData.keep=true;
+  addNS(rotor,new THREE.CylinderGeometry(.10,.15,.44,12),steelM,0,-.24,0);
+  addNS(rotor,new THREE.SphereGeometry(.18,12,8),goldM,0,.02,0).scale.set(1,.5,1);
+  for(let k=0;k<4;k++){
+    const arm=new THREE.Group();arm.rotation.y=k*Math.PI/2;rotor.add(arm);
+    const blade=addNS(arm,BX(4.60,.055,.34),deepM,2.46,0,0);
+    blade.rotation.z=.035;
+    addNS(arm,BX(.52,.062,.36),creamM,4.74,0,0);
+    addNS(arm,BX(.24,.28,.10),steelM,.34,-.02,0);
+  }
+  /* 旋翼盘面模糊影（转速越高越实） */
+  const discTex=(()=>{
+    const S=256,[c,x]=cv(S,S);
+    const gr=x.createRadialGradient(S/2,S/2,S*.06,S/2,S/2,S/2);
+    gr.addColorStop(0,'rgba(255,255,255,.05)');
+    gr.addColorStop(.55,'rgba(226,236,246,.30)');
+    gr.addColorStop(.90,'rgba(214,228,242,.16)');
+    gr.addColorStop(1,'rgba(255,255,255,0)');
+    x.fillStyle=gr;x.fillRect(0,0,S,S);
+    return ctex(c);
+  })();
+  const disc=new THREE.Mesh(new THREE.CircleGeometry(4.95,56),
+    new THREE.MeshBasicMaterial({map:discTex,color:0xdfeaf6,transparent:true,opacity:.02,
+      blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false}));
+  disc.rotation.x=-Math.PI/2;disc.position.set(0,2.30,.28);disc.castShadow=false;disc.visible=false;
+  g.add(disc);
+  /* ⑪ 起落架：两根滑橇 + 四根支柱（哑光深灰，不跟机身抢眼） */
+  for(const sx of [-1,1]){
+    const curve=new THREE.CatmullRomCurve3([
+      new THREE.Vector3(sx*.98,.34,-1.78),
+      new THREE.Vector3(sx*.98,.14,-1.44),
+      new THREE.Vector3(sx*.98,.11,-.30),
+      new THREE.Vector3(sx*.98,.11,1.06),
+      new THREE.Vector3(sx*.98,.26,1.62)
+    ]);
+    add(g,new THREE.TubeGeometry(curve,18,.055,8,false),gearM,0,0,0);
+    for(const sz of [-.66,.80]){
+      const strut=add(g,new THREE.CylinderGeometry(.042,.052,.92,8),gearM,sx*.76,.52,sz);
+      strut.rotation.z=sx*.47;
+    }
+  }
+  /* ⑫ 顶灯 / 尾灯 / 机鼻探照灯 */
+  addNS(g,new THREE.SphereGeometry(.07,8,6),new THREE.MeshBasicMaterial({color:0xff6a5a}),0,2.10,.62);
+  addNS(g,new THREE.SphereGeometry(.06,8,6),new THREE.MeshBasicMaterial({color:0xfff6e0}),0,1.64,4.50);
+  const sl=add(g,new THREE.CylinderGeometry(.12,.14,.20,12),deepM,0,.78,-.66);sl.rotation.x=Math.PI/2;
+  addNS(g,new THREE.SphereGeometry(.10,10,8),new THREE.MeshBasicMaterial({color:0xffeec2}),0,.78,-.78);
+
+  /* 机身下的软阴影（跟着高度放大变淡） */
+  const shadow=new THREE.Mesh(new THREE.PlaneGeometry(1,1),
+    new THREE.MeshBasicMaterial({map:heliShadowTex(),color:0xffffff,transparent:true,opacity:.5,
+      blending:THREE.MultiplyBlending,depthWrite:false,fog:false}));
+  shadow.rotation.x=-Math.PI/2;shadow.position.y=.035;shadow.castShadow=false;
+  shadow.scale.set(7,7,1);shadow.renderOrder=2;shadow.userData.keep=true;
+  scene.add(shadow);
+
+  heliSys.g=g;heliSys.rotorG=rotor;heliSys.tRotor=tRotor;heliSys.disc=disc;heliSys.shadow=shadow;
+  heliSys.x=x;heliSys.z=z;heliSys.yaw=yaw;
+  return g;
+}
+
+/* 飞行路线：从停机坪起飞 → 绕园区一圈 → 回到停机坪落地 */
+const HELI_PATH=new THREE.CatmullRomCurve3([
+  new THREE.Vector3(HELI_PAD.x,0.007,HELI_PAD.z),
+  new THREE.Vector3(46,13,46),
+  new THREE.Vector3(36,25,38),
+  new THREE.Vector3(22,31,26),
+  new THREE.Vector3(4,33,12),
+  new THREE.Vector3(-16,33,6),
+  new THREE.Vector3(-34,30,14),
+  new THREE.Vector3(-38,27,30),
+  new THREE.Vector3(-32,26,46),
+  new THREE.Vector3(-12,27,55),
+  new THREE.Vector3(10,29,58),
+  new THREE.Vector3(32,30,56),
+  new THREE.Vector3(48,26,54),
+  new THREE.Vector3(55,11,52),
+  new THREE.Vector3(HELI_PAD.x,0.007,HELI_PAD.z)
+],false,'catmullrom',.32);
+heliSys.len=HELI_PATH.getLength();
+
+buildHelipad();
+buildHelicopter(HELI_PAD.x,HELI_PAD.z,heliSys.yaw);
+
+/* ══ 乘坐逻辑 ══ */
+function heliNearPlayer(){
+  if(!fp.on||heliSys.riding)return false;
+  return Math.hypot(fp.x-heliSys.x,fp.z-heliSys.z)<8.2;
+}
+function toggleHeliRide(){
+  if(heliSys.riding){heliSys.fast=true;return;}      // 飞行中按 E = 加速回场
+  if(wheelSys.riding)stopFacilityRide();
+  if(trainSys.riding)trainSys.riding=false;
+  if(balloonSys.riding)stopBalloonRide();
+  if(launchSys.active)stopLaunchRide();
+  if(!fp.on)fpEnter(true);
+  heliSys.riding=true;heliSys.phase='spin';heliSys.t=0;
+  heliSys.fast=false;heliSys.dist=0;heliSys.rotorSpd=.05;
+  if(window.MP)MP.pushFirstPerson();
+  /* 登机瞬间视角就切到机外侧后方：机子在画面里，视线朝外看园区 */
+  heliSys.camYaw=heliSys.yaw+2.30;
+  heliSys.camOff=0;heliSys.camInit=false;
+  fp.yaw=heliSys.camYaw;fp.pitch=-.05;
+  sfx.blip(660,.14,.07);
+}
+function endHeliRide(){
+  if(!heliSys.riding)return;
+  heliSys.riding=false;heliSys.phase='idle';heliSys.t=0;heliSys.fast=false;
+  if(window.MP)MP.popFirstPerson();
+  hudHide();
+  const a=heliSys.yaw+1.25;
+  fp.x=heliSys.x+Math.cos(a)*3.6;fp.z=heliSys.z+Math.sin(a)*3.6;
+  fp.y=groundY(fp.x,fp.z);fp.vx=fp.vz=0;
+  fp.yaw=heliSys.yaw-Math.PI*.5;fp.pitch=0;
+  sfx.blip(392,.12,.06);
+}
+const _heliTmp=new THREE.Vector3();
+const _heliLook=new THREE.Vector3();
+const _heliMat=new THREE.Matrix4();
+function updateHeliRide(dt){
+  const g=heliSys.g;
+  if(!g)return;
+  const t=performance.now()*.001;
+
+  /* 旋翼转速：停机时慢转，飞行时全速 */
+  const want=heliSys.riding?(heliSys.phase==='land'?.30:1):heliSys.idleSpd;
+  heliSys.rotor+=(want-heliSys.rotor)*Math.min(1,dt*(heliSys.phase==='spin'?1.15:1.7));
+  heliSys.rotorG.rotation.y+=dt*(2.4+heliSys.rotor*46);
+  heliSys.tRotor.rotation.x+=dt*(3.2+heliSys.rotor*62);
+  if(heliSys.disc){
+    heliSys.disc.material.opacity=.02+heliSys.rotor*.20;
+    heliSys.disc.visible=heliSys.rotor>.06;
+  }
+  if(sfx&&sfx.setRotor)sfx.setRotor(heliSys.rotor*.85);
+
+  /* 风向袋：随风慢慢摆 */
+  if(heliSys.sock){
+    heliSys.sock.rotation.y=Math.sin(t*.42)*.30+2.35+Math.sin(t*1.7)*.10;
+    heliSys.sock.rotation.z=Math.sin(t*1.1)*.09;
+  }
+
+  if(heliSys.riding){
+    if(heliSys.phase==='spin'){
+      heliSys.t+=dt;
+      g.position.set(heliSys.x,.007+Math.sin(t*40)*.014*heliSys.rotor,heliSys.z);
+      if(heliSys.t>1.9){heliSys.phase='fly';heliSys.t=0;}
+    }else if(heliSys.phase==='fly'){
+      const u=clamp(heliSys.dist/heliSys.len,0,1);
+      let spd=16*(heliSys.fast?3.4:1);
+      spd*=Math.max(.05,Math.min(1,Math.min(u/.10,(1-u)/.085)));
+      heliSys.dist+=spd*dt;
+      const u2=clamp(heliSys.dist/heliSys.len,0,1);
+      const p=HELI_PATH.getPointAt(u2);
+      const tg=HELI_PATH.getTangentAt(u2);
+      /* 偏航：沿切线走，带平滑，避免曲线拐点处机身突然甩头 */
+      const prevYaw=heliSys.yaw;
+      let dYaw=Math.atan2(-tg.x,-tg.z)-prevYaw;
+      while(dYaw>Math.PI)dYaw-=Math.PI*2;
+      while(dYaw<-Math.PI)dYaw+=Math.PI*2;
+      heliSys.yaw=prevYaw+dYaw*Math.min(1,dt*2.6);
+      heliSys.x=p.x;heliSys.y=Math.max(0,p.y);heliSys.z=p.z;
+      /* 俯仰随爬升角，侧倾随转弯率 */
+      const climb=Math.atan2(tg.y,Math.hypot(tg.x,tg.z));
+      heliSys.pitch+=(-climb*.62-heliSys.pitch)*Math.min(1,dt*2.2);
+      const rate=dYaw/Math.max(dt,1e-3);
+      const wantRoll=Math.max(-.40,Math.min(.40,-rate*.26));
+      heliSys.roll+=(wantRoll-heliSys.roll)*Math.min(1,dt*2.0);
+      g.position.set(heliSys.x,heliSys.y,heliSys.z);
+      g.rotation.set(heliSys.pitch,heliSys.yaw,heliSys.roll,'YXZ');
+      if(u2>=1){heliSys.phase='land';heliSys.t=0;heliSys.pitch=0;heliSys.roll=0;}
+    }else if(heliSys.phase==='land'){
+      heliSys.t+=dt;
+      g.position.set(heliSys.x,.007,heliSys.z);
+      g.rotation.set(0,heliSys.yaw,0,'YXZ');
+      if(heliSys.t>2.4)endHeliRide();
+    }
+    /* 机身下的影子：飞越高越大越淡 */
+    if(heliSys.shadow){
+      const h=Math.max(0,heliSys.y);
+      const sc=5.6+h*.30;
+      heliSys.shadow.position.set(heliSys.x,.035,heliSys.z);
+      heliSys.shadow.scale.set(sc,sc,1);
+      heliSys.shadow.material.opacity=Math.max(.06,.46-h*.011);
+    }
+    /* 相机：机外侧后方，视线朝外
+       —— 不能用 camera.position.lerp / camera.lookAt：
+          MP.freezeCam 会把这两个方法永久打成空函数（它是钉机位的调试工具），
+          一旦同页面先拍过定点图，直升机视角就再也动不了。
+          这里改成逐分量插值 + Matrix4.lookAt + setFromRotationMatrix，完全绕开那两个方法。 */
+    const BASE=2.30;
+    const base=heliSys.yaw+BASE;
+    if(!heliSys.camInit){heliSys.camBase=base;heliSys.camOff=0;heliSys.camInit=true;}
+    /* 鼠标横向输入 = fp.yaw 的变化量；机身自身偏航引起的基线变化要扣掉，
+       否则飞机一拐头，视角就跟着漂，鼠标完全失去控制。 */
+    const md=fp.yaw-heliSys.camBase-heliSys.camOff;
+    if(Math.abs(md)>1e-6)heliSys.camOff=Math.max(-1.5,Math.min(1.5,heliSys.camOff+md));
+    heliSys.camBase=base;
+    fp.yaw=base+heliSys.camOff;          // 保持 fp.yaw 与当前视角一致
+    /* 追尾机位：机身在画面左下角，视线越过机头看向园区（不是把相机摆到机前朝后看）。
+       机头方向 f=(-sin y,-cos y)，机右 r=(cos y,-sin y)。
+       相机 = 机 -13f +4.5r +5.5u（后方偏右上方），注视点 = 机 +22f。
+       这样机子偏轴约 19°、仰角约 15°，正好卡在画面左下，园区铺在正前方。 */
+    const yaw=heliSys.yaw;
+    const fwdX=-Math.sin(yaw),fwdZ=-Math.cos(yaw);
+    const rgtX=Math.cos(yaw),rgtZ=-Math.sin(yaw);
+    const camYaw=yaw+0.333+heliSys.camOff;
+    const DIST=13.76;
+    const pitch=Math.max(-1.0,Math.min(1.0,fp.pitch));
+    _heliTmp.set(heliSys.x+Math.sin(camYaw)*DIST,
+                 heliSys.y+5.5+pitch*2.2,
+                 heliSys.z+Math.cos(camYaw)*DIST);
+    const ck=Math.min(1,dt*3.2);
+    camera.position.x+=(_heliTmp.x-camera.position.x)*ck;
+    camera.position.y+=(_heliTmp.y-camera.position.y)*ck;
+    camera.position.z+=(_heliTmp.z-camera.position.z)*ck;
+    camera.up.set(0,1,0);
+    _heliLook.set(heliSys.x+fwdX*22,
+                  heliSys.y+1.6+pitch*14,
+                  heliSys.z+fwdZ*22);
+    _heliMat.lookAt(camera.position,_heliLook,camera.up);
+    camera.quaternion.setFromRotationMatrix(_heliMat);
+    hudShow(heliSys.phase==='fly'?'直升机 · 绕园区巡航中':'直升机 · 旋翼加速中',
+            heliSys.phase==='fly'?'立刻回场 (E)':'等待起飞 (E)',()=>{heliSys.fast=true;},true);
+  }else{
+    if(heliSys.shadow){
+      heliSys.shadow.position.set(heliSys.x,.035,heliSys.z);
+      heliSys.shadow.scale.set(5.6,5.6,1);
+      heliSys.shadow.material.opacity=.46;
+    }
+    /* 停机坪上的走近提示 */
+    if(fp.on&&!balloonSys.riding&&!wheelSys.riding&&!trainSys.riding&&!launchSys.active){
+      if(heliNearPlayer()){
+        hudShow('停机坪 · 直升机 · 按 E 或点击登机（起飞后绕园区一圈再落地）','登机 (E)',()=>toggleHeliRide());
+        heliSys.hud=true;
+      }
     }
   }
 }
@@ -12546,6 +13100,28 @@ const sfx={
     src.connect(hp);hp.connect(lp);lp.connect(g);g.connect(this.master);
     src.start();
     this.windGain=g;
+  },
+  /* 直升机旋翼：低频噪声 + 11.5Hz 桨叶切割调制。
+     只有一层，不叠别的音 —— 叠多层就是"吵"，用户受不了。 */
+  startRotor(){
+    if(this.rotorGain||!this.ctx)return;
+    const c=this.ctx;
+    const src=c.createBufferSource();src.buffer=this.noiseBuf;src.loop=true;
+    const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=430;lp.Q.value=.7;
+    const g=c.createGain();g.gain.value=0;
+    src.connect(lp);lp.connect(g);g.connect(this.master);
+    src.start();
+    const lfo=c.createOscillator();lfo.type='square';lfo.frequency.value=11.5;
+    const lg=c.createGain();lg.gain.value=0;
+    lfo.connect(lg);lg.connect(g.gain);lfo.start();
+    this.rotorGain=g;this.rotorChop=lg;
+  },
+  setRotor(v){
+    if(!this.ctx)return;
+    if(!this.rotorGain)this.startRotor();
+    const t=this.ctx.currentTime,v0=Math.max(0,Math.min(1,v));
+    this.rotorGain.gain.setTargetAtTime(v0*0.030,t,.28);
+    this.rotorChop.gain.setTargetAtTime(v0*0.016,t,.28);
   },
   midiHz(m){return 440*Math.pow(2,(m-69)/12);},
   // 温暖圣诞木质钢琴 + 丝滑钢片琴（延音重叠 Legato，衔接如流水）
@@ -13978,6 +14554,13 @@ cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.toFixed(2),z:+cam
   clockShow:(on)=>{ if(clockGroupRef) clockGroupRef.visible=!!on; return !!on; },
   /* 调试：改视场角（拍定点画面用）*/
   fov:(v)=>{camera.fov=v;camera.updateProjectionMatrix();return v;},
+  /* 调试：把世界坐标投影成屏幕像素（顶视图标定地标用，省得靠肉眼估比例） */
+  camProject:(pts)=>pts.map(p=>{
+    const v=new THREE.Vector3(p[0],p[1]||0,p[2]).project(camera);
+    return[Math.round((v.x*.5+.5)*innerWidth),Math.round((-v.y*.5+.5)*innerHeight)];
+  }),
+  /* 调试：列出全场 NPC 名字（查重名 / 查数字后缀用） */
+  npcNames:()=>npcs.map(n=>n.name),
   /* 调试：全服统一时间状态（校准是否生效、相位基准、各表演的当前进度） */
   time:()=>({t:+t.toFixed(3),srvNow:srvNow(),calib:srvCalib,
     off:Math.round(srvOff),offTarget:Math.round(srvOffTarget),
@@ -13994,6 +14577,14 @@ cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.toFixed(2),z:+cam
     lightI:+pianoPlaza.light.intensity.toFixed(2)}),
   pianoPlay:()=>pianoPlay(),
   /* 调试：马戏团状态（当前节目 / 各表演件位置 / 扫光角） */
+  enterWalk:()=>{fpEnter(true);return !!fp.on;},
+  heliRide:()=>{toggleHeliRide();return 'ok';},
+  heliWalkTo:(x,z)=>{fp.x=x;fp.z=z;fp.y=groundY(x,z);fp.vx=fp.vz=0;return [fp.x,fp.y,fp.z];},
+  camPos:()=>[+camera.position.x.toFixed(1),+camera.position.y.toFixed(1),+camera.position.z.toFixed(1)],
+  heli:()=>({riding:heliSys.riding,phase:heliSys.phase,rotor:+heliSys.rotor.toFixed(2),
+    x:+heliSys.x.toFixed(1),y:+heliSys.y.toFixed(1),z:+heliSys.z.toFixed(1),
+    yaw:+heliSys.yaw.toFixed(2),dist:+heliSys.dist.toFixed(1),len:+heliSys.len.toFixed(1),
+    padX:HELI_PAD.x,padZ:HELI_PAD.z,padR:HELI_PAD.R}),
   circus:()=>({x:circus.x,z:circus.z,act:circus.act,actCn:CIRCUS_ACTS[circus.act].cn,
     sweepY:circus.sweep?+circus.sweep.rotation.y.toFixed(3):null,
     spotOn:!!circus.light,
@@ -15879,6 +16470,13 @@ function updateAerialHaze(dt,t){
   MP.freezeCam = function (px, py, pz, tx, ty, tz) {
     if (!MP._camFrozen) {
       MP._camFrozen = true;
+      /* 记下原型方法：冻结是「打补丁」，不解除会把整个相机的 lerp/lookAt 永久废掉，
+         后面任何设施的乘坐视角都会失效（直升机就踩过这个坑）。 */
+      MP._camOrig = {
+        lerp: camera.position.lerp,
+        slerp: camera.quaternion.slerp,
+        lookAt: camera.lookAt
+      };
       camera.position.lerp = function () { return this; };
       camera.quaternion.slerp = function () { return this; };
       camera.lookAt = function () { return this; };
@@ -15894,6 +16492,23 @@ function updateAerialHaze(dt,t){
     camera.quaternion.setFromRotationMatrix(m);
     try { controls.target.set(tx, ty, tz); } catch (e) { }
     return MP.debug();
+  };
+
+  /* 解除 freezeCam：把 camera.position.lerp / quaternion.slerp / lookAt 还原回原型，
+     否则同页面后续的乘坐视角（直升机/摩天轮/热气球）全都会失去相机控制。 */
+  MP.unfreezeCam = function () {
+    if (!MP._camFrozen) return false;
+    MP._camFrozen = false;
+    const o = MP._camOrig;
+    if (o) {
+      camera.position.lerp = o.lerp;
+      camera.quaternion.slerp = o.slerp;
+      camera.lookAt = o.lookAt;
+    }
+    MP._camOrig = null;
+    /* freezeCam 是给 controls.update 打的实例属性补丁，删掉自有属性即恢复原型方法 */
+    try { delete controls.update; controls.enabled = true; } catch (e) { }
+    return true;
   };
 
   /* 调试接口：给自动化测试读状态用 */
@@ -17060,7 +17675,7 @@ function animate(){
   if(fpvSys.active){
     updateFpvDrone(dt);
   }else if(fp.on){
-    if(!trainSys.riding&&!wheelSys.riding&&!launchSys.active&&!balloonSys.riding)fpUpdate(dt);
+    if(!trainSys.riding&&!wheelSys.riding&&!launchSys.active&&!balloonSys.riding&&!heliSys.riding)fpUpdate(dt);
   }else{
     let f=0,s=0;
     if(fp.keys['KeyW']||fp.keys['ArrowUp'])f+=1;
@@ -17100,6 +17715,7 @@ function animate(){
   updateTrain(dt);
   updateWheelRide(dt);
   updateBalloonRide(dt);
+  updateHeliRide(dt);
   updateLaunchRide(dt);
   updatePianoPlaza(dt,t);
   updateCircus(dt,t);
@@ -17108,7 +17724,7 @@ function animate(){
   updateHelis(dt);
   updateFireworks(dt);
   updateAerialHaze(dt,t);
-  const ridingFast=fpvSys.active||(wheelSys.riding&&wheelSys.kind==='coaster')||trainSys.riding;
+  const ridingFast=fpvSys.active||(wheelSys.riding&&wheelSys.kind==='coaster')||trainSys.riding||heliSys.riding;
   if(!ridingFast||(_reflTick&1)===0)updateOuterCrowd(ridingFast?dt*2:dt,t);
   _reflTick++;
   // 乘车高速俯瞰时冻结阴影重绘避免瞬时卡顿，平地走动时每 36 帧轻刷一次
@@ -17338,6 +17954,7 @@ function xmSetShot(id){
   if(wheelSys.riding)stopFacilityRide();
   if(trainSys.riding)toggleRideTrain();
   if(balloonSys.riding)stopBalloonRide();
+  if(heliSys.riding)endHeliRide();
   intro.active=false;intro.t=intro.dur;camTween=null;
   if(!fp.on)fpEnter(true);
   if(sh.kind==='chase'){
@@ -18368,7 +18985,7 @@ function toggleRideTrain(){
 }
 const wheelSys={riding:false,cab:null,kind:null,car:null,label:'',bump:null};
 const RIDE_EXITS={
-  wheel:[27,41.2],carousel:[4.0,35.5],ship:[39.5,36.5],coaster:[-7.5,20.5],bumper:[-6.5,45.0],sleigh:[0,10.2],heli:[0,10.2]
+  wheel:[27,41.2],carousel:[4.0,36.6],ship:[39.5,36.5],coaster:[-7.5,20.5],bumper:[-6.5,45.0],sleigh:[0,10.2],heli:[0,10.2]
 };
 function stopFacilityRide(){
   if(wheelSys.cab&&wheelSys.cab.userData.rods)wheelSys.cab.userData.rods.forEach(r=>r.visible=true);
@@ -19083,6 +19700,8 @@ addEventListener('keydown',e=>{
     return;
   }
   if(e.code==='KeyE'){
+    if(heliSys.riding){heliSys.fast=true;return;}
+    if(heliNearPlayer()){toggleHeliRide();return;}
     if(balloonSys.riding){stopBalloonRide();return;}
     const _bNear=balloonNearPlayer();
     if(_bNear>=0){toggleBalloonRide(_bNear);return;}
