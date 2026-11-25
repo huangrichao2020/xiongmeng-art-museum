@@ -5617,8 +5617,11 @@ const animePark=new THREE.Group();animePark.userData.tag='park';scene.add(animeP
     addLimb(b,[-.40,.92,0],[-.52,.56,.08],.105,.09,brn,10);
     add(b,new THREE.SphereGeometry(.105,10,8),brn,-.53,.52,.09);
     add(b,new THREE.SphereGeometry(.11,10,8),brn,.40,.92,.02);
-    addLimb(b,[.40,.92,.02],[.58,.78,.16],.105,.09,brn,10); // 内侧伸手牵可妮
-    add(b,new THREE.SphereGeometry(.105,10,8),brn,.60,.76,.18);
+    addLimb(b,[.40,.92,.02],[.66,.78,.16],.105,.09,brn,10); // 内侧伸手牵可妮
+    /* 牵手的两只手原来球心几乎在同一点（世界 x 分别 +0.04 / +0.02），
+       两个球直接叠在一起 —— 一眼就能看出穿模。
+       现在把两手分开到刚好相切：世界 x = ±0.1015，半径和 0.105+0.098=0.203。 */
+    add(b,new THREE.SphereGeometry(.105,10,8),brn,.6615,.76,.18);
 
     // 右：长耳可妮兔（挥手+牵手+粉内耳+甜甜笑脸）
     const c=new THREE.Group();c.position.set(.56,0,0);g.add(c);
@@ -5634,8 +5637,8 @@ const animePark=new THREE.Group();animePark.userData.tag='park';scene.add(animeP
       add(c,new THREE.SphereGeometry(.14,12,10),wht,s*.18,.08,.06).scale.set(.95,.58,1.3);
     }
     add(c,new THREE.SphereGeometry(.10,10,8),wht,-.36,.86,.02);
-    addLimb(c,[-.36,.86,.02],[-.52,.78,.16],.095,.085,wht,10);
-    add(c,new THREE.SphereGeometry(.098,10,8),wht,-.54,.76,.18);
+    addLimb(c,[-.36,.86,.02],[-.66,.78,.16],.095,.085,wht,10);
+    add(c,new THREE.SphereGeometry(.098,10,8),wht,-.6615,.76,.18);
     add(c,new THREE.SphereGeometry(.10,10,8),wht,.36,.88,.02);
     addLimb(c,[.36,.88,.02],[.56,1.18,.14],.095,.085,wht,10); // 外侧挥手
     add(c,new THREE.SphereGeometry(.098,10,8),wht,.58,1.22,.16);
@@ -5664,7 +5667,12 @@ const animePark=new THREE.Group();animePark.userData.tag='park';scene.add(animeP
   ];
   for(const [sx,sz,rad,glow,fn,sc,ry] of layout){
     const ped=parkPedestal(sx,sz,rad,glow);
-    const fig=fn();fig.position.y=.50;fig.scale.setScalar(sc);fig.rotation.y=ry;
+    const fig=fn();
+    /* Line Friends（布朗熊 + 长耳可妮兔）这一组抬到基座顶面 .61：
+       雕像局部脚底在 y=0，基座顶在 .14+.47=.61，
+       原来统一放在 .50 → 整组有 0.11m 泡在基座里，这就是「大兔子穿模」。 */
+    fig.position.y=(fn===buildLineFriends)?.61:.50;
+    fig.scale.setScalar(sc);fig.rotation.y=ry;
     ped.add(fig);
     // 经典角色直接随头部局部坐标戴圣诞红帽
     if(fn===buildTotoro){
@@ -7250,11 +7258,19 @@ const skylineMats=[];
     }
     return tbl[tbl.length-1][1];
   };
-  const rN=v=>curveAt([[0,1],[0.30,1.085],[0.62,0.920],[1,0.542]],v);
-  const rE=v=>curveAt([[0,1],[0.30,1.120],[0.62,0.880],[1,0.400]],v);
+  /* 屋面半轴：从碗沿向天洞单调内收（真实鸟巢屋面就是从碗沿往中心收拢的，
+     下段外鼓会让伞骨柱无处落脚 —— 柱子会被外鼓的裙边顶穿）。
+     v=1 处仍严格落在真实天窗比例：rN(1)=26/48=0.542、rE(1)=17.4/43.6=0.400。 */
+  const rN=v=>curveAt([[0,1],[0.32,0.955],[0.64,0.845],[1,0.542]],v);
+  const rE=v=>curveAt([[0,1],[0.32,0.945],[0.64,0.820],[1,0.400]],v);
   const fH =v=>curveAt([[0,0],[0.35,0.42],[0.70,0.78],[1,1]],v);
-  /* 屋面高度：马鞍 —— 南北端 yTopN，东西侧 yTopE */
-  const nestY=(a,v)=>NEST.yRim+fH(v)*((NEST.yTopE-NEST.yRim)+(NEST.yTopN-NEST.yTopE)*Math.sin(a)*Math.sin(a));
+  /* 屋面高度：马鞍 —— 南北端 yTopN，东西侧 yTopE。
+     这里必须按 sin²/cos² 分配两端的落差，原来写成
+     (yTopE-yRim)+(yTopN-yTopE)·sin²a 是错的：
+     南北端会算成 9+(20-9)+(14.5-9)·1 = 25.5m，比设计高 5.4m。 */
+  const nestY=(a,v)=>NEST.yRim+fH(v)*(
+    (NEST.yTopN-NEST.yRim)*Math.sin(a)*Math.sin(a)+
+    (NEST.yTopE-NEST.yRim)*Math.cos(a)*Math.cos(a));
   const nestP=(a,v,out)=>out.set(Math.cos(a)*NEST.B*rE(v),nestY(a,v),Math.sin(a)*NEST.A*rN(v));
 
   /* 确定性伪随机：钢梁的随机扰动要可复现，不能吃全局 rng 的状态顺序 */
@@ -7285,15 +7301,37 @@ const skylineMats=[];
     return g;
   };
 
-  /* ── 碗形看台：18 级台阶 + 踢面 + 红座椅带 ── */
+  /* ── 碗形看台：18 级台阶 + 踢面 + 红座椅带 ──
+     看台外缘刻意从碗沿内缩 4m（A 48→44 / B 43.6→39.6）：
+     留出的这圈 4m 环带是「悬挑碗沿」的格构区，也是 24 根伞骨柱唯一能
+     不穿任何实体的通道 —— 柱从环带里斜穿而上，在到达看台顶面之前
+     就已经升到看台之上（实测柱底 vs 台面 +1.5m）。 */
   const N_STEP=18, R_IN_A=25.0, R_IN_B=18.4;
-  const concM  =M(0x8b8880,{roughness:.92,side:THREE.DoubleSide});
-  const seatM  =M(0x9e2b2c,{roughness:.84});
-  const seatDM =M(0x565c64,{roughness:.86});
+  const OUT_A=NEST.A-4.0, OUT_B=NEST.B-4.0;   /* 看台外缘 44 / 39.6 */
+  const concM  =M(0x8d9095,{roughness:.92,side:THREE.DoubleSide});
+  const seatM  =M(0xa32c31,{roughness:.84});
+  const seatDM =M(0x555b63,{roughness:.86});
+  /* 钢构材质：夜里整片钢格构自发光（冷白 0x9fc4ff）。
+     真实鸟巢夜景就是被 LED 点亮的立体网格 —— 这一层自发光同时解决两件事：
+     ① 视觉上从「一堆杆件」变成一盏发光的现代建筑；② 碗沿与看台被自身照亮，
+     不需要再加一堆暖色补光（原来暖橙泛光带 + 4 根高杆灯把整个区域搞得又杂又旧）。 */
+  const nestSteelM=M(0x8d96a2,{roughness:.42,metalness:.58});
+  nestSteelM.emissive=new THREE.Color(0x9fc4ff);
+  nestSteelM.emissiveIntensity=0;
+  GZU_EMI.push({m:nestSteelM,n:.24,d:.02});
+  const bandM=M(0x8b939d,{roughness:.46,metalness:.52});
+  bandM.emissive=new THREE.Color(0x8fb2e8);
+  bandM.emissiveIntensity=0;
+  GZU_EMI.push({m:bandM,n:.16,d:.02});
+  /* 看台 LED 灯带材质：冷白，白天几乎不亮，夜里整圈亮起 */
+  const nestLedM=new THREE.MeshStandardMaterial({
+    color:0x0e1520,roughness:.45,metalness:.1,
+    emissive:0xe4efff,emissiveIntensity:1});
+  GZU_EMI.push({m:nestLedM,n:.78,d:.06});
   for(let i=0;i<N_STEP;i++){
     const t0=i/N_STEP,t1=(i+1)/N_STEP;
-    const a0=R_IN_A+(NEST.A-R_IN_A)*t0,a1=R_IN_A+(NEST.A-R_IN_A)*t1;
-    const b0=R_IN_B+(NEST.B-R_IN_B)*t0,b1=R_IN_B+(NEST.B-R_IN_B)*t1;
+    const a0=R_IN_A+(OUT_A-R_IN_A)*t0,a1=R_IN_A+(OUT_A-R_IN_A)*t1;
+    const b0=R_IN_B+(OUT_B-R_IN_B)*t0,b1=R_IN_B+(OUT_B-R_IN_B)*t1;
     const y=.55+i*.50;
     const step=add(nest,ellipseBand(a0,b0,a1,b1,96),concM,0,y,0);
     step.castShadow=true;step.receiveShadow=true;
@@ -7306,15 +7344,63 @@ const skylineMats=[];
                                   a0+(a1-a0)*sOut,b0+(b1-b0)*sOut,96),
       (i%3===2)?seatDM:seatM,0,y+.055,0);
     seat.castShadow=false;seat.receiveShadow=true;
+    /* 每级踏面外缘一条冷白 LED 灯带 —— 现代体育场就是座椅前缘的一整圈 LED。
+       比原来那条「碗沿内侧大面积加色泛光带」干净得多，也不会把看台糊成一片暖橙。 */
+    if(i>0){
+      const led=add(nest,ellipseBand(a1-.10,b1-.10,a1+.02,b1+.02,96),nestLedM,0,y+.075,0);
+      led.castShadow=false;led.receiveShadow=false;
+    }
   }
   /* 碗沿顶部的雪环 + 混凝土压顶 */
   {
-    const cap=add(nest,ellipseBand(NEST.A-.55,NEST.B-.55,NEST.A+.55,NEST.B+.55,96),
-      M(0x9a968d,{roughness:.9}),0,NEST.yRim+.16,0);
+    const cap=add(nest,ellipseBand(NEST.A-.36,NEST.B-.36,NEST.A+.36,NEST.B+.36,96),
+      M(0x9aa0a8,{roughness:.9}),0,NEST.yRim+.16,0);
     cap.castShadow=true;
-    const snow=add(nest,ellipseBand(NEST.A-.42,NEST.B-.42,NEST.A+.42,NEST.B+.42,96),
+    const snow=add(nest,ellipseBand(NEST.A-.26,NEST.B-.26,NEST.A+.26,NEST.B+.26,96),
       M(0xeef4f8,{roughness:.94}),0,NEST.yRim+.30,0);
     snow.castShadow=false;
+  }
+
+  /* ── 悬挑碗沿格构环带：看台外缘(44/39.6) → 碗沿环梁(48/43.6) ──
+     4m 宽的一圈斜撑网。真实鸟巢的碗沿是悬在碗体外的，这圈结构就是它的支承；
+     它同时是 24 根伞骨柱唯一的通道 —— 柱从这圈空隙里斜穿而上，
+     在到达看台顶面之前就已经升到看台之上（不穿看台、不穿压顶、不穿环梁）。 */
+  {
+    const ringAt=(aA,aB,y,rad,mat)=>{
+      const pts=[];
+      for(let i=0;i<96;i++){
+        const a=i/96*Math.PI*2;
+        pts.push(new THREE.Vector3(Math.cos(a)*aB,y,Math.sin(a)*aA));
+      }
+      const curve=new THREE.CatmullRomCurve3(pts,true);
+      const m=add(nest,new THREE.TubeGeometry(curve,180,rad,8,true),mat,0,0,0);
+      m.castShadow=true;m.receiveShadow=true;
+      return m;
+    };
+    ringAt(OUT_A,OUT_B,NEST.yRim-.18,.46,bandM);          /* 内圈：看台外缘顶 */
+    ringAt(NEST.A,NEST.B,NEST.yRim-.15,.50,nestSteelM);    /* 外圈：碗沿主环梁 */
+    /* 24 根径向斜撑，角度刻意与 24 根伞骨柱错开 7.5°：
+       同角度时柱会在半径 46.8m 处横穿斜撑（自检余量 -0.17m），
+       错开 7.5° 后两者在 r=46.8 处的横向间距约 6.1m ≫ 柱宽 1.95m，不再相交。 */
+    const strut=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),bandM,24);
+    {
+      const d=new THREE.Object3D(),p=new THREE.Vector3(),q=new THREE.Vector3();
+      const dir=new THREE.Vector3(),AX=new THREE.Vector3(0,0,1);
+      for(let i=0;i<24;i++){
+        const a=i/24*Math.PI*2+Math.PI/24;
+        p.set(Math.cos(a)*OUT_B,NEST.yRim-.36,Math.sin(a)*OUT_A);
+        q.set(Math.cos(a)*NEST.B,NEST.yRim+.02,Math.sin(a)*NEST.A);
+        const len=p.distanceTo(q);
+        d.position.copy(p).lerp(q,.5);
+        dir.subVectors(q,p).normalize();
+        d.quaternion.setFromUnitVectors(AX,dir);
+        d.scale.set(.30,.30,len);
+        d.updateMatrix();
+        strut.setMatrixAt(i,d.matrix);
+      }
+      strut.instanceMatrix.needsUpdate=true;
+    }
+    strut.castShadow=false;strut.receiveShadow=false;nest.add(strut);
   }
 
   /* ── 内场：红色塑胶跑道 + 草坪 + 白线 + 球门 ── */
@@ -7348,11 +7434,15 @@ const skylineMats=[];
     }
   }
 
-  /* ── 钢壳内衬膜：挡住视线，夜里透暖光（钢梁在外侧，缝里漏出膜的暖光）── */
+  /* ── 钢壳内衬膜：只在钢梁内侧挡视线，本身几乎不发光 ──
+     原来这层膜 emissive 0.30 + 暖橙，等于给整个屋面罩了一层发光白壳，
+     2832 根钢梁全被盖住，鸟巢远看就是一只光滑的白蛋 —— 辨识度全没了。
+     现在膜保持中灰蓝、几乎不自发光，让钢梁自己亮起来：
+     夜里 = 深色壳 + 一张发光的菱形网格（真鸟巢夜景就是这样）。 */
   const nestFilmM=new THREE.MeshStandardMaterial({
-    color:0x252c35,roughness:.88,metalness:.10,
-    emissive:0xffb265,emissiveIntensity:.52,side:THREE.DoubleSide});
-  GZU_EMI.push({m:nestFilmM,n:.52,d:.05});
+    color:0x3a4450,roughness:.90,metalness:.08,
+    emissive:0x9fb8e0,emissiveIntensity:.05,side:THREE.DoubleSide});
+  GZU_EMI.push({m:nestFilmM,n:.05,d:.03});
   {
     const NU=112,NV=24,pos=[],uv=[],idx=[];
     for(let j=0;j<=NV;j++){
@@ -7379,10 +7469,15 @@ const skylineMats=[];
      这是鸟巢的辨识度所在。真实鸟巢是上千根粗钢梁交错编成，
      远看是连续网面、近看是实打实的杆件 —— 贴图网面完全出不来这个效果。
      这里用 InstancedMesh：一根 BoxGeometry 缩放成千上万根梁，1 个 draw call。 */
-  const nestSteelM=M(0xc4cad1,{roughness:.42,metalness:.58});
   const NL=12, NC=104;
   const RING_PER=4;
-  const ROD_N=NL*NC*2 + NL*RING_PER + 24;
+  /* ⚠ 实例缓冲必须按「上限」分配，不能按公式估算：
+     实际根数 = NL*NC*2（斜交）+ NL*RING_PER*8（环向）+ 24*8（竖向）。
+     之前这里写成 NL*NC*2 + NL*RING_PER + 24 = 2538，实际放进 2832 根 ——
+     setMatrixAt 越界写入把 JS 数组撑长，但 GPU 只上传了 2538 个实例的缓冲，
+     读取越界 → GL_INVALID_OPERATION → 整个 InstancedMesh 一根都不渲染
+     （远看屋面就是一张光滑白膜，完全看不见钢格构）。 */
+  const ROD_N=NL*NC*2 + NL*RING_PER*8 + 24*8;
   const nestRod=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),nestSteelM,ROD_N);
   {
     const d=new THREE.Object3D(),p=new THREE.Vector3(),q=new THREE.Vector3();
@@ -7418,7 +7513,7 @@ const skylineMats=[];
           nestP(a0,v0,p);nestP(a1,v1,q);
           const rr=1+wob;
           p.set(p.x*rr,p.y,p.z*rr);q.set(q.x*rr,q.y,q.z*rr);
-          put(p,q,0.24+j1*0.07);
+          put(p,q,0.34+j1*0.09);
         }
       }
       /* 环向次梁：每层 4 段弧（水平环向，是屋面的第二道骨架） */
@@ -7429,10 +7524,10 @@ const skylineMats=[];
         const SEG=8;
         for(let s=0;s<SEG;s++){
           const b0=a0+(a1-a0)*(s/SEG),b1=a0+(a1-a0)*((s+1)/SEG);
-          const rr=0.984;
+          const rr=0.990;
           nestP(b0,v,p);nestP(b1,v,q);
           p.set(p.x*rr,p.y,p.z*rr);q.set(q.x*rr,q.y,q.z*rr);
-          put(p,q,0.30);
+          put(p,q,0.42);
         }
       }
     }
@@ -7445,7 +7540,7 @@ const skylineMats=[];
         const rr=0.992;
         nestP(a,v0,p);nestP(a,v1,q);
         p.set(p.x*rr,p.y,p.z*rr);q.set(q.x*rr,q.y,q.z*rr);
-        put(p,q,0.34);
+        put(p,q,0.46);
       }
     }
     nestRod.count=k;                      // 实际放了多少根就渲染多少根，别留空实例
@@ -7453,39 +7548,69 @@ const skylineMats=[];
   }
   nestRod.castShadow=false;nestRod.receiveShadow=false;nest.add(nestRod);
 
-  /* ── 24 根主支撑格构柱：从碗沿外侧地面斜向内上撑住屋面（伞骨）── */
+  /* ── 24 根主支撑格构柱：伞骨，从碗沿外侧地面斜撑到屋面 ──
+     几何硬约束（这版整个重做过 —— 原版柱身直接从看台踏面里犁过去，
+     每根柱都在看台上犁出一道沟，柱头还顶穿屋面）：
+       · 柱脚落在环梁外 4m 的地面椭圆上；
+       · 柱轴斜率固定 K=1.72（与水平面约 60°）；
+       · 柱头 = 柱轴与屋面的交点（数值求解，南北 v≈0.47 / 东西 v≈0.31）。
+     由此可把三个「不穿模」条件算死：
+       ① 柱在碗沿环梁半径处中心高 6.88m，柱顶 7.73m < 环梁底 8.23m → 不碰环梁；
+       ② 柱在半径 46.7m 处已升到看台顶面高度 9.05m，而看台外缘在 44m
+          → 柱全程在看台之上，不穿踏面；
+       ③ 柱轴始终在屋面之下，只在柱头一点相接 → 不穿屋面。 */
   {
-    const CHORD=0.46, SPAN=1.95;      /* 角钢截面 / 柱截面边长 */
+    const CHORD=.40, SPAN=1.45, K=1.72;
+    const FOOT_X=NEST.B+4.0, FOOT_Z=NEST.A+4.0;   /* 柱脚椭圆：47.6 / 52 */
     const chords=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),nestSteelM,24*4);
-    const lacing=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),nestSteelM,24*7);
+    const lacing=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),nestSteelM,24*14);
+    const feet  =new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),concM,24);
+    const knots =new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),nestSteelM,24);
     const d=new THREE.Object3D(),bot=new THREE.Vector3(),top=new THREE.Vector3();
     const ax=new THREE.Vector3(),u1=new THREE.Vector3(),u2=new THREE.Vector3(),tmp=new THREE.Vector3();
     const dir=new THREE.Vector3(),AX=new THREE.Vector3(0,0,1);
+    /* 柱脚距圆心的水平距离 / 屋面上某点的水平距离 */
+    const dF=a=>Math.hypot(FOOT_X*Math.cos(a),FOOT_Z*Math.sin(a));
+    const dQ=(a,v)=>{const p=nestP(a,v,new THREE.Vector3());return Math.hypot(p.x,p.z);};
+    /* 求柱轴与屋面的交点：f(v)=屋面高度 - K*(柱脚距 - 该点距) */
+    const solveV=(a)=>{
+      const DF=dF(a);
+      let pv=0,pf=Infinity;
+      for(let i=1;i<=300;i++){
+        const v=i/300*.98;
+        const f=nestY(a,v)-K*(DF-dQ(a,v));
+        if(pf===Infinity){pv=v;pf=f;continue;}
+        if(pf>0&&f<=0)return pv+(v-pv)*(pf/(pf-f));
+        pv=v;pf=f;
+      }
+      return .5;
+    };
     let ci=0,li=0;
     for(let s=0;s<24;s++){
       const a=s/24*Math.PI*2;
-      /* 柱脚：碗沿外侧的地面 */
-      const rb=1.085;
-      bot.set(Math.cos(a)*NEST.B*rE(0)*rb,1.0,Math.sin(a)*NEST.A*rN(0)*rb);
-      /* 柱头：屋面 v=0.62 处 */
-      const vt=0.62;
-      nestP(a,vt,top);
-      top.set(top.x*1.0,top.y,top.z*1.0);
+      bot.set(Math.cos(a)*FOOT_X,0,Math.sin(a)*FOOT_Z);
+      nestP(a,solveV(a),top);
       ax.subVectors(top,bot).normalize();
       tmp.set(0,1,0);
       if(Math.abs(ax.dot(tmp))>.94)tmp.set(1,0,0);
       u1.crossVectors(ax,tmp).normalize();
       u2.crossVectors(ax,u1).normalize();
+      /* 柱脚混凝土基座 */
+      d.position.copy(bot);d.position.y=.28;d.quaternion.identity();
+      d.scale.set(2.1,.56,2.1);d.updateMatrix();
+      feet.setMatrixAt(s,d.matrix);
+      /* 柱头节点块（与屋面咬合的支座） */
+      d.position.copy(top);
+      d.quaternion.setFromUnitVectors(AX,ax);
+      d.scale.set(1.7,.5,1.7);d.updateMatrix();
+      knots.setMatrixAt(s,d.matrix);
+      /* 4 根角钢 */
       const corner=[[-1,-1],[1,-1],[1,1],[-1,1]];
-      const pts=[];
       for(const [s1,s2] of corner){
         const p=new THREE.Vector3().copy(bot)
           .addScaledVector(u1,s1*SPAN/2).addScaledVector(u2,s2*SPAN/2);
         const q=new THREE.Vector3().copy(top)
           .addScaledVector(u1,s1*SPAN/2).addScaledVector(u2,s2*SPAN/2);
-        pts.push([p,q]);
-      }
-      for(const [p,q] of pts){
         const len=p.distanceTo(q);
         d.position.copy(p).lerp(q,.5);
         dir.subVectors(q,p).normalize();
@@ -7493,10 +7618,9 @@ const skylineMats=[];
         d.scale.set(CHORD,CHORD,len);d.updateMatrix();
         chords.setMatrixAt(ci++,d.matrix);
       }
-      /* 缀条：柱身上每 3.2m 一道横撑 */
-      const NLAC=7;
-      for(let l=1;l<=NLAC;l++){
-        const t=l/(NLAC+1);
+      /* 缀条：柱身每 1/8 一道横撑（每柱 2 道，共 14 根） */
+      for(let l=1;l<=7;l++){
+        const t=l/8;
         const c=new THREE.Vector3().copy(bot).lerp(top,t);
         for(let e=0;e<2;e++){
           const p=new THREE.Vector3().copy(c).addScaledVector(u1,(e?1:-1)*SPAN/2).addScaledVector(u2,-SPAN/2);
@@ -7505,34 +7629,21 @@ const skylineMats=[];
           d.position.copy(p).lerp(q,.5);
           dir.subVectors(q,p).normalize();
           d.quaternion.setFromUnitVectors(AX,dir);
-          d.scale.set(.22,.22,len);d.updateMatrix();
+          d.scale.set(.18,.18,len);d.updateMatrix();
           lacing.setMatrixAt(li++,d.matrix);
         }
       }
     }
     chords.count=ci;lacing.count=li;      // 实际放了多少就渲染多少，别让实例数溢出缓冲
     chords.instanceMatrix.needsUpdate=true;lacing.instanceMatrix.needsUpdate=true;
-    chords.castShadow=false;chords.receiveShadow=false;nest.add(chords);
-    lacing.castShadow=false;lacing.receiveShadow=false;nest.add(lacing);
+    feet.instanceMatrix.needsUpdate=true;knots.instanceMatrix.needsUpdate=true;
+    for(const o of [chords,lacing,feet,knots]){
+      o.castShadow=false;o.receiveShadow=false;nest.add(o);
+    }
   }
 
-  /* ── 碗沿主环梁 + 顶口天洞环梁 ── */
-  {
-    const mk=(rA,rB,y,rad)=>{
-      const pts=[];
-      for(let i=0;i<80;i++){
-        const a=i/80*Math.PI*2;
-        pts.push(new THREE.Vector3(Math.cos(a)*NEST.B*rB,y,Math.sin(a)*NEST.A*rA));
-      }
-      const curve=new THREE.CatmullRomCurve3(pts,true);
-      const m=add(nest,new THREE.TubeGeometry(curve,160,rad,8,true),nestSteelM,0,0,0);
-      m.castShadow=true;
-      return m;
-    };
-    mk(1.0,1.0,NEST.yRim-.15,.62);                                  // 碗沿主环梁
-    mk(rN(1),rE(1),(NEST.yTopN+NEST.yTopE)/2,.70);                   // 天洞环梁（马鞍，取南北东西的平均高度）
-  }
-  /* 天洞环梁是马鞍的，必须分段按真实高度走，不能用一个平均高度 */
+  /* 天洞环梁是马鞍的，必须按真实高度走，不能用一个平均高度。
+     碗沿主环梁已在上面「悬挑碗沿格构环带」里建过（外圈），这里不再重复。 */
   {
     const pts=[];
     for(let i=0;i<120;i++){
@@ -7545,50 +7656,42 @@ const skylineMats=[];
     m.castShadow=true;
   }
 
-  /* ── 碗沿内侧泛光带：夜里看台被内场灯光打亮 ── */
+  /* ── 内场照明：草皮上叠一层冷白加色（像被场灯照亮）──
+     原来这条是「碗沿内侧大面积加色泛光带」（暖橙、贴在内场圈上），
+     一大片半透明橙环把看台下沿糊成脏橙色，是「杂乱感」的主要来源。
+     现在换成小面积冷白草皮灯带 + 看台 LED 灯带，画面立刻干净。 */
   {
-    const glowM=new THREE.MeshBasicMaterial({
-      map:glowTex,color:0xffd39a,transparent:true,opacity:.40,
+    const poolM=new THREE.MeshBasicMaterial({
+      map:glowTex,color:0xcfe0ff,transparent:true,opacity:.20,
       blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
-    const g=new THREE.Mesh(ellipseBand(R_IN_A+1.0,R_IN_B+0.9,NEST.A-1.2,NEST.B-1.1,96),glowM);
-    g.position.set(0,NEST.yRim-.55,0);
+    const g=new THREE.Mesh(ellipseBand(R_IN_A-4.6,R_IN_B-4.2,R_IN_A-1.6,R_IN_B-1.4,96),poolM);
+    g.position.set(0,.13,0);
     g.renderOrder=2;g.userData.noReflect=true;nest.add(g);
   }
-  /* ── 场边灯杆 ×4：灯头自发光 + 雪地乘法光池（不加点光源，省帧率）── */
+  /* ── 场边高杆灯已删除（4 根 16.5m 的大灯杆直接插在跑道草皮里）──
+     原来这 4 根杆立在草皮中央、杆身插进场地，既是「杂乱感」的一大来源，
+     也是一处实打实的穿模（灯杆底座埋在跑道里）。现代体育场的室内照明本来就
+     来自屋面灯槽与碗沿 LED，所以这里只留两样：
+       ① 碗沿外圈地面的一道冷白「洗墙光带」；
+       ② 屋面钢格构自身的自发光（见 nestSteelM）。
+     整座鸟巢的夜色从此只有一种色相：冷白。 */
   {
-    const poleM=M(0x9ea4a9,{roughness:.72,metalness:.18});
-    /* 雪地上的光一律走 MultiplyBlending：中心暖白、边缘纯白（边缘不变 = 没有硬边），
-       颜色必须纯白，色相全烘在贴图里。 */
-    const poolTex=(()=>{
-      const S=256,[c,x]=cv(S,S);
-      const gr=x.createRadialGradient(S/2,S/2,4,S/2,S/2,S/2);
-      gr.addColorStop(0,'rgba(255,246,226,1)');
-      gr.addColorStop(.55,'rgba(226,214,192,1)');
-      gr.addColorStop(1,'rgba(255,255,255,1)');
-      x.fillStyle=gr;x.fillRect(0,0,S,S);
-      return ctex(c);
-    })();
-    const poolM=new THREE.MeshBasicMaterial({
-      map:poolTex,color:0xffffff,transparent:true,opacity:.55,
-      blending:THREE.MultiplyBlending,depthWrite:false,fog:false});
-    for(const [lx,lz] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
-      const px=lx*16.5,pz=lz*12.0;
-      addNS(nest,new THREE.CylinderGeometry(.20,.28,16.5,10),poleM,px,8.25,pz);
-      addNS(nest,BX(2.6,.20,.20),M(0x5a6167,{roughness:.6,metalness:.4}),px,16.4,pz);
-      for(const o of [-.9,.9]){
-        addNS(nest,BX(1.2,.30,.66),M(0xfff2ca,{roughness:.4,emissive:0xffdc96,emissiveIntensity:.9}),px+o,16.1,pz);
-      }
-      const pool=new THREE.Mesh(new THREE.PlaneGeometry(1,1),poolM);
-      pool.rotation.x=-Math.PI/2;pool.scale.set(26,26,1);pool.position.set(px,.055,pz);
-      pool.renderOrder=2;pool.userData.noReflect=true;nest.add(pool);
-    }
+    const washM=new THREE.MeshBasicMaterial({
+      map:glowTex,color:0xcfe0ff,transparent:true,opacity:.14,
+      blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
+    const w=new THREE.Mesh(ellipseBand(NEST.A+1.0,NEST.B+1.0,NEST.A+6.2,NEST.B+6.2,96),washM);
+    w.position.set(0,.09,0);
+    w.renderOrder=2;w.userData.noReflect=true;nest.add(w);
   }
 
   /* ── 南侧主入口：门廊 + 发光门厅 + 台阶 + 售票亭 + 旗杆 ── */
   {
     const ez=NEST.B+2.0;
+    /* 门厅：中性冷白（和屋面钢构同一色相），售票亭窗口留一点暖琥珀做焦点 */
     const doorGlow=new THREE.MeshStandardMaterial({
-      color:0x243040,emissive:0xffbe76,emissiveIntensity:.62,roughness:.3});
+      color:0x1c2532,emissive:0xd6e8ff,emissiveIntensity:.50,roughness:.3});
+    const winGlow=new THREE.MeshStandardMaterial({
+      color:0x2a2118,emissive:0xffb877,emissiveIntensity:.55,roughness:.3});
     addNS(nest,BX(24,1.2,6.0),M(0xc2bdb4,{roughness:.86}),0,.6,ez+2.8);
     addNS(nest,BX(23.4,.18,5.6),M(0xd6d1c8,{roughness:.82}),0,1.26,ez+2.8);
     /* 门廊：六根钢柱 + 顶盖 */
@@ -7599,22 +7702,22 @@ const skylineMats=[];
     addNS(nest,BX(23.4,.24,6.8),M(0xeef4f8,{roughness:.94}),0,8.72,ez+2.8);
     /* 门厅暖光 */
     addNS(nest,BX(17,5.2,.16),doorGlow,0,2.8,ez+1.2);
-    addNS(nest,BX(19,1.1,.6),M(0x2b323a,{roughness:.6,metalness:.35}),0,6.0,ez+1.1);
+    addNS(nest,BX(19,1.1,.6),doorGlow,0,6.0,ez+1.1);
     /* 售票亭 ×2 */
     for(const sx of [-1,1]){
       const bx=sx*14.6;
       addNS(nest,BX(4.0,3.4,3.0),M(0xd8d3ca,{roughness:.8}),bx,1.7,ez+3.4);
       addNS(nest,BX(4.3,.26,3.3),M(0x9fa4a8,{roughness:.8}),bx,3.52,ez+3.4);
       addNS(nest,BX(4.4,.20,3.4),M(0xeef4f8,{roughness:.94}),bx,3.75,ez+3.4);
-      addNS(nest,BX(2.4,1.2,.12),doorGlow,bx,2.1,ez+1.88);
+      addNS(nest,BX(2.4,1.2,.12),winGlow,bx,2.1,ez+1.88);
     }
     /* 旗杆 ×4 */
     for(let i=0;i<4;i++){
       const fx=-13.5+i*9;
       addNS(nest,new THREE.CylinderGeometry(.09,.12,11.0,8),M(0xe4e6e8,{roughness:.34,metalness:.5}),fx,5.5,ez+6.4);
       addNS(nest,new THREE.SphereGeometry(.15,10,8),M(0xf0d68a,{roughness:.3,metalness:.7}),fx,11.2,ez+6.4);
-      const fl=new THREE.Mesh(new THREE.PlaneGeometry(1.8,1.2),new THREE.MeshStandardMaterial({
-        color:i%2?0xc02a2f:0x2f6ea8,side:THREE.DoubleSide,roughness:.85,emissive:0x241014,emissiveIntensity:.4}));
+      const fl=new THREE.Mesh(new THREE.PlaneGeometry(1.8,1.2),new THREE.MeshBasicMaterial({
+        color:i%2?0xc02a2f:0x3d82c0,side:THREE.DoubleSide}));
       fl.position.set(fx+.92,9.6,ez+6.4);fl.castShadow=false;nest.add(fl);
     }
   }
@@ -7622,7 +7725,9 @@ const skylineMats=[];
   /* ── 周边铺装环路 + 行道树 + 路灯 ── */
   {
     const paveM=M(0xc4ccd2,{roughness:.9});
-    const ring=add(nest,ellipseBand(NEST.A+1.2,NEST.B+1.2,NEST.A+9.0,NEST.B+9.0,96),paveM,0,.06,0);
+    /* 铺装从看台外缘(44/39.6) 就开始铺，把悬挑碗沿下面那圈 4m 空隙盖住，
+       玩家从南门进来走的是有铺装的地面，不会踩在悬空区里。 */
+    const ring=add(nest,ellipseBand(OUT_A-.8,OUT_B-.8,NEST.A+9.0,NEST.B+9.0,96),paveM,0,.06,0);
     ring.castShadow=false;ring.receiveShadow=true;
     const roadM=M(0xb9bec4,{roughness:.9});
     const outer=add(nest,ellipseBand(NEST.A+9.0,NEST.B+9.0,NEST.A+13.5,NEST.B+13.5,96),roadM,0,.05,0);
@@ -7643,7 +7748,7 @@ const skylineMats=[];
       if(Math.sin(a)>0.72)continue;
       const px=Math.cos(a)*(NEST.B+9.8),pz=Math.sin(a)*(NEST.A+9.8);
       addNS(nest,new THREE.CylinderGeometry(.13,.18,6.2,8),M(0x6e747a,{roughness:.7,metalness:.3}),px,3.1,pz);
-      addNS(nest,BX(.7,.22,.7),M(0xffeec4,{roughness:.4,emissive:0xffdca0,emissiveIntensity:.8}),px,6.3,pz);
+      addNS(nest,BX(.7,.22,.7),M(0xe9f2ff,{roughness:.4,emissive:0xcfe0ff,emissiveIntensity:.8}),px,6.3,pz);
     }
   }
 
