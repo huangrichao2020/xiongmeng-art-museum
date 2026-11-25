@@ -7033,6 +7033,12 @@ const skylineMats=[];
   };
   /* 北片 z∈[-148,-52] 整段让给鸟巢：x=0 这几条南北向主干道在这里断开，
      不然马路会从鸟巢中间穿过去、把主体育场劈成两半。 */
+  /* 两条贯穿的东西向长马路（rot=π/2 → 长边落在 x 方向）：
+       z=-46 北外环大道 —— 正好在鸟巢南门外侧，是鸟巢门口的马路；
+       z=75  —— 游乐园背后、观光铁路（z≈62~64）以外那一片的马路。
+     这两条之前被误删了，缺了它们鸟巢门口和铁路以北都是一片空白。 */
+  addStreetSeg(0,-46,8.4,376,Math.PI/2);      // z  -46，x -188..188
+  addStreetSeg(0,75,8.4,376,Math.PI/2);       // z   75，x -188..188
   addStreetSeg(0,-191,8.4,86,Math.PI/2);      // z -234..-148
   /* 南段 x=0 主轴：z∈[16,60] 让给游乐园。
      游乐园地面占 x∈[-32,44]、z∈[19,57]，而这条主轴上叠着 5 段马路，
@@ -11210,8 +11216,16 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
   /* ── 碰碰车场（24×16m 扩大一倍，小车体环绕跑） ── */
   {
     const g=new THREE.Group();g.position.set(7,0,45);fair.add(g);
-    add(g,BX(24,.1,16),M(0xa6c4d8,{roughness:.40,metalness:.06,emissive:0x244254,emissiveIntensity:.16}),0,.05,0).castShadow=false;
-    for(let i=0;i<11;i++)add(g,BX(.45,.02,14.8),M(0xc4d8e6,{roughness:.65}),-10+i*2,.115,0).castShadow=false;
+    /* 场地按城市马路做：沥青路面 + 黄色边线 + 白色车道虚线，
+       原来是一块浅蓝「冰面」加 11 条浅色纵条，看着像冰场不像路。 */
+    const asphM=M(0x3c434b,{roughness:.66,metalness:.04});
+    const lineY=M(0xe8c33c,{roughness:.62});
+    const lineW=M(0xe6ecf2,{roughness:.58});
+    add(g,BX(24,.1,16),asphM,0,.05,0).castShadow=false;
+    for(const sz of [-1,1])add(g,BX(23,.03,.18),lineY,0,.115,sz*7.2).castShadow=false;
+    for(const sx of [-1,1])add(g,BX(.18,.03,14.2),lineY,sx*11.2,.115,0).castShadow=false;
+    for(const sx of [-1,1])add(g,BX(.14,.03,14.2),lineY,sx*.24,.115,0).castShadow=false;
+    for(let i=0;i<9;i++)add(g,BX(1.5,.02,.13),lineW,-8.4+i*2.1,.112,0).castShadow=false;
     const arenaRailM=M(0x2d3848,{roughness:.72,metalness:.25,envMapIntensity:.25});
     const arenaCapM=M(0x9fb0c4,{roughness:.55,metalness:.35,envMapIntensity:.3});
     for(const [ax,az,len,rot] of [[0,-8,24,0],[0,8,24,0],[-12,0,16,Math.PI/2],[12,0,16,Math.PI/2]]){
@@ -11265,7 +11279,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       addNS(car,new THREE.SphereGeometry(.085,8,6),getBulbMat(0xffe078,i),.42,2.56,-.96);
       car.scale.setScalar(.62);
       car.userData.keep=true;
-      car.userData.physObj={type:'ride',ref:{kind:'bumper',car,label:'冰面碰碰车'}};
+      car.userData.physObj={type:'ride',ref:{kind:'bumper',car,label:'沥青场地碰碰车'}};
       const outer=i%2===0;
       const ang=(i/8)*Math.PI*2;
       car.userData.st={
@@ -13673,7 +13687,7 @@ const PANELS={
       ['海盗船','大摆锤来回甩，两座高塔撑着，船上坐着八只熊'],
       ['旋转木马','八匹白马绕中心柱转，红顶篷上一圈灯泡'],
       ['雪地飞索','两根高柱拉一条缆绳，四把吊椅来回摆'],
-      ['碰碰车','24×16m 冰面围栏场地，八辆小碰碰车内外双圈环绕疾驰'],
+      ['碰碰车','24×16m 沥青围栏场地，八辆小碰碰车内外双圈环绕疾驰'],
       ['圣诞树','13 米巨型圣诞树缠满彩灯，顶上金星星，树下堆着礼物；园中另有 18 棵小雪松'],
       ['小吃一条街','爆米花 / 棉花糖 / 热巧克力 / 烤香肠 / 圣诞糖果 / 热红酒，六摊连排挂灯串'],
       ['人','十几只维尼小熊在排队、围观圣诞树、吃小吃、在园子里溜达']

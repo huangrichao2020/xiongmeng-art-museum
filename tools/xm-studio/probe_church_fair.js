@@ -55,10 +55,10 @@ const EXE = path.join(os.homedir(), "Library/Caches/ms-playwright/chromium-1248/
   console.log('教堂对象:', JSON.stringify(r.churches));
 
   const shots = [
-    ['nest', [46, 26, -44], [0, 12, -100]],
-    ['church', [-26, 9, 6], [-49, 11, 32]],
-    ['fair', [6, 26, 66], [6, 0, 34]],
-    ['fair2', [24, 8, 62], [6, 2, 38]]
+    ['gate', [0, 10, -20], [0, 6, -54]],
+    ['road75', [0, 30, 110], [0, 0, 70]],
+    ['bumper', [7, 9, 62], [7, 0, 45]],
+    ['nest', [46, 26, -44], [0, 12, -100]]
   ];
   for (const [name, pos, tgt] of shots) {
     await pg.evaluate(([p, t]) => { window.MP.freezeCam(p[0], p[1], p[2], t[0], t[1], t[2]); }, [pos, tgt]);
