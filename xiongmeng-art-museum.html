@@ -417,67 +417,80 @@
     body.fp #dock{bottom:152px}
   }
 
-  /* ---------- 游乐园邮箱式留言板 ---------- */
+  /* ---------- 游乐园留言板 · 蛋仔派对风格 ---------- */
+  /* 蛋仔派对的 UI：圆润无锐角、糖果高饱和色、软阴影、圆鼓鼓的按钮 */
   #gb-modal{
     position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;
-    background:rgba(4,9,16,.68);backdrop-filter:blur(8px);padding:16px;
+    background:rgba(38,26,54,.55);backdrop-filter:blur(7px);padding:16px;
   }
   #gb-modal.show{display:flex}
   #gb-box{
     width:min(820px,96vw);height:min(540px,88vh);display:flex;flex-direction:column;
-    background:#101926;border:1px solid rgba(232,182,83,.42);border-radius:8px;
-    box-shadow:0 24px 60px rgba(0,0,0,.65);color:#eef4fa;overflow:hidden;font-family:var(--han);
+    background:linear-gradient(180deg,#fff8ec 0%,#ffeede 62%,#ffe2e6 100%);
+    border:4px solid #ffffff;border-radius:34px;
+    box-shadow:0 26px 60px rgba(60,30,70,.45),0 0 0 3px rgba(255,216,77,.75);
+    color:#5a4436;overflow:hidden;font-family:var(--han);
   }
   #gb-head{
-    display:flex;align-items:center;justify-content:space-between;padding:12px 16px;
-    background:linear-gradient(90deg,#182638,#231a24);border-bottom:1px solid rgba(232,182,83,.25);
+    display:flex;align-items:center;justify-content:space-between;padding:13px 18px;
+    background:linear-gradient(90deg,#ffd84d 0%,#ffb3c8 52%,#a8e6d4 100%);
+    border-bottom:4px solid #ffffff;
   }
-  #gb-head .title{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:700;color:#ffe6a8}
-  #gb-head .cnt{font-size:11px;font-family:var(--mono);color:#9fb6cc;background:rgba(255,255,255,.07);padding:2px 8px;border-radius:10px}
+  #gb-head .title{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:800;color:#7a4a1e;
+    text-shadow:0 2px 0 rgba(255,255,255,.85)}
+  #gb-head .cnt{font-size:11px;font-family:var(--mono);color:#8a5a2e;background:rgba(255,255,255,.78);
+    padding:3px 11px;border-radius:14px;font-weight:700}
   #gb-head .acts{display:flex;align-items:center;gap:8px}
   .gb-btn{
-    padding:6px 12px;border-radius:4px;border:1px solid rgba(255,255,255,.16);
-    background:rgba(255,255,255,.06);color:#e6f0fa;cursor:pointer;font-size:12px;transition:.18s;
+    padding:7px 14px;border-radius:20px;border:2px solid rgba(122,74,30,.16);
+    background:#ffffff;color:#7a4a1e;cursor:pointer;font-size:12px;font-weight:700;transition:.18s;
+    box-shadow:0 3px 0 rgba(122,74,30,.16);
   }
-  .gb-btn:hover{background:rgba(255,255,255,.14)}
-  .gb-btn.pri{background:#d49b38;border-color:#e8b653;color:#141008;font-weight:700}
-  .gb-btn.pri:hover{background:#e8b653}
-  .gb-btn.dan{border-color:rgba(235,87,87,.45);color:#ff9b9b}
-  .gb-btn.dan:hover{background:rgba(235,87,87,.18)}
-  #gb-body{flex:1;display:grid;grid-template-columns:270px 1fr;min-height:0}
+  .gb-btn:hover{transform:translateY(-1px);box-shadow:0 5px 0 rgba(122,74,30,.18)}
+  .gb-btn:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(122,74,30,.16)}
+  .gb-btn.pri{background:#ff7aa2;border-color:#ff5c8d;color:#fff;text-shadow:0 1px 0 rgba(190,40,90,.4);
+    box-shadow:0 4px 0 #e0507d}
+  .gb-btn.pri:hover{background:#ff8fb1}
+  .gb-btn.dan{border-color:#ffb3b3;color:#e05a5a}
+  .gb-btn.dan:hover{background:#ffe4e4}
+  #gb-body{flex:1;display:grid;grid-template-columns:270px 1fr;min-height:0;gap:12px;padding:12px}
   #gb-list{
-    border-right:1px solid rgba(255,255,255,.09);overflow-y:auto;background:rgba(8,13,20,.55);
+    border-radius:22px;overflow-y:auto;background:rgba(255,255,255,.72);
+    border:3px solid #fff;box-shadow:inset 0 2px 8px rgba(140,90,60,.10);
   }
   .gb-item{
-    padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;transition:.15s;
+    padding:11px 14px;border-bottom:2px dashed rgba(190,140,90,.24);cursor:pointer;transition:.15s;
   }
-  .gb-item:hover{background:rgba(255,255,255,.05)}
-  .gb-item.on{background:rgba(232,182,83,.14);border-left:3px solid #e8b653;padding-left:11px}
+  .gb-item:hover{background:rgba(255,216,77,.22)}
+  .gb-item.on{background:linear-gradient(90deg,#ffe9a8,#fff2cd);border-left:5px solid #ff7aa2;padding-left:9px}
   .gb-item .row1{display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:4px}
-  .gb-item .from{font-weight:700;color:#ffe4a0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px}
-  .gb-item .time{font-size:10px;font-family:var(--mono);color:#7e93a8}
-  .gb-item .prev{font-size:12px;color:#b8cade;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  #gb-main{padding:18px 20px;display:flex;flex-direction:column;justify-content:space-between;overflow-y:auto;gap:14px}
+  .gb-item .from{font-weight:800;color:#e0507d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px}
+  .gb-item .time{font-size:10px;font-family:var(--mono);color:#a98a68}
+  .gb-item .prev{font-size:12px;color:#7d6a58;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #gb-main{padding:14px;display:flex;flex-direction:column;justify-content:space-between;overflow-y:auto;gap:14px;
+    border-radius:22px;background:rgba(255,255,255,.55)}
   .gb-letter{
-    background:linear-gradient(180deg,#fcf7ea,#f4ebd6);color:#2b2218;border-radius:6px;
-    padding:18px 20px;box-shadow:inset 0 0 0 1px rgba(176,132,56,.35);flex:1;display:flex;flex-direction:column;gap:12px;
+    background:#fffdf6;color:#5a4436;border-radius:24px;
+    padding:18px 20px;box-shadow:0 6px 0 rgba(190,140,90,.18),inset 0 0 0 3px #fff;
+    border:3px solid #ffd84d;flex:1;display:flex;flex-direction:column;gap:12px;
   }
-  .gb-letter .meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:12px;color:#7a6345;border-bottom:1px dashed rgba(122,99,69,.3);padding-bottom:8px}
+  .gb-letter .meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:12px;color:#a98a68;
+    border-bottom:2px dashed rgba(190,140,90,.30);padding-bottom:8px}
   .gb-letter .txt{font-size:17px;line-height:1.7;word-break:break-word;flex:1}
   .gb-letter .ops{display:flex;gap:8px;justify-content:flex-end}
   .gb-form{display:flex;flex-direction:column;gap:10px;flex:1}
-  .gb-form label{font-size:12px;color:#a9bfd4}
+  .gb-form label{font-size:12px;color:#8a6b4e}
   .gb-form input,.gb-form textarea{
-    width:100%;box-sizing:border-box;background:#0a111a;border:1px solid rgba(255,255,255,.16);
-    border-radius:4px;padding:9px 11px;color:#eef4fa;font-size:13px;font-family:var(--han);outline:none;
+    width:100%;box-sizing:border-box;background:#fffdf6;border:3px solid #ffd84d;
+    border-radius:18px;padding:10px 13px;color:#5a4436;font-size:13px;font-family:var(--han);outline:none;
+    box-shadow:inset 0 2px 4px rgba(190,140,90,.10);
   }
-  .gb-form input:focus,.gb-form textarea:focus{border-color:#e8b653}
+  .gb-form input:focus,.gb-form textarea:focus{border-color:#ff7aa2;box-shadow:0 0 0 4px rgba(255,122,162,.22)}
   .gb-form textarea{resize:none;height:86px}
-  .gb-form .bar{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#8fa6bd}
-  .gb-err{color:#ff8f8f;font-size:12px;min-height:16px}
+  .gb-form .bar{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#a98a68}
+  .gb-err{color:#e0507d;font-size:12px;min-height:16px;font-weight:700}
   @media (max-width:680px){
     #gb-body{grid-template-columns:1fr;grid-template-rows:175px 1fr}
-    #gb-list{border-right:none;border-bottom:1px solid rgba(255,255,255,.1)}
   }
 
   /* ---------- 盲盒拆礼弹窗 ---------- */
@@ -2580,6 +2593,7 @@ function buildCandyCane(h=1.35){
 }
 function buildSnowman(sc=1,opts={}){
   const g=new THREE.Group();
+  g.userData.isSnowman=true;   // 探针统计雪人数量用
   const sw=XMAS_MATS.smSnow;
   const blk=XMAS_MATS.smDark;
   const scarfM=sharedMat(opts.scarf||0xdc2f2f,{roughness:.68});
@@ -3042,8 +3056,11 @@ for(const x of [-3.2,-1.1,1.1,3.2]){
   for(const s of [-1,1]){
     const et=buildChristmasTree({scale:.54,layers:5,gifts:true});
     et.position.set(s*8.3,.30,8.55);shop.add(et);
-    const sm=buildSnowman(.82);
-    sm.position.set(s*4.9,.30,8.55);sm.rotation.y=-s*.22;shop.add(sm);
+    // 门前迎宾雪人只留一只（两只一左一右太对称也太挤），挂在西侧那棵树下
+    if(s<0){
+      const sm=buildSnowman(.82);
+      sm.position.set(s*4.9,.30,8.55);sm.rotation.y=-s*.22;shop.add(sm);
+    }
     const cc=buildCandyCane(1.45);
     cc.position.set(s*3.9,.30,8.20);cc.rotation.y=s>.0?Math.PI:0;shop.add(cc);
   }
@@ -6296,18 +6313,14 @@ let fireflyMat=null;
 {
   const scarfCols=[0xdc2f2f,0x1f8a4c,0x2563eb,0xeab308,0xc026d3,0xe11d48];
   const hats=['santa','beanie','top'];
-  /* 原来 25 只，砍到 9 只（全场雪人总数 52 → 26，正好砍掉一半）。
-     留下的都是站在「会有人走过来的地方」的：市集北侧两头、北街小店旁、
-     雪松大道南北两段、西侧环路、东侧环路、街道行道树两处。
-     被砍掉的主要是三种没人去的：±60 远处的野地、成对挤在一起的重复站位、
-     以及 z=-27 那排贴在环路边的。 */
+  /* 原来 25 只 → 9 只 → 现在再砍到 4 只。
+     只留四个「真的会有人走到跟前」的点：艺术馆门前台阶两头（迎宾）、
+     街道行道树两处。其余的删掉 —— 雪人一多，街面就变成「雪人广场」，
+     走路时满眼都是圆滚滚的雪球，抢掉了摊位和树这些真正的主体。 */
   const spots=[
     [-4.2,-13.2,1.06,0,true],[5.6,-13.1,.86,-.2,false],
-    [-22.5,-13.2,1.08,-.15,false],
-    [8.7,-5.8,.92,-1.1,true],[8.7,4.2,.96,-1.0,true],
     [-46.2,5.0,1.00,.8,true],
-    [44.2,-8.2,1.08,-.6,true],
-    [-19.5,9.35,.82,.1,true],[11.1,9.35,.84,.2,true]
+    [44.2,-8.2,1.08,-.6,true]
   ];
   spots.forEach(([sx,sz,sc,ry,wv],idx)=>{
     const sm=buildSnowman(sc,{
@@ -8480,12 +8493,10 @@ const skylineMats=[];
   // 将原本零散丑陋的地面扁平雪堆，统一替换为俏皮可爱的冬日小雪人
   const driftScarf=[0xdc2f2f,0x1f8a4c,0x2563eb,0xeab308,0xc026d3,0xe11d48];
   const driftHats=['santa','beanie','top'];
-  /* 原来 16 只，砍到 6 只：教堂/剧院后场与北段环路之间各留两只当雪地点缀，
-     其余十只全是空旷地带里没人会走到的小雪人，纯属凑数。 */
+  /* 原来 16 只 → 6 只 → 现在只留 2 只（教堂后场东西两侧各一只当点缀）。
+     后场是片大空地，雪人摆多了只会变成障碍赛道，全砍。 */
   const drifts=[
-    [-33,20,0.82],[45,20,0.82],
-    [-16,9.5,0.76],[18,9.5,0.76],
-    [-22,-25,0.82],[22,-25,0.82]
+    [-33,20,0.82],[45,20,0.82]
   ];
   drifts.forEach(([dx,dz,sc],idx)=>{
     const sm=buildSnowman(sc,{
@@ -9686,6 +9697,72 @@ function makePerson(color,skin,opts={}){
 const npcs=[];
 const ART=[[-4.9,0.4],[0,-7.2],[4.6,-0.6],[-6.2,4.2],[3.3,-1.0]];
 const NPC_ACCS=['headphone','camera','coffee','backpack','cap','beret','santa','beanie','earmuff','bow','antler','gift','honey'];
+/* ── NPC 名字 ──
+   每个 NPC 有自己的名字，头顶挂一块小号蛋仔气泡牌。
+   名字池是小熊世界风格的中文昵称 + 一点点搞怪后缀，重复了就加数字。 */
+const NPC_NAME_POOL=[
+  '团子','奶盖','芋圆','布丁','麻薯','奶糖','泡芙','椰果','芋泥','珍珠',
+  '豆花','蛋挞','曲奇','摩卡','拿铁','蛋仔','果冻','芝士','抹茶','可可',
+  '焦糖','草莓','海盐','柠檬','蜜桃','葡萄','蓝莓','樱桃','雪梨','柚子'
+];
+const NPC_NAMES=[];
+function pickNpcName(){
+  let nm;
+  let guard=0;
+  do{ nm=NPC_NAME_POOL[RI(0,NPC_NAME_POOL.length-1)]; guard++; }
+  while(NPC_NAMES.indexOf(nm)>=0&&guard<200);
+  // 名字用完就加序号，保证全场唯一
+  let uniq=nm,k=2;
+  while(NPC_NAMES.indexOf(uniq)>=0){uniq=nm+k;k++;}
+  NPC_NAMES.push(uniq);
+  return uniq;
+}
+/* 小号 NPC 名牌：蛋仔派对那种圆鼓鼓的白色气泡，但比玩家牌小一半多。
+   不带头像圆片（NPC 不是真人），只留一个圆角气泡 + 底部小尖角。
+   画布只有 256×88，文字更小，贴图也更省。 */
+function makeNpcTagSprite(text,color){
+  const c=document.createElement('canvas');
+  const W=256,H=88;
+  c.width=W;c.height=H;
+  const x=c.getContext('2d');
+  x.clearRect(0,0,W,H);
+  const hex=String(color).charAt(0)==='#'?String(color):'#'+color.toString(16).padStart(6,'0');
+  x.font='800 32px system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  x.textBaseline='middle';
+  const nameW=x.measureText(text).width;
+  const R=18,PAD=12;
+  const bubbleW=Math.min(W-6,PAD*2+nameW);
+  const bx=(W-bubbleW)/2,by=8,bh=48;
+  const tipY=by+bh;
+  /* 底部小尖角，指向角色头顶 */
+  x.beginPath();
+  x.moveTo(W/2-9,tipY-3);x.lineTo(W/2,tipY+11);x.lineTo(W/2+9,tipY-3);
+  x.closePath();x.fillStyle=hex;x.fill();
+  /* 气泡主体：白底 + 彩色描边 */
+  x.beginPath();
+  x.moveTo(bx+R,by);
+  x.arcTo(bx+bubbleW,by,bx+bubbleW,by+bh,R);
+  x.arcTo(bx+bubbleW,by+bh,bx,by+bh,R);
+  x.arcTo(bx,by+bh,bx,by,R);
+  x.arcTo(bx,by,bx+bubbleW,by,R);
+  x.closePath();
+  x.fillStyle='rgba(255,255,255,.93)';x.fill();
+  x.strokeStyle=hex;x.lineWidth=5;x.lineJoin='round';x.stroke();
+  /* 名字 */
+  x.fillStyle='#3a4256';
+  x.font='800 30px system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  x.textAlign='center';
+  x.fillText(text,W/2,by+bh/2+1,bubbleW-PAD*2);
+  const tex=new THREE.CanvasTexture(c);
+  tex.colorSpace=THREE.SRGBColorSpace;
+  tex.anisotropy=2;
+  const mat=new THREE.SpriteMaterial({map:tex,depthTest:false,transparent:true});
+  const sp=new THREE.Sprite(mat);
+  /* 尺寸：宽度约 0.86m —— 10~15m 外能看清名字，又不至于在画面里占地方 */
+  sp.scale.set(.86,.296,1);
+  sp.renderOrder=998;
+  return sp;
+}
 function addNpc(path,color,skin,speed,indoor,opts={}){
   if(!opts.acc)opts={...opts,acc:NPC_ACCS[npcs.length%NPC_ACCS.length]};
   const p=makePerson(color,skin,opts);
@@ -9695,6 +9772,13 @@ function addNpc(path,color,skin,speed,indoor,opts={}){
   const item={p,path,i:0,t:0,dir:1,speed:speed||.7,wait:R(0,3),indoor:!!indoor,look:null,phase:R(0,Math.PI*2),baseY:path[0][1],
     vx:0,vz:0,vy:0,jumpY:0,squash:0,squashV:0,puffCd:0,happyT:0,baseSc:opts.scale||1};
   p.userData.physObj={type:'npc',ref:item};
+  /* 头顶小号名字牌：挂在小熊身上，跟随移动与压扁弹跳 */
+  const nm=pickNpcName();
+  const tag=makeNpcTagSprite(nm,'#'+color.toString(16).padStart(6,'0'));
+  tag.position.y=1.30;
+  tag.userData.keep=true;
+  p.add(tag);
+  item.name=nm;item.tag=tag;
   npcs.push(item);
 }
 /* 室外静态障碍物碰撞表（所有路灯/行道树/隔离柱/垃圾桶/长椅/标识牌/东园雕塑与矮灯，防任何穿模） */
@@ -9705,7 +9789,9 @@ const OUTDOOR_OBS=(()=>{
   for(const lx of [-19.5,-10.5,9.5,18.0,36.0])list.push([lx,11.45,.68]);
   for(const bx of [-8.4,4.5])list.push([bx,9.5,.55]);
   list.push([-7.2,9.3,.45],[9.6,10.6,.48],[-10.75,11.2,.48],[19.6,10.7,.58],[3.25,8.75,.72],[-10.9,9.55,.95]);
-  for(const s of [-1,1])list.push([s*8.3,8.55,1.05],[s*4.9,8.55,.72],[s*3.9,8.20,.5]);
+  // 门前迎宾雪人只剩西侧一只（东侧那只已删），碰撞同步只留西侧
+  for(const s of [-1,1])list.push([s*8.3,8.55,1.05],[s*3.9,8.20,.5]);
+  list.push([-4.9,8.55,.72]);
   // 2. 东侧动漫雪园内部全障碍：中央与两圈雕塑底座 + 门柱 + 角树 + 雪人 + 草坪灯 + 高灯杆（灌木障碍已删）
   const PX=26.5,PZ=-2.0;
   list.push([PX,PZ,2.35],[PX-5.5,PZ-4.2,1.85],[PX+5.5,PZ-4.2,1.8],[PX-5.5,PZ+4.2,1.85],[PX+5.5,PZ+4.2,1.75]);
@@ -10956,92 +11042,10 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
 
   /* ── 已去掉游乐园四周外围栏，保留正门牌坊，全园四面畅通无阻 ── */
 
-  /* ── 游乐园大门：鎏金花格门楼（正对艺术馆正门）
-     尺寸收小但做"贵"：柱础线脚 + 鎏金包边 + 柱头卷涡 +
-     镂空金格花梁 + 锦缎牌匾 + 檐口瀑布灯串 ── */
-  {
-    const g=new THREE.Group();g.position.set(4,0,19.9);fair.add(g);
-    const HW=3.7;                 // 半跨：门洞净宽 7.4m
-    const PH=4.3;                 // 柱顶高
-    const stemM=M(0x1f4034,{roughness:.55,metalness:.35});   // 墨绿柱身
-    const giltM=M(0xe8b653,{roughness:.28,metalness:.85});   // 鎏金
-    const darkM=M(0x141a1f,{roughness:.45,metalness:.7});     // 深色铁艺
-    const silkM=M(0x7a1f2a,{roughness:.72});                  // 酒红锦缎
-    /* 两根主柱：柱础（三层线脚）→ 收分柱身 → 金箍 → 柱头卷涡 → 顶球 */
-    for(const s of [-1,1]){
-      const px=s*HW;
-      // 柱础：三层递收的方形台
-      add(g,BX(1.24,.26,1.24),darkM,px,.13,0);
-      add(g,BX(1.06,.22,1.06),giltM,px,.37,0);
-      add(g,BX(.94,.24,.94),stemM,px,.60,0);
-      // 柱身：下粗上细的收分柱
-      add(g,BX(.62,PH-.95,.62),stemM,px,.60+(PH-.95)/2,0);
-      // 柱身鎏金竖向包边（四条棱线）
-      for(const t of [-1,1]){
-        add(g,BX(.05,PH-1.15,.05),giltM,px+t*.30,.66+(PH-1.15)/2,.28);
-        add(g,BX(.05,PH-1.15,.05),giltM,px+t*.30,.66+(PH-1.15)/2,-.28);
-      }
-      // 金箍（腰部）
-      add(g,BX(.72,.16,.72),giltM,px,.62+PH*.42,0);
-      add(g,BX(.70,.10,.70),giltM,px,.62+PH*.66,0);
-      // 柱头：方形科林斯块 + 四角卷涡 + 顶球
-      add(g,BX(.86,.30,.86),giltM,px,PH-.14,0);
-      add(g,BX(.98,.14,.98),giltM,px,PH+.05,0);
-      for(const t of [-1,1])for(const u of [-1,1]){
-        const vol=add(g,new THREE.TorusGeometry(.15,.055,8,14),giltM,px+t*.40,PH-.14,u*.40);
-        vol.rotation.y=Math.PI/4;vol.castShadow=false;
-      }
-      const cap=add(g,new THREE.SphereGeometry(.20,14,10),giltM,px,PH+.30,0);cap.castShadow=false;
-      // 柱身螺旋缠灯（密集小珠）
-      for(let i=0;i<26;i++){
-        const t=i/26*Math.PI*7;
-        bulb(g,px+Math.cos(t)*.40,.72+i*((PH-1.15)/26),Math.sin(t)*.40,.072,i*3+(s>0?1:0));
-      }
-    }
-    /* 花格横梁：镂空鎏金网格 + 上下金边 + 积雪 */
-    {
-      const beamY=PH+.52, span=HW*2+1.5;
-      add(g,BX(span,.13,.16),giltM,0,beamY+.34,0);      // 上金边
-      add(g,BX(span,.13,.16),giltM,0,beamY-.34,0);      // 下金边
-      // 竖向格条
-      const bars=13;
-      for(let i=0;i<=bars;i++){
-        const bx=-span/2+i*(span/bars);
-        add(g,BX(.07,.68,.07),giltM,bx,beamY,0);
-      }
-      // 斜向交叉花格（细菱形网）
-      for(let i=0;i<24;i++){
-        const bx=-span/2+.4+i*((span-.8)/23);
-        const d=add(g,BX(.045,.72,.045),giltM,bx,beamY,0);
-        d.rotation.z=(i%2?.52:-.52);
-      }
-      // 梁中两侧的拱形花格
-      for(const s of [-1,1]){
-        for(let i=0;i<9;i++){
-          const a=Math.PI*(i/8);
-          add(g,BX(.05,.05,.05),giltM,s*1.85+Math.cos(a)*.62,beamY+.46+Math.sin(a)*.52,0);
-        }
-        add(g,BX(.16,.26,.16),giltM,s*1.85,beamY+.42,0);
-      }
-      // 梁顶积雪
-      add(g,BX(span,.16,.30),snowM,0,beamY+.50,0).castShadow=false;
-    }
-    /* 檐口瀑布灯串：贴着花格梁下沿两排密集小珠，形成"光帘" */
-    for(let r=0;r<2;r++){
-      const yy=PH+.16-r*.19;
-      for(let i=0;i<40;i++){
-        const u=i/39;
-        const bx=-HW-.35+u*(HW*2+.7);
-        bulb(g,bx,yy-Math.sin(u*Math.PI)*.07-r*.02,.30,.058,r*40+i);
-      }
-    }
-    /* 梁顶一圈描金灯 + 塔尖星 */
-    for(let i=0;i<30;i++){
-      const u=i/29;
-      bulb(g,-HW-.5+u*(HW*2+1.0),PH+.98,.16,.062,80+i);
-    }
-    pool(g,5.5,.03,.14);
-  }
+  /* ── 游乐园大门（鎏金花格门楼）已按要求拆除 ──
+     原来的门楼正对艺术馆正门，两根墨绿鎏金大柱 + 花格横梁 + 瀑布灯串，
+     站在正门里往外看就是一道横在画面中间的深色门框，把游乐园整个挡住。
+     现在拆掉，园区与艺术馆之间直接通透。 */
 
   /* ── 西北广场已腾空，供海盗船进驻与云霄飞车大展区 ── */
 
@@ -11647,45 +11651,98 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       scene.add(fl);
       shopLights.push({l:fl,base:inten,street:true});
     }
-    /* ── 游乐园大门内侧正中 · 游客留言信箱亭（一进门正前方就能看见）
-         按教堂标准重做：石台座 + 四根石柱 + 三层檐口线脚 + 人字雪顶 + 鎏金邮筒 ── */
+    /* ── 游乐园留言亭 · 蛋仔派对风格 ──
+         蛋仔派对的场景语言：一切都是圆的 —— 圆润的蛋型主体、Q 弹的糖果色、
+         厚实圆角、软萌贴脸。原来的石柱+人字雪顶+鎏金邮筒太"正经建筑"，
+         和游乐园的欢乐调性不搭。现在整座亭子改成蛋仔风格：
+           · 底座 = 圆鼓鼓的奶油色蛋托盘（不是方石台）
+           · 主体 = 一颗巨大的鹅黄色「蛋仔」立牌（蛋型，带腮红和小脚）
+           · 屋顶 = 蓬松的草莓奶盖云朵顶（几个压扁的球叠出来）
+           · 邮箱 = 糖果粉圆角小信箱，圆滚滚的，比原来小一号
+           · 配色 = 奶油白 / 鹅黄 / 草莓粉 / 薄荷绿，全高饱和糖果色
+         ── */
     {
       const gb=new THREE.Group();gb.position.set(4.0,0,24.5);gb.rotation.y=Math.PI;fair.add(gb);
-      const redBoxM=M(0xb8292f,{roughness:.45,metalness:.2});
-      const gilt2M=M(0xe8b653,{roughness:.3,metalness:.8});
-      /* 石台座 + 两层线脚 */
-      add(gb,BX(2.36,.28,1.52),SK.M.stone,0,.14,0);
-      add(gb,BX(2.52,.09,1.68),SK.M.trimDark,0,.32,0);
-      add(gb,BX(2.30,.07,1.46),SK.M.trim,0,.40,0);
-      /* 四根石柱（柱础 + 柱身 + 柱头） */
-      for(const sx of [-1,1])for(const sz of [-1,1]){
-        const X=sx*.98,Z=sz*.50;
-        add(gb,BX(.26,.12,.26),SK.M.stone,X,.50,Z);
-        add(gb,BX(.17,2.10,.17),SK.M.trim,X,1.61,Z);
-        add(gb,BX(.26,.12,.26),SK.M.trimDark,X,2.71,Z);
-        add(gb,BX(.22,.08,.22),SK.M.trim,X,2.81,Z);
+      const creamM=M(0xfff4e2,{roughness:.62,metalness:0});
+      const yolkM=M(0xffd84d,{roughness:.55,metalness:0});
+      const strawM=M(0xff8fb4,{roughness:.58,metalness:0});
+      const mintM=M(0x7fe0c4,{roughness:.58,metalness:0});
+      const cocoaM=M(0x6b4a3a,{roughness:.7,metalness:0});
+      const blushM=M(0xff9db4,{roughness:.8,metalness:0});
+      /* ① 奶油蛋托底座：一圈圆盘 + 一圈糖珠 */
+      add(gb,new THREE.CylinderGeometry(1.62,1.78,.26,28),creamM,0,.13,0);
+      add(gb,new THREE.CylinderGeometry(1.50,1.62,.14,28),yolkM,0,.32,0);
+      for(let i=0;i<12;i++){
+        const a=i/12*Math.PI*2;
+        addNS(gb,new THREE.SphereGeometry(.085,10,8),i%2?strawM:mintM,Math.cos(a)*1.62,.42,Math.sin(a)*1.62);
       }
-      /* 三层檐口线脚 */
-      add(gb,BX(2.44,.11,1.56),SK.M.trimDark,0,2.92,0);
-      add(gb,BX(2.70,.13,1.82),SK.M.trim,0,3.04,0);
-      add(gb,BX(2.38,.10,1.50),SK.M.trimDark,0,3.15,0);
-      /* 人字雪顶（与市集摊位同一套屋面做法，瓦 + 雪 + 脊瓦） */
-      SK.pitchedRoof(gb,{w:2.44,d:1.56,y:3.20,rise:.62,over:.24});
-      /* 顶脊小金饰 */
-      const fin=add(gb,new THREE.ConeGeometry(.10,.34,8),gilt2M,0,3.20+.62+.42,0);
-      fin.castShadow=false;
-      /* 红色圣诞邮筒（稳立于底座前侧 z=+0.26，拱顶沿 Z 轴正确对齐箱体） */
-      add(gb,BX(.46,.88,.42),redBoxM,0,.98,.26);
-      const mTop=add(gb,new THREE.CylinderGeometry(.23,.23,.42,14,1,false,0,Math.PI),redBoxM,0,1.42,.26);
-      mTop.rotation.x=Math.PI/2;
-      add(gb,BX(.30,.06,.05),M(0x141a1f,{roughness:.4}),0,1.28,.48);
-      add(gb,BX(.26,.18,.04),gilt2M,0,1.00,.48);
-      /* 檐下灯串 */
-      for(let i=0;i<9;i++)addNS(gb,new THREE.SphereGeometry(.07,8,6),getBulbMat([0xff4d4d,0xffe078,0x48e58b][i%3],i),-1.0+i*.25,2.86,.30);
-      /* 地面光池 */
-      const gpool=new THREE.Mesh(new THREE.PlaneGeometry(3.6,3.6),new THREE.MeshBasicMaterial({
-        map:glowTex,color:0xffd68a,transparent:true,opacity:.13,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
-      gpool.rotation.x=-Math.PI/2;gpool.position.set(0,.45,.2);gpool.castShadow=false;gb.add(gpool);
+      /* ② 巨型蛋仔立牌：真正的蛋型（上小下大），带腮红和小脚 */
+      {
+        const egg=new THREE.Group();egg.position.set(0,.42,0);gb.add(egg);
+        const body=add(egg,new THREE.SphereGeometry(.86,28,22),yolkM,0,.96,0);
+        body.scale.set(1,1.14,1);
+        // 头顶小呆毛（蛋仔经典）+ 呆毛尖端的小圆球
+        const ah=add(egg,new THREE.CapsuleGeometry(.045,.26,6,10),yolkM,.07,2.10,0);
+        ah.rotation.z=.34;
+        addNS(egg,new THREE.SphereGeometry(.11,12,10),strawM,.19,2.32,0);
+        // 腮红两坨：在眼睛正下方偏外一点，不能压到眼睛
+        addNS(egg,new THREE.SphereGeometry(.145,12,10),blushM,-.40,1.02,.78).scale.set(1,.58,.30);
+        addNS(egg,new THREE.SphereGeometry(.145,12,10),blushM,.40,1.02,.78).scale.set(1,.58,.30);
+        // 眼睛：两颗黑豆 + 白色高光
+        for(const s of [-1,1]){
+          addNS(egg,new THREE.SphereGeometry(.125,14,12),cocoaM,s*.30,1.26,.82).scale.set(.90,1.06,.6);
+          addNS(egg,new THREE.SphereGeometry(.046,10,8),creamM,s*.30+.035,1.32,.89);
+        }
+        // 嘴巴：小小的甜心弧线（蛋仔标志性的微笑）
+        {
+          const smile=addNS(egg,new THREE.TorusGeometry(.13,.028,8,16,Math.PI),cocoaM,0,.90,.80);
+          smile.rotation.set(0,0,Math.PI);
+          smile.scale.set(1,.7,.4);
+        }
+        // 小脚
+        for(const s of [-1,1]){
+          const ft=add(egg,new THREE.SphereGeometry(.24,14,12),strawM,s*.36,.20,.16);
+          ft.scale.set(1,.62,1.35);
+        }
+      }
+      /* ③ 草莓奶盖云朵顶：几团压扁的球叠出蓬松感 */
+      {
+        const cloud=new THREE.Group();cloud.position.set(0,2.44,0);gb.add(cloud);
+        const puffs=[[0,0,0,1.02],[-.86,.16,.10,.72],[.86,.16,-.08,.70],[-.42,.44,-.06,.66],[.44,.46,.08,.64],[0,.62,.18,.58]];
+        for(const [px,py,pz,sc] of puffs){
+          const b=add(cloud,new THREE.SphereGeometry(.60,18,14),creamM,px,py,pz);
+          b.scale.set(sc,sc*.72,sc*.86);
+        }
+        // 奶盖上撒的糖粒
+        for(let i=0;i<10;i++){
+          const a=i/10*Math.PI*2, r=.55+ (i%3)*.16;
+          addNS(cloud,new THREE.SphereGeometry(.075,10,8),[strawM,mintM,yolkM][i%3],Math.cos(a)*r,.42+ (i%2)*.12,Math.sin(a)*r*.8);
+        }
+      }
+      /* ④ 糖果粉圆角小信箱（蛋仔版，比原来的邮筒小一号、圆一号） */
+      {
+        const box=new THREE.Group();box.position.set(.62,.42,1.02);gb.add(box);
+        const b=add(box,BX(.62,.74,.44),strawM,0,.40,0);
+        // 圆角化：四角加小球，看起来就是软软的
+        for(const sx of [-1,1])for(const sy of [0,1])for(const sz of [-1,1])
+          addNS(box,new THREE.SphereGeometry(.13,12,10),strawM,sx*.25,.40+sy*.30-.15,sz*.17);
+        // 投信口（一条深色弧线）
+        addNS(box,BX(.30,.055,.06),cocoaM,0,.52,.21);
+        // 挂着一枚小爱心标签
+        const heart=addNS(box,new THREE.SphereGeometry(.11,12,10),yolkM,.20,.24,.24);
+        heart.scale.set(1,.9,.5);
+        // 邮箱顶部小旗（提示这是留言信箱）
+        const pole=add(box,new THREE.CylinderGeometry(.022,.022,.44,6),mintM,0,.98,0);
+        pole.castShadow=false;
+        const flag=add(box,BX(.30,.18,.03),mintM,.14,1.14,0);
+        flag.rotation.z=-.16;
+      }
+      /* ⑤ 底部一圈软糖圆环（把主体和地面接住，不留硬边） */
+      add(gb,new THREE.TorusGeometry(1.34,.13,10,36),mintM,0,.30,0).rotation.x=Math.PI/2;
+      /* ⑥ 地面光池（暖光，别太亮） */
+      const gpool=new THREE.Mesh(new THREE.PlaneGeometry(4.2,4.2),new THREE.MeshBasicMaterial({
+        map:glowTex,color:0xffd8a8,transparent:true,opacity:.16,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+      gpool.rotation.x=-Math.PI/2;gpool.position.set(0,.10,.2);gpool.castShadow=false;gb.add(gpool);
       gb.userData.keep=true;
       gb.userData.physObj={type:'guestbook',ref:gb};
       amusement.dyn.add(gb);
@@ -16691,6 +16748,15 @@ function animate(){
     n.squashV+=(0-n.squash)*120*dt-n.squashV*10.5*dt;n.squash+=n.squashV*dt;
     const sy=n.baseSc*(1-n.squash), sxz=n.baseSc*(1+n.squash*.5);
     n.p.scale.set(sxz,sy,sxz);
+    /* 名字牌不参与压扁弹跳（否则字会跟着变小看不清），
+       并且只在 26m 内显示 —— 远了就是一堆看不清的小白点，反而碍眼 */
+    if(n.tag){
+      const sc=1/n.baseSc;
+      n.tag.scale.set(.86*sc,.296*sc,1);
+      n.tag.position.y=1.30*sc;
+      const tdx=n.p.position.x-camX,tdz=n.p.position.z-camZ;
+      n.tag.visible=(tdx*tdx+tdz*tdz)<900;
+    }
 
     // 停步观赏或原地开心挥爪
     if(n.wait>0){
@@ -17148,7 +17214,7 @@ const XM_SHOTS=[
   /* ── 静态风景机位 ── */
   {id:'museum-gate',   name:'艺术馆正门',   kind:'static',pos:[24,4.6,23],   look:[6,6.2,2],    fov:58,move:'sway', desc:'玻璃幕墙、暖金灯带与门前雪松'},
   {id:'plaza-night',  name:'中央广场夜景', kind:'static',pos:[9,6.2,20],    look:[-2,3.2,-6], fov:64,move:'drift',desc:'环城大道、远景校区与雪幕'},
-  {id:'fair-gate',    name:'游乐园鎏金门楼',kind:'static',pos:[-7,3.2,26],  look:[4,3.4,19.5], fov:58,move:'sway', desc:'鎏金花格门楼与积雪顶'},
+  {id:'fair-gate',    name:'游乐园入口',   kind:'static',pos:[-7,3.2,26],  look:[4,3.4,19.5], fov:58,move:'sway', desc:'敞开的园区入口与远处旋转木马'},
   {id:'church-front', name:'教堂正门',     kind:'static',pos:[-49,4.2,12], look:[-49,7.6,26],fov:54,move:'sway', desc:'哥特立面、尖拱门与红毯大道'},
   {id:'circus-front',name:'露天马戏团',   kind:'static',pos:[27.5,8.2,30],look:[50,3.2,30],fov:58,move:'sway',desc:'条纹篷顶与场内表演'},
   {id:'anime-plaza',  name:'动漫雪园中轴', kind:'static',pos:[26.5,2.9,10],look:[26.5,2.4,-8],fov:62,move:'push',desc:'中轴大道与手办雕像群'},
@@ -18551,10 +18617,10 @@ function updateLaunchRide(dt){
 const fpvSys=(()=>{
   // 顺时针一镜到底、零折返、零穿墙的 7 大真孔洞/峡谷/高塔俯冲闭合航线
   const pts=[
-    // 【Stage 1：北街助跑 -> 正中钻过游乐园鎏金花格大门牌坊拱洞 (x=4.0, z=19.9, 门洞宽7.4m×高4.3m)】
+    // 【Stage 1：北街助跑 -> 从艺术馆正门直穿游乐园园区入口（鎏金门楼已拆除，改为敞开的直线路径）】
     new THREE.Vector3( -6.5,  2.3, 12.2),
     new THREE.Vector3(  2.8,  2.3, 13.8),
-    new THREE.Vector3(  4.0,  2.4, 19.9), // ★ 孔洞穿越 1：笔直钻过游乐园正门牌坊中心
+    new THREE.Vector3(  4.0,  2.4, 19.9), // 游乐园正门原址（门楼已拆，直接穿行）
     new THREE.Vector3(  1.2,  2.5, 25.8), // 从留言亭左侧通道丝滑切入园内
 
     // 【Stage 2：中央旋转木马贴檐压弯 -> 21×28m 皇家溜冰场 1.65m 贴冰长掠 + 云霄飞车高架桥洞下穿】
@@ -18599,7 +18665,7 @@ const fpvSys=(()=>{
   ];
   const curve=new THREE.CatmullRomCurve3(pts,true,'centripetal',.5);
   const STAGES=[
-    [0.00,'STAGE 01 · 游乐园鎏金大门牌坊正中钻洞穿越'],
+    [0.00,'STAGE 01 · 穿游乐园敞开的正门入口直入园区'],
     [0.14,'STAGE 02 · 皇家溜冰场 1.6m 贴冰长掠 + 云霄飞车桥洞下穿'],
     [0.29,'STAGE 03 · 哥特大教堂双塔峡谷穿缝 + 正立面垂直俯冲'],
     [0.45,'STAGE 04 · 11.5m 皇家巨型圣诞树贴冠刀锋环绕 + 喷泉掠水'],
@@ -19295,10 +19361,9 @@ function updateTrain(dt){
   });
 })();
 
-// 屋檐晶莹冰凌（游乐园大门 + 艺术馆正门檐 + 小吃街檐）
+// 屋檐晶莹冰凌（艺术馆正门檐 + 小吃街檐）
 {
   const iciclePts=[];
-  for(let i=0;i<22;i++)iciclePts.push([0.4+i*.34,4.28,20.22,R(.16,.38)]); // 游乐园大门
   for(let i=0;i<16;i++)iciclePts.push([-2.8+i*.37,4.35,8.85,R(.14,.32)]); // 艺术馆门檐
   for(let k=0;k<6;k++)for(let i=0;i<5;i++)iciclePts.push([11.4+k*4.8+i*.78,2.62,23.45,R(.12,.26)]); // 小吃街檐
   const iceGeo=new THREE.ConeGeometry(.045,1,6);
