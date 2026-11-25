@@ -1126,7 +1126,7 @@ const animeOutlineShader={
     tDiffuse:{value:null},
     uRes:{value:new THREE.Vector2(Math.max(1,innerWidth*HI_DPR),Math.max(1,innerHeight*HI_DPR))},
     uHQ:{value:1.0},
-    uSat:{value:1.0}
+    uSat:{value:1.05}   /* 微缩景观的饱和度要比现实略高一点，才像摆在桌上的模型 */
   },
   vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
   fragmentShader:`
@@ -1223,7 +1223,16 @@ key.shadow.camera.near=1;key.shadow.camera.far=160;
 key.shadow.bias=-.0004;key.shadow.normalBias=.055;
 scene.add(key);scene.add(key.target);
 
-const moon=new THREE.DirectionalLight(0x7fa8d8,.25); scene.add(moon);
+/* 冷色轮廓光（rim）—— 微缩景观夜景的标志手法：
+   暖色实用光负责「照亮」，冷色背光负责「勾边」，暗部才不会糊成一片死黑。
+   ⚠ 原来这盏灯根本没设 position，DirectionalLight 默认在 (0,1,0)，
+   方向光等于从正上方垂直砸下来 —— 那不是轮廓光，只是一盏顶光，
+   而且方向接近垂直时阴影视矩阵会退化（city-sandbox 微缩沙盘的踩坑记录）。
+   现在从西北后方低角度打过来，所有物体的背侧会有一道冷蓝轮廓。 */
+const moon=new THREE.DirectionalLight(0x86aee8,.40);
+moon.position.set(-58,26,-48);
+scene.add(moon);scene.add(moon.target);
+moon.target.position.set(0,3,10);
 
 /* ════════════════════════════════════════════════════════════
    2. 程序化贴图
@@ -2153,8 +2162,32 @@ const MAT={
 planar.enabled=false;
 wetShared.uReflOn.value=0;
 
+/* ── 雪面细节贴图 ──
+   原来雪地是一张 400×400 的纯色平面，只挂了一层噪声色图，
+   点光源打上去整片死平，既没有结晶高光也没有起伏。
+   微缩景观的雪是要「有颗粒」才像雪的：
+   粗糙度贴图 = 低频的压实 / 蓬松差异，凹凸贴图 = 高频的雪粒颗粒。 */
+const snowRoughTex=bakeTex(256,(u,v)=>{
+  const n=nSteel.fbm(u*3.2+11,v*3.2+5,4);
+  const val=.60+n*.32;               // 0.60~0.92
+  return[val,val,val];
+});
+snowRoughTex.colorSpace=THREE.NoColorSpace;
+snowRoughTex.repeat.set(22,22);
+const snowBumpTex=bakeTex(256,(u,v)=>{
+  const g=nSteel.fbm(u*26+3,v*26+9,3);
+  const s=nSteel.fbm(u*8+21,v*8+2,3);
+  const val=.25+(g*.55+s*.45)*.5;
+  return[val,val,val];
+});
+snowBumpTex.colorSpace=THREE.NoColorSpace;
+snowBumpTex.repeat.set(64,64);
 const ground=add(scene,new THREE.PlaneGeometry(400,400),
-  M(0xdfe8f2,{roughness:.88,metalness:.03,flatShading:false,map:noiseTex('#d9e5f0','255,255,255',2400)}),
+  M(0xdfe8f2,{roughness:.88,metalness:.03,flatShading:false,
+    map:noiseTex('#d9e5f0','255,255,255',2400),
+    roughnessMap:snowRoughTex,
+    /* 凹凸贴图每个像素都要算屏幕空间导数，而地面占屏面积最大 —— 触屏端不挂 */
+    ...(IS_TOUCH_DEV?{}:{bumpMap:snowBumpTex,bumpScale:.014})}),
   0,-.02,0);
 ground.rotation.x=-Math.PI/2;ground.castShadow=false;
 ground.material.map.repeat.set(40,40);
@@ -2327,6 +2360,7 @@ step1.userData.tag='street';
    4.8 圣诞主题公共模型库（圣诞树 / 驯鹿 / 雪橇 / 雪人 / 花环 / 礼盒 / 圣诞帽 / 拐杖糖）
    ════════════════════════════════════════════════════════════ */
 const xmasStars=[], xmasBulbPool=[];
+
 const _xmasBulbCache=new Map();
 /* ── 乘法混合用的光晕贴图 ──
    加色混合落在白雪上只会把雪地烧得更白，等于什么都看不见；
@@ -2380,6 +2414,16 @@ const lacquerSheenTex=(()=>{
   t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;
   return t;
 })();
+/* ── 「夜里才该亮」的地面灯光登记表 ──
+   地埋灯的雪地光斑、钢琴的光池、环城马路的路面光晕，白天必须淡出：
+   大白天雪地上浮着一圈暖色、沥青上浮着一串黄斑，看着就是贴纸，不是灯。
+   MUL_GLOW_K 每帧由主循环按昼夜算好；钢琴扫光那条单独在 updatePianoPlaza 里用。 */
+const MUL_GLOW_POOL=[];
+let MUL_GLOW_K=1;
+function regNightGlow(mat,base){
+  MUL_GLOW_POOL.push({mat,base:(base===undefined?mat.opacity:base)});
+  return mat;
+}
 function getBulbMat(hex,phase=0){
   if(hex===undefined||hex===null)hex=0xffe078;
   const bucket=Math.abs(Math.round(phase))%4;
@@ -5696,6 +5740,34 @@ const lampPools=[];
       pl.position.set(x,5.8,12.85);scene.add(pl);shopLights.push({l:pl,base:68,street:true});
     }
   }
+  /* ── 沿环城马路补一整串路面灯光晕 ──
+     微缩景观的夜景，街道必须有连续、有节奏的光：
+     原来只有南侧 5 盏路灯，北段、西弧、东弧大半条马路是死黑沥青，画面像半成品。
+     这里沿路内侧路缘铺一串暖色光晕 —— 深色沥青上加色混合才看得见
+     （跟钢琴广场那圈地埋灯是同一个手法：加色在黑漆/深色面上有效，在白雪上无效）。
+     不再加坡灯杆：灯杆沿路一排排插下去，很容易插进建筑和市集摊位里，
+     而光晕贴在路面上、被建筑挡住也只是被挡住，不会穿模。
+     零光源成本（不占每像素的光照预算），合批后几乎不增加 draw call。 */
+  {
+    const roadHaloGeo=new THREE.PlaneGeometry(4.4,4.4);
+    const roadHaloMat=regNightGlow(new THREE.MeshBasicMaterial({
+      map:glowTex,color:0xffcb8e,transparent:true,opacity:.24,
+      blending:THREE.AdditiveBlending,depthWrite:false,fog:false}),.24);
+    const grp=new THREE.Group();
+    const spacing=13;
+    const n=Math.max(8,Math.round(LOOP.totalLen/spacing));
+    for(let i=0;i<n;i++){
+      const s=(i+.5)/n*LOOP.totalLen;
+      const p=LOOP.sample(s,-(LOOP.halfW-.6));   // 贴着路内侧路缘
+      const q=new THREE.Mesh(roadHaloGeo,roadHaloMat);
+      q.rotation.x=-Math.PI/2;
+      q.position.set(p.x,.05,p.z);
+      q.castShadow=false;q.receiveShadow=false;
+      q.userData.noReflect=true;
+      grp.add(q);
+    }
+    street.add(grp);
+  }
 }
 
 /* 限速牌 / 停车牌（规范双面正字圆盘 + 底部立杆支撑，前后观看均不镜像、立杆不挡字） */
@@ -6719,13 +6791,22 @@ const skylineMats=[];
         bx.fillStyle='#ececec';bx.fillRect(wx-6,wy-6,ww+12,wh+12);
         bx.fillStyle='#1f1f1f';bx.fillRect(wx,wy,ww,wh);
         if(rng()<.68){
+          /* 夜景城市不能是一格一格一模一样的暖黄矩阵 ——
+             色温（白炽黄 / 暖白 / 荧光冷白 / 绿白）随机，
+             明度随机（有的全亮、有的半亮），再随机来一扇「只亮一半」的窗，
+             一栋楼里才像真有人住，而不是贴了一张 Excel 表格。 */
+          const wcol=['#ffd27a','#ffe9b8','#ffe0a0','#cfe0ff','#d8f0ff','#e2ffd6'][Math.floor(rng()*6)];
           const g=x.createLinearGradient(wx,wy,wx,wy+wh);
           g.addColorStop(0,'#2e3540');
           g.addColorStop(.32,sp.wins[Math.floor(rng()*sp.wins.length)]);
-          g.addColorStop(1,'#ffd27a');
+          g.addColorStop(1,wcol);
           x.fillStyle=g;
-          x.globalAlpha=.78+rng()*.20;
+          x.globalAlpha=.34+rng()*.64;
           x.fillRect(wx,wy,ww,wh);
+          if(rng()<.30){                       // 只亮一半（像拉着半边窗帘）
+            x.globalAlpha=.16+rng()*.22;
+            x.fillRect(wx,wy,ww,wh*(.32+rng()*.36));
+          }
           x.globalAlpha=1;
         }else{
           x.fillStyle='#131a23';
@@ -9771,9 +9852,9 @@ const pianoPlaza={
       addNS(plaza,new THREE.SphereGeometry(.085,10,8),getBulbMat(0xffd49a,0),q[0],.045,q[1]);
       const ring=addNS(plaza,new THREE.TorusGeometry(.135,.028,6,16),M(0x3a4149,{roughness:.5,metalness:.7}),q[0],.012,q[1]);
       ring.rotation.x=Math.PI/2;
-      const sp=addNS(plaza,new THREE.CircleGeometry(.42,20),new THREE.MeshBasicMaterial({
+      const sp=addNS(plaza,new THREE.CircleGeometry(.42,20),regNightGlow(new THREE.MeshBasicMaterial({
         map:mulGlowTex,color:0xffffff,transparent:true,opacity:.50,
-        blending:THREE.MultiplyBlending,depthWrite:false,fog:false}),q[0],.016,q[1]);
+        blending:THREE.MultiplyBlending,depthWrite:false,fog:false}),.50),q[0],.016,q[1]);
       sp.rotation.x=-Math.PI/2;sp.renderOrder=2;sp.userData.noReflect=true;
     }
   }
@@ -9794,9 +9875,9 @@ const pianoPlaza={
       ring.rotation.x=Math.PI/2;
       /* 灯脚下的雪面暖斑：地埋灯的球只有 8.5cm，站在地上根本看不见。
          用乘法贴图在雪地上留一小圈淡暖光，远看就是「钢琴外围一圈亮着的地灯」。 */
-      const spot=addNS(bg2,new THREE.CircleGeometry(.42,20),new THREE.MeshBasicMaterial({
+      const spot=addNS(bg2,new THREE.CircleGeometry(.42,20),regNightGlow(new THREE.MeshBasicMaterial({
         map:mulGlowTex,color:0xffffff,transparent:true,opacity:.50,
-        blending:THREE.MultiplyBlending,depthWrite:false,fog:false}),lx,.016,lz);
+        blending:THREE.MultiplyBlending,depthWrite:false,fog:false}),.50),lx,.016,lz);
       spot.rotation.x=-Math.PI/2;spot.renderOrder=2;spot.userData.noReflect=true;
     }
     mergeStatic(bg2);
@@ -9939,9 +10020,9 @@ const pianoPlaza={
      一台钢琴在雪夜里要靠「光」立得住，不是靠再堆装饰件。 */
   {
     /* 脚下光池：乘法混合，雪地上真的能看见一圈暖光 */
-    const pl=new THREE.Mesh(new THREE.CircleGeometry(1,48),new THREE.MeshBasicMaterial({
+    const pl=new THREE.Mesh(new THREE.CircleGeometry(1,48),regNightGlow(new THREE.MeshBasicMaterial({
       map:mulGlowTex,color:0xffffff,transparent:true,opacity:.34,
-      blending:THREE.MultiplyBlending,depthWrite:false,fog:false}));
+      blending:THREE.MultiplyBlending,depthWrite:false,fog:false}),.34));
     pl.rotation.x=-Math.PI/2;
     pl.position.set(pg.position.x,.028,pg.position.z);
     pl.scale.setScalar(2.05);   /* 光池只盖住琴脚，多了就成了「底盘」 */
@@ -10034,7 +10115,8 @@ function updatePianoPlaza(dt,t){
   pp.flash=Math.max(0,pp.flash-dt*.85);
   if(pp.sweep){
     pp.sweep.rotation.y=phaseOf(24.17)*.26+pp.flash*.9;   // 纯相位，扫光全服同进度
-    pp.sweepMat.opacity=.09+.07*Math.sin(t*1.7)+pp.flash*.24;
+    /* 扫光是「灯在转」的效果，白天该没有；flash（弹奏反馈）不受昼夜限制 */
+    pp.sweepMat.opacity=(.09+.07*Math.sin(t*1.7))*MUL_GLOW_K+pp.flash*.24;
   }
   if(pp.upl)for(const l of pp.upl)l.intensity=l.userData.base*(1+pp.flash*2.2);
   if(pp.spot)pp.spot.intensity=13+pp.flash*16;
@@ -12533,9 +12615,11 @@ function applyTime(h){
   }else{
     key.color.setHex(0xa8ccf0);key.intensity=.38;
     key.position.set(-Math.cos(az)*36,40,-18);
-    moon.intensity=.24;moon.color.setHex(0x88b4e6);
-    ambient.color.setHex(0x324864);ambient.intensity=.54;
-    hemi.color.setHex(0x46668c);hemi.groundColor.setHex(0x16202c);hemi.intensity=.56;
+    moon.intensity=.40;moon.color.setHex(0x86aee8);
+    /* 夜里的环境光压低、压冷：暖色实用光源有 20 多盏，环境光再高就把暗部洗成灰，
+       夜景会显脏。压下去之后暖光才跳得出来，暗部也才有冷调层次。 */
+    ambient.color.setHex(0x2d4160);ambient.intensity=.47;
+    hemi.color.setHex(0x46668c);hemi.groundColor.setHex(0x16202c);hemi.intensity=.52;
     paintSky(WINTER_SKY[0],WINTER_SKY[1],WINTER_SKY[2],WINTER_SKY[3]);
     scene.fog.color.setHex(WINTER_FOG);scene.fog.density=WINTER_FOG_D;
     scene.userData.baseFogD=WINTER_FOG_D;scene.userData.baseFogCol=WINTER_FOG;
@@ -12928,7 +13012,33 @@ function fpStep(dx,dz){
   fp.vx*=.05;fp.vz*=.05;
 }
 /* 调试接口：window.diorama.fp 可读取/设置第一人称位置 */
-window.diorama={cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.toFixed(2),z:+camera.position.z.toFixed(2),
+window.diorama={
+/* 材质体检：列出「没有任何贴图的大面积 MeshStandardMaterial」，
+   按地面投影面积排序 —— 用来把还在裸奔的纯色块揪出来。
+   微缩景观最忌讳大面积纯色：没有贴图的表面上所有光照都落在同一块颜色上，
+   夜里就是一片死黑或死白，看不出体积。 */
+sceneAudit:()=>{
+  const out=[];
+  const box=new THREE.Box3(),sz=new THREE.Vector3();
+  scene.traverse(o=>{
+    if(!o.isMesh)return;
+    const ms=Array.isArray(o.material)?o.material:[o.material];
+    for(const m of ms){
+      if(!m||!m.isMeshStandardMaterial)continue;
+      if(m.map||m.emissiveMap)continue;
+      box.setFromObject(o);box.getSize(sz);
+      const area=Math.max(0,sz.x*sz.z);
+      if(area<4)continue;
+      out.push({c:'#'+m.color.getHexString(),r:+m.roughness.toFixed(2),
+                mt:+m.metalness.toFixed(2),area:+area.toFixed(0),
+                sz:[+sz.x.toFixed(1),+sz.y.toFixed(1),+sz.z.toFixed(1)]});
+      break;
+    }
+  });
+  out.sort((a,b)=>b.area-a.area);
+  return out.slice(0,40);
+},
+cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.toFixed(2),z:+camera.position.z.toFixed(2),
   tx:+controls.target.x.toFixed(2),ty:+controls.target.y.toFixed(2),tz:+controls.target.z.toFixed(2),
   introOn:intro.active,introT:+intro.t.toFixed(2),home:[HOME.pos.x,HOME.pos.y,HOME.pos.z]}),fp:{
   get:()=>({x:+fp.x.toFixed(2),y:+fp.y.toFixed(2),z:+fp.z.toFixed(2),yaw:+fp.yaw.toFixed(2),on:fp.on}),
@@ -15432,11 +15542,21 @@ function animate(){
        门楣上那一排灯看起来就是在「闪」。改成慢半拍 + 幅度收窄的呼吸感。 */
   {
     const lOn=state.lights?1.0:0.12;
-    const glowScale=(nightNow?1.0:(state.timeKey==='dusk'||state.timeKey==='dawn'?.78:.44))*lOn;
+    const glowScale=(nightNow?1.0:(state.timeKey==='dusk'||state.timeKey==='dawn'?.78:.40))*lOn;
+    /* 雪地上的假灯光：夜里全开；黄昏黎明留一点；白天全灭 */
+    MUL_GLOW_K=state.lights?(nightNow?1.0:(state.timeKey==='dusk'||state.timeKey==='dawn'?.55:0.0)):0;
+    for(let i=0;i<MUL_GLOW_POOL.length;i++){
+      const it=MUL_GLOW_POOL[i];
+      it.mat.opacity=it.base*MUL_GLOW_K;
+    }
     for(let i=0;i<xmasBulbPool.length;i++){
       const p=xmasBulbPool[i];
       const pulse=(.84+.16*Math.sin(t*1.5+p.phase))*glowScale;
       p.mat.color.copy(p.base).multiplyScalar(pulse);
+      /* 白天灯是关着的：只把亮度压下来（外壳还是自己的颜色），
+         不要往灰黑里推 —— 推成灰黑就是雪地里一排黑点，像挖了一排坑。
+         地埋灯是半球嵌在雪里的，白天本来就该只露出一点点暗色玻璃。 */
+      if(glowScale<.72)p.mat.color.multiplyScalar(.82);
     }
     for(let i=0;i<xmasStars.length;i++){
       xmasStars[i].rotation.y=t*.9+i;
