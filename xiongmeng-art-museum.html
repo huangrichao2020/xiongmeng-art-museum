@@ -14939,13 +14939,14 @@ function exitWalk(){
 /* ── 虚拟摇杆（左手移动）──
    统一只用 pointer 事件：触屏上浏览器本来就会派发 pointer 事件，
    再额外挂一套 touch 会让 touchmove 和 pointermove 轮流写同一个值，摇杆会自己抖回中间。 */
-const joy={active:false,cx:0,cy:0,dx:0,dy:0,mag:0};
+const joy={active:false,cx:0,cy:0,dx:0,dy:0,mag:0,pid:null,src:''};
 const joyEl=document.getElementById('joystick'),stickEl=document.getElementById('stick');
 /* 摇杆手感：
    行程 26px（内圈直径就是 62，正好卡在虚线圈里）—— 原来 33px 偏钝；
    输出走平方根曲线：手指推 8px 就给到一半速度，推到底才满舵。
    之前是线性输出，推 8px 只有 0.24 速度，人几乎不动，就感觉"要用力滑"。 */
 const JOY_R=26;
+let JOY_PAD_R=67;      // 左下角摇杆外圈半径（按实际元素算）
 function joyApply(x,y){
   let dx,dy,len;
   if(joy.src==='screen'){
@@ -14961,8 +14962,21 @@ function joyApply(x,y){
     return;
   }
   /* 左下角固定摇杆：手指按在圆上哪一点，就朝那个方向走。
-     不用先按回中间再往边上滑 —— 按住不动，人就一直朝那个方向走。 */
+     不用先按回中间再往边上滑 —— 按住不动，人就一直朝那个方向走。
+     作用范围只在屏幕左半区：
+       · 手指在摇杆圈内 → 按哪走哪
+       · 滑出圈但还在左半区 → 锁住最后的方向继续走（看左边时不会突然停）
+       · 滑到右半区 → 摇杆输出归零，右半区是转头用的，不该再改人物方向 */
+  if(x>=innerWidth*0.5){
+    joy.dx=joy.dy=joy.mag=0;
+    stickEl.style.transform='translate(0,0)';
+    return;
+  }
   dx=x-joy.cx;dy=y-joy.cy;len=Math.hypot(dx,dy);
+  if(len>JOY_PAD_R){
+    if(len<3){joy.dx=joy.dy=joy.mag=0;stickEl.style.transform='translate(0,0)';}
+    return;                       // 出圈但在左半区：保持上一次输出不变
+  }
   if(len<3){                      // 正中心没有方向可判，给个很小的死区
     joy.dx=joy.dy=joy.mag=0;
     stickEl.style.transform='translate(0,0)';
@@ -14993,7 +15007,9 @@ function joyHide(){
 joyEl.addEventListener('pointerdown',e=>{
   e.preventDefault();
   const r=joyEl.getBoundingClientRect();
-  joy.active=true;joy.src='pad';joy.cx=r.x+r.width/2;joy.cy=r.y+r.height/2;
+  joy.active=true;joy.src='pad';joy.pid=e.pointerId;
+  joy.cx=r.x+r.width/2;joy.cy=r.y+r.height/2;
+  JOY_PAD_R=r.width/2;
   joyApply(e.clientX,e.clientY);
   // 指针已释放时 setPointerCapture 会抛，包一层别把手势打断
   try{joyEl.setPointerCapture&&joyEl.setPointerCapture(e.pointerId);}catch(err){}
@@ -15008,9 +15024,11 @@ joyEl.addEventListener('pointercancel',joyReset);
 /* 以前还挂 pointerleave → joyReset：手指只要滑出摇杆圆圈就被清零，
    正在推的时候突然停住，用户只能重新按住，越推越烦。
    现在滑出圆圈照样能继续推（下面还有 window 级兜底），松手才停。 */
-/* 兜底：capture 丢失时（iOS 某些情况）滑出元素也要跟手 */
+/* 兜底：capture 丢失时（iOS 某些情况）滑出元素也要跟手。
+   必须盯住摇杆那根手指的 pointerId —— 右手在右半区转视角时
+   pointerId 不同，不能让它改到人物的方向。 */
 addEventListener('pointermove',e=>{
-  if(joy.active&&joy.src==='pad')joyApply(e.clientX,e.clientY);
+  if(joy.active&&joy.src==='pad'&&e.pointerId===joy.pid)joyApply(e.clientX,e.clientY);
 },{passive:true});
 
 /* 触屏手势：每根手指按 pointerId 单独记账
