@@ -11897,6 +11897,7 @@ const circus={
   x:50,z:30,R:6.94,
   g:null,sweep:null,sweep2:null,sweepMat:null,sweepMat2:null,
   pool:null,light:null,magic:{},jug:{},acro:{},clown:{},aud:[],
+  lining:null,
   act:0
 };
 const CIRCUS_ACTS=[
@@ -12010,12 +12011,13 @@ const CIRCUS_ACTS=[
      半径随高度走「钟形」：顶部收得快、腰部鼓、檐口外撇，才是马戏团大帐篷的轮廓。
      侧视时从帐篷里面往上看会看到背面，所以这层帆布必须是双面材质。 */
   const Y_EAVE=5.15,Y_TOP=8.9,RR=9.25;
-  function goreGeo(a0,a1){
+  function goreGeo(a0,a1,inset){
+    const ins=inset||0;
     const US=5,VS=6,pos=[],uv=[],idx=[];
     for(let v=0;v<=VS;v++){
       const tv=v/VS;
-      const r=RR*(0.10+0.90*Math.pow(tv,1.30));
-      const y=Y_EAVE+(Y_TOP-Y_EAVE)*Math.pow(1-tv,1.30);
+      const r=Math.max(.06,RR*(0.10+0.90*Math.pow(tv,1.30))-ins);
+      const y=Y_EAVE+(Y_TOP-Y_EAVE)*Math.pow(1-tv,1.30)-ins*.55;
       for(let u=0;u<=US;u++){
         const tu=u/US,a=a0+(a1-a0)*tu;
         pos.push(Math.cos(a)*r,y,Math.sin(a)*r);uv.push(tu,tv);
@@ -12037,6 +12039,43 @@ const CIRCUS_ACTS=[
     mesh.castShadow=true;mesh.receiveShadow=true;
     g.add(mesh);
   }
+  /* ── 帐内深色内衬 ──
+     帆布是双面材质还带自发光（夜里从外面看要保住红白暖调），
+     结果从帐篷里往上看，天花板是一整片发亮的帆布，晃眼。
+     在帆布内侧 0.14m 再包一层深色布：外面看不到（帆布不透明），
+     里面看进去就是一顶暗顶。
+     关键：这一层必须「不吃光」。
+     之前用 MeshStandardMaterial(深棕)，结果帐内三盏点光直接把它照成一片亮橙棕 ——
+     深色 albedo 挡不住强点光，颜色被照度顶上去，视觉上跟原来的白帆布没差。
+     换成 MeshBasicMaterial（unlit），亮度只由颜色决定，灯再强也压不下去。 */
+  /* 内衬照样是红白相间的条纹，只是压到了很暗 ——
+     纯色一片反而像一块黑板，认不出这是个帐篷顶。 */
+  const linerMRed=new THREE.MeshBasicMaterial({
+    color:0x3d1a13,map:weave,side:THREE.BackSide,fog:true});
+  const linerMCream=new THREE.MeshBasicMaterial({
+    color:0x2f2a21,map:weave,side:THREE.BackSide,fog:true});
+  circus.lining=new THREE.Group();
+  circus.lining.userData.keep=true;      // 不参与合批：要能单独开关、单独调色
+  {
+    /* 24 片瓜瓣按颜色合成两个网格：2 个 draw call，比 24 片各画一次省得多 */
+    const gR=[],gC=[];
+    for(let i=0;i<24;i++){
+      const a0=i/24*Math.PI*2,a1=(i+1)/24*Math.PI*2;
+      (i%2===0?gR:gC).push(goreGeo(a0,a1,.14));
+    }
+    const mR=new THREE.Mesh(mergeGeos(gR,true),linerMRed);
+    const mC=new THREE.Mesh(mergeGeos(gC,true),linerMCream);
+    for(const m of [mR,mC]){m.castShadow=false;m.receiveShadow=false;circus.lining.add(m);}
+    for(const gg of gR.concat(gC))gg.dispose();
+    /* 篷顶正中有个小圆孔（旗杆穿出来的地方），补一圈暗环，
+       不然抬头正上方会漏出一圈亮帆布。 */
+    const ring=new THREE.Mesh(new THREE.RingGeometry(.60,1.08,24),
+      new THREE.MeshBasicMaterial({color:0x2a2119,side:THREE.DoubleSide,fog:true}));
+    ring.rotation.x=-Math.PI/2;ring.position.y=8.87;
+    ring.castShadow=false;ring.receiveShadow=false;
+    circus.lining.add(ring);
+  }
+  g.add(circus.lining);
   /* ── 扇贝形檐口：每片瓜瓣下挂一条垂幔 + 一个半圆扇贝 ── */
   for(let i=0;i<24;i++){
     const a0=i/24*Math.PI*2,a1=(i+1)/24*Math.PI*2,am=(a0+a1)/2;
@@ -12681,22 +12720,39 @@ function buildHelicopter(x,z,yaw){
   return g;
 }
 
-/* 飞行路线：从停机坪起飞 → 绕园区一圈 → 回到停机坪落地 */
+/* 飞行路线：停机坪水平滑出 → 爬升 → 绕园区一圈 → 回到停机坪上空
+   → 收拢成一条下降盘旋 → 水平接地。
+   两端都做成水平的：
+     · 起飞第一段的切线是水平的（u=0 处切线 = P1-P0），所以离地时不会猛抬头；
+     · 降落最后一段水平接地（u=1 处切线 = Pn-Pn-1），
+       盘旋下降时坡度也只有 10~30°，不是原来那种 60~70° 的陡降。
+   盘旋半径 8~12m，正好套在停机坪（半径 8m）上方，越转越小，最后落在坪中心。 */
 const HELI_PATH=new THREE.CatmullRomCurve3([
   new THREE.Vector3(HELI_PAD.x,0.007,HELI_PAD.z),
-  new THREE.Vector3(46,13,46),
-  new THREE.Vector3(36,25,38),
-  new THREE.Vector3(22,31,26),
-  new THREE.Vector3(4,33,12),
-  new THREE.Vector3(-16,33,6),
-  new THREE.Vector3(-34,30,14),
-  new THREE.Vector3(-38,27,30),
-  new THREE.Vector3(-32,26,46),
-  new THREE.Vector3(-12,27,55),
-  new THREE.Vector3(10,29,58),
-  new THREE.Vector3(32,30,56),
-  new THREE.Vector3(48,26,54),
-  new THREE.Vector3(55,11,52),
+  new THREE.Vector3(HELI_PAD.x,0.007,44.5),   // 水平滑出
+  new THREE.Vector3(50.5,3.2,39.5),          // 爬升
+  new THREE.Vector3(46,8.5,36),
+  new THREE.Vector3(37,16,32),
+  new THREE.Vector3(26,22,25),
+  new THREE.Vector3(12,27,17),
+  new THREE.Vector3(-4,30,10),
+  new THREE.Vector3(-20,31,6),
+  new THREE.Vector3(-34,29,12),
+  new THREE.Vector3(-40,26,26),
+  new THREE.Vector3(-36,25,40),
+  new THREE.Vector3(-24,25,50),
+  new THREE.Vector3(-8,26,55),
+  new THREE.Vector3(10,27,56),
+  new THREE.Vector3(30,29,59),              // 从跳伞塔(27.5,52.5,高26m)南侧绕过
+  new THREE.Vector3(44,27,54),
+  new THREE.Vector3(52,24,52),              // 回到停机坪正上方
+  new THREE.Vector3(60,20,56),              // 开始收拢下降
+  new THREE.Vector3(64,15,48),
+  new THREE.Vector3(58,10,44),
+  new THREE.Vector3(48,7,46),
+  new THREE.Vector3(46,3.2,56),
+  new THREE.Vector3(50,1.0,53.6),         // 最后一段下降（18° 进场）
+  new THREE.Vector3(52.0,0.007,51.4),     // 接地：沿 -Z 水平滑进坪心
   new THREE.Vector3(HELI_PAD.x,0.007,HELI_PAD.z)
 ],false,'catmullrom',.32);
 heliSys.len=HELI_PATH.getLength();
@@ -12764,12 +12820,14 @@ function updateHeliRide(dt){
   if(heliSys.riding){
     if(heliSys.phase==='spin'){
       heliSys.t+=dt;
+      heliSys.pitch=0;heliSys.roll=0;      // 停机坪上必须是水平姿态
       g.position.set(heliSys.x,.007+Math.sin(t*40)*.014*heliSys.rotor,heliSys.z);
+      g.rotation.set(0,heliSys.yaw,0,'YXZ');
       if(heliSys.t>1.9){heliSys.phase='fly';heliSys.t=0;}
     }else if(heliSys.phase==='fly'){
       const u=clamp(heliSys.dist/heliSys.len,0,1);
       let spd=16*(heliSys.fast?3.4:1);
-      spd*=Math.max(.05,Math.min(1,Math.min(u/.10,(1-u)/.085)));
+      spd*=Math.max(.05,Math.min(1,Math.min(u/.10,(1-u)/.14)));
       heliSys.dist+=spd*dt;
       const u2=clamp(heliSys.dist/heliSys.len,0,1);
       const p=HELI_PATH.getPointAt(u2);
@@ -12781,17 +12839,39 @@ function updateHeliRide(dt){
       while(dYaw<-Math.PI)dYaw+=Math.PI*2;
       heliSys.yaw=prevYaw+dYaw*Math.min(1,dt*2.6);
       heliSys.x=p.x;heliSys.y=Math.max(0,p.y);heliSys.z=p.z;
-      /* 俯仰随爬升角，侧倾随转弯率 */
+      /* 俯仰：跟的是「爬升趋势」，不是路径的瞬时切线角。
+         三个坑叠在一起会出事：
+           ① 符号：rotation.x 为正才是机头抬起（尾巴相对下沉）。
+              之前写的是 -climb，爬升时反而把尾巴甩到天上、降落时把尾巴压进地里 —— 就是穿模。
+           ② 幅度：尾梁伸到机身后 4.5m、高只有 1.4m，
+              俯仰超过 16° 尾巴就插进地面，所以限幅 ±0.20 rad（≈11.5°）。
+           ③ 低空：贴地时按离地高度把俯仰收掉，起降段机头不会猛抬、尾巴不会扫地。 */
       const climb=Math.atan2(tg.y,Math.hypot(tg.x,tg.z));
-      heliSys.pitch+=(-climb*.62-heliSys.pitch)*Math.min(1,dt*2.2);
+      const agl=Math.max(0,heliSys.y);
+      const lowK=Math.min(1,agl/4.0);
+      const wantPitch=Math.max(-.20,Math.min(.20,climb*.30))*lowK;
+      heliSys.pitch+=(wantPitch-heliSys.pitch)*Math.min(1,dt*2.0);
       const rate=dYaw/Math.max(dt,1e-3);
-      const wantRoll=Math.max(-.40,Math.min(.40,-rate*.26));
+      /* 侧倾按离地高度衰减：贴地滑行时完全不侧倾。
+         以前这里留了 .35 的保底，飞机还站在地上就开始歪 —— 滑橇直接插进雪地。 */
+      const wantRoll=Math.max(-.34,Math.min(.34,-rate*.24))*Math.min(1,agl/2.5);
       heliSys.roll+=(wantRoll-heliSys.roll)*Math.min(1,dt*2.0);
+      /* 硬约束：任何一个零件都不许低于地面 2cm。
+         滑橇底（局部 x=±0.98, y=0.055）被侧倾压下 0.98·sin(roll)，
+         尾梁末端（局部 z=4.47, y=1.40）被抬头压下 4.47·sin(pitch)，
+         离地 0m 时侧倾最多 2°、离地 0.3m 时抬头最多 4.5°。
+         这一层是几何算出来的，不是手感调出来的：改了姿态就自动不会扎地。 */
+      const limRoll=Math.asin(Math.max(0,Math.min(1,(agl+0.055-0.02)/0.98)));
+      if(Math.abs(heliSys.roll)>limRoll)heliSys.roll=(heliSys.roll<0?-1:1)*limRoll;
+      const limPitch=Math.asin(Math.max(-1,Math.min(1,(agl+1.40-0.02)/4.47)));
+      if(heliSys.pitch>limPitch)heliSys.pitch=limPitch;
+      if(heliSys.pitch<-limPitch)heliSys.pitch=-limPitch;
       g.position.set(heliSys.x,heliSys.y,heliSys.z);
       g.rotation.set(heliSys.pitch,heliSys.yaw,heliSys.roll,'YXZ');
       if(u2>=1){heliSys.phase='land';heliSys.t=0;heliSys.pitch=0;heliSys.roll=0;}
     }else if(heliSys.phase==='land'){
       heliSys.t+=dt;
+      heliSys.pitch=0;heliSys.roll=0;
       g.position.set(heliSys.x,.007,heliSys.z);
       g.rotation.set(0,heliSys.yaw,0,'YXZ');
       if(heliSys.t>2.4)endHeliRide();
@@ -12836,9 +12916,11 @@ function updateHeliRide(dt){
     camera.position.y+=(_heliTmp.y-camera.position.y)*ck;
     camera.position.z+=(_heliTmp.z-camera.position.z)*ck;
     camera.up.set(0,1,0);
-    _heliLook.set(heliSys.x+fwdX*22,
-                  heliSys.y+1.6+pitch*14,
-                  heliSys.z+fwdZ*22);
+    /* 调试用：camLookSelf=true 时看机身自己（目视核对俯仰姿态） */
+    const lookSelf=!!heliSys.camLookSelf;
+    _heliLook.set(heliSys.x+fwdX*(lookSelf?2.2:22),
+                  heliSys.y+(lookSelf?0.35:1.6+pitch*14),
+                  heliSys.z+fwdZ*(lookSelf?2.2:22));
     _heliMat.lookAt(camera.position,_heliLook,camera.up);
     camera.quaternion.setFromRotationMatrix(_heliMat);
     hudShow(heliSys.phase==='fly'?'直升机 · 绕园区巡航中':'直升机 · 旋翼加速中',
@@ -14585,8 +14667,46 @@ cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.toFixed(2),z:+cam
     x:+heliSys.x.toFixed(1),y:+heliSys.y.toFixed(1),z:+heliSys.z.toFixed(1),
     yaw:+heliSys.yaw.toFixed(2),dist:+heliSys.dist.toFixed(1),len:+heliSys.len.toFixed(1),
     padX:HELI_PAD.x,padZ:HELI_PAD.z,padR:HELI_PAD.R}),
-  circus:()=>({x:circus.x,z:circus.z,act:circus.act,actCn:CIRCUS_ACTS[circus.act].cn,
-    sweepY:circus.sweep?+circus.sweep.rotation.y.toFixed(3):null,
+  /* 尾梁末端的世界坐标：俯仰一压就会扎进地面，用它当「有没有穿模」的判据 */
+  heliTail:()=>{
+    if(!heliSys.g)return null;
+    const v=new THREE.Vector3(0,1.40,4.47);
+    heliSys.g.localToWorld(v);
+    return[+v.x.toFixed(2),+v.y.toFixed(2),+v.z.toFixed(2)];
+  },
+  heliNose:()=>{
+    if(!heliSys.g)return null;
+    const v=new THREE.Vector3(0,1.24,-1.25);
+    heliSys.g.localToWorld(v);
+    return[+v.x.toFixed(2),+v.y.toFixed(2),+v.z.toFixed(2)];
+  },
+  heliAtt:()=>({pitch:+heliSys.pitch.toFixed(3),roll:+heliSys.roll.toFixed(3),yaw:+heliSys.yaw.toFixed(2)}),
+  /* 把乘坐视角绕到机身侧面（off 弧度，±1.5）：目视核对俯仰姿态用 */
+  sideView:(off)=>{const o=Math.max(-1.5,Math.min(1.5,off||0));
+    heliSys.camOff=o;fp.yaw=heliSys.yaw+2.30+o;return o;},
+  /* 调试用：true = 相机看机身自己（看侧影核对俯仰） */
+  heliCamLook:(self)=>{heliSys.camLookSelf=!!self;return heliSys.camLookSelf;},
+  /* 整架直升机真实的最低点（世界坐标 y）：判定「有没有扎进地面」的硬指标。
+     逐顶点采样（每帧最多几百个点），把 matrixWorld 算进去，机身/滑橇/尾梁都算。 */
+  heliMinY:()=>{
+    if(!heliSys.g)return null;
+    heliSys.g.updateMatrixWorld(true);
+    const v=new THREE.Vector3();
+    let min=1e9,part='';
+    heliSys.g.traverse(o=>{
+      if(!o.isMesh||!o.geometry||!o.geometry.attributes.position)return;
+      const p=o.geometry.attributes.position;
+      const step=Math.max(1,Math.floor(p.count/90));
+      for(let i=0;i<p.count;i+=step){
+        v.fromBufferAttribute(p,i).applyMatrix4(o.matrixWorld);
+        if(v.y<min){min=v.y;part=(o.name||o.geometry.type)+''; }
+      }
+    });
+    return {min:+min.toFixed(3),part:part};
+  },
+  /* 调试：开关帐篷内衬（A/B 对比天花板亮度用） */
+  circusLining:(on)=>{if(circus.lining)circus.lining.visible=!!on;return !!on;},
+  circus:()=>({x:circus.x,z:circus.z,act:circus.act,actCn:CIRCUS_ACTS[circus.act].cn,    sweepY:circus.sweep?+circus.sweep.rotation.y.toFixed(3):null,
     spotOn:!!circus.light,
     hatY:+circus.magic.hat.position.y.toFixed(3),
     rabbit:circus.magic.rabbit.visible,
