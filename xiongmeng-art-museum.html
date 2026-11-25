@@ -14533,10 +14533,12 @@ function fpUpdate(dt){
   if(fp.keys['KeyS']||fp.keys['ArrowDown'])f-=1;
   if(fp.keys['KeyA']||fp.keys['ArrowLeft'])s-=1;
   if(fp.keys['KeyD']||fp.keys['ArrowRight'])s+=1;
-  // 虚拟摇杆：上推前进、右推横移，力度越大越快
+  // 虚拟摇杆：上推前进、右推横移，滑得越远走越快（速度连续变化，不再只有两档）
   if(joy.mag>0.02){
-    f+=-joy.dy*1.15;s+=joy.dx*1.15;
-    sp=onIce?(joy.mag>.78?9.0:5.8):(joy.mag>.78?6.4:3.4);
+    f+=-joy.dy;s+=joy.dx;
+    const runK=(fp.keys['ShiftLeft']||fp.keys['ShiftRight'])?1.3:1;
+    const slow=onIce?5.8:3.2, fast=onIce?9.2:6.4;
+    sp=Math.min(fast*1.25,(slow+(fast-slow)*joy.mag)*runK);
   }
   const fx=-Math.sin(fp.yaw),fz=-Math.cos(fp.yaw),rx=Math.cos(fp.yaw),rz=-Math.sin(fp.yaw);
   let dx=fx*f+rx*s,dz=fz*f+rz*s;
@@ -14939,62 +14941,37 @@ function exitWalk(){
 /* ── 虚拟摇杆（左手移动）──
    统一只用 pointer 事件：触屏上浏览器本来就会派发 pointer 事件，
    再额外挂一套 touch 会让 touchmove 和 pointermove 轮流写同一个值，摇杆会自己抖回中间。 */
-const joy={active:false,cx:0,cy:0,dx:0,dy:0,mag:0,pid:null,src:''};
+const joy={active:false,cx:0,cy:0,ox:0,oy:0,dx:0,dy:0,mag:0,pid:null,src:''};
 const joyEl=document.getElementById('joystick'),stickEl=document.getElementById('stick');
-/* 摇杆手感：
-   行程 26px（内圈直径就是 62，正好卡在虚线圈里）—— 原来 33px 偏钝；
-   输出走平方根曲线：手指推 8px 就给到一半速度，推到底才满舵。
-   之前是线性输出，推 8px 只有 0.24 速度，人几乎不动，就感觉"要用力滑"。 */
-const JOY_R=26;
-let JOY_PAD_R=67;      // 左下角摇杆外圈半径（按实际元素算）
+/* 摇杆手感（11-25 重做）：跟右边视角键一套逻辑 —— 位移驱动。
+   按下哪儿哪儿就是原点，往哪滑就往哪走，滑多远走多快。
+   之前两套语义都废了：
+     · 「按圆上哪一点走哪」= 要先瞄准才走得动，还容易误判；
+     · 「滑出圈锁方向 / 滑到右半区清零」= 手一抖就断。
+   现在只有一条规则：位移 = 方向 + 幅度（跟 TOUCH_LOOK 一样吃原始 dx/dy）。
+   幅度走平方根曲线：推 8px 就有一半速度，推到 40px 满舵。 */
+const JOY_FULL=40;      // 满舵所需位移（px）
+const JOY_DEAD=2.5;     // 死区，忽略手抖
 function joyApply(x,y){
-  let dx,dy,len;
-  if(joy.src==='screen'){
-    /* 左半屏的动态摇杆：手指按哪就是摇杆中心，往哪滑往哪走 */
-    dx=x-joy.cx;dy=y-joy.cy;len=Math.hypot(dx,dy);
-    if(len>JOY_R){dx=dx/len*JOY_R;dy=dy/len*JOY_R;}
-    const raw=Math.min(1,len/JOY_R);
-    if(raw<.06){joy.dx=joy.dy=joy.mag=0;stickEl.style.transform='translate(0,0)';return;}
-    const k=Math.sqrt(raw)/raw;      // 曲线系数：小位移放大
-    joy.dx=dx/JOY_R*k;joy.dy=dy/JOY_R*k;
-    joy.mag=Math.min(1,Math.sqrt(raw));
-    stickEl.style.transform='translate('+(dx*k)+'px,'+(dy*k)+'px)';
-    return;
-  }
-  /* 左下角固定摇杆：手指按在圆上哪一点，就朝那个方向走。
-     不用先按回中间再往边上滑 —— 按住不动，人就一直朝那个方向走。
-     作用范围只在屏幕左半区：
-       · 手指在摇杆圈内 → 按哪走哪
-       · 滑出圈但还在左半区 → 锁住最后的方向继续走（看左边时不会突然停）
-       · 滑到右半区 → 摇杆输出归零，右半区是转头用的，不该再改人物方向 */
-  if(x>=innerWidth*0.5){
+  const dx=x-joy.ox, dy=y-joy.oy;
+  const len=Math.hypot(dx,dy);
+  if(len<JOY_DEAD){                     // 没滑 = 不动（滑了才走）
     joy.dx=joy.dy=joy.mag=0;
     stickEl.style.transform='translate(0,0)';
     return;
   }
-  dx=x-joy.cx;dy=y-joy.cy;len=Math.hypot(dx,dy);
-  if(len>JOY_PAD_R){
-    if(len<3){joy.dx=joy.dy=joy.mag=0;stickEl.style.transform='translate(0,0)';}
-    return;                       // 出圈但在左半区：保持上一次输出不变
-  }
-  if(len<3){                      // 正中心没有方向可判，给个很小的死区
-    joy.dx=joy.dy=joy.mag=0;
-    stickEl.style.transform='translate(0,0)';
-    return;
-  }
-  /* 幅度：离中心越远越快，但保底 0.5 —— 按在边缘附近也走得动 */
-  const mag=Math.max(.5,Math.sqrt(Math.min(1,len/JOY_R)));
-  joy.dx=dx/len*mag;joy.dy=dy/len*mag;
-  joy.mag=mag;
-  /* 内圈跳到手指所在的方向上 */
-  const k=Math.min(1,len/JOY_R);
-  stickEl.style.transform='translate('+(dx*k)+'px,'+(dy*k)+'px)';
+  const mag=Math.min(1,Math.sqrt(len/JOY_FULL));   // 小位移放大，推一点就动
+  joy.dx=dx/len*mag; joy.dy=dy/len*mag; joy.mag=mag;
+  /* 内圈跟着手指走：视觉行程封顶 38px，正好卡在虚线圈里 */
+  const vis=Math.min(38,len);
+  stickEl.style.transform='translate('+(dx/len*vis)+'px,'+(dy/len*vis)+'px)';
 }
 function joyReset(){joy.active=false;joy.dx=joy.dy=joy.mag=0;stickEl.style.transform='translate(0,0)';}
-/* 动态摇杆：左半屏按住时，把摇杆挪到手指底下；松手归位 */
+/* 摇杆浮起来：手指按在哪，整个摇杆就挪到哪，原点 = 手指落点。
+   左下角那颗固定摇杆只是「归位时的家」，按下去一样浮到手指底下 —— 一个入口，两种按法。 */
 function joyShowAt(x,y){
   const r=joyEl.getBoundingClientRect().width/2;
-  joy.active=true;joy.cx=x;joy.cy=y;joy.src='screen';
+  joy.active=true;joy.cx=x;joy.cy=y;joy.ox=x;joy.oy=y;
   joyEl.style.left=(x-r)+'px';
   joyEl.style.top=(y-r)+'px';
   joyEl.style.right='auto';joyEl.style.bottom='auto';
@@ -15008,8 +14985,11 @@ joyEl.addEventListener('pointerdown',e=>{
   e.preventDefault();
   const r=joyEl.getBoundingClientRect();
   joy.active=true;joy.src='pad';joy.pid=e.pointerId;
-  joy.cx=r.x+r.width/2;joy.cy=r.y+r.height/2;
-  JOY_PAD_R=r.width/2;
+  /* 按在圈的哪边都无所谓：原点就是手指本身，往哪滑往哪走 */
+  joy.cx=e.clientX;joy.cy=e.clientY;joy.ox=e.clientX;joy.oy=e.clientY;
+  joyEl.style.left=(e.clientX-r.width/2)+'px';
+  joyEl.style.top=(e.clientY-r.height/2)+'px';
+  joyEl.style.right='auto';joyEl.style.bottom='auto';
   joyApply(e.clientX,e.clientY);
   // 指针已释放时 setPointerCapture 会抛，包一层别把手势打断
   try{joyEl.setPointerCapture&&joyEl.setPointerCapture(e.pointerId);}catch(err){}
@@ -15019,8 +14999,8 @@ joyEl.addEventListener('pointermove',e=>{
   e.preventDefault();
   joyApply(e.clientX,e.clientY);
 });
-joyEl.addEventListener('pointerup',joyReset);
-joyEl.addEventListener('pointercancel',joyReset);
+joyEl.addEventListener('pointerup',joyHide);
+joyEl.addEventListener('pointercancel',joyHide);
 /* 以前还挂 pointerleave → joyReset：手指只要滑出摇杆圆圈就被清零，
    正在推的时候突然停住，用户只能重新按住，越推越烦。
    现在滑出圆圈照样能继续推（下面还有 window 级兜底），松手才停。 */
@@ -15030,6 +15010,13 @@ joyEl.addEventListener('pointercancel',joyReset);
 addEventListener('pointermove',e=>{
   if(joy.active&&joy.src==='pad'&&e.pointerId===joy.pid)joyApply(e.clientX,e.clientY);
 },{passive:true});
+/* 手指在圈外抬起（capture 丢了）也要把摇杆收回左下角 */
+addEventListener('pointerup',e=>{
+  if(joy.active&&joy.src==='pad'&&e.pointerId===joy.pid)joyHide();
+});
+addEventListener('pointercancel',e=>{
+  if(joy.active&&joy.src==='pad'&&e.pointerId===joy.pid)joyHide();
+});
 
 /* 触屏手势：每根手指按 pointerId 单独记账
    —— 摇杆那根手指按在 #joystick 上，不进画面的手势表，
