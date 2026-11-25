@@ -85,6 +85,38 @@ function saveNames() {
   } catch (e) { log('写 ID 存档失败：' + e.message); }
 }
 
+/* ── 雪币钱包存档 ──
+   每个账号一份 {coin, earned, spent}，落盘 wallets.json。
+   （之前雪币只活在前端内存里，一刷新就归零 —— 玩家攒的钱全没了）*/
+const WALLET_FILE = path.join(__dirname, 'wallets.json');
+const wallets = new Map();
+const WALLET_START_COIN = 60;          // 新账号启动资金，跟前端默认值一致
+function loadWallets() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(WALLET_FILE, 'utf8'));
+    for (const k of Object.keys(raw)) {
+      const w = raw[k] || {};
+      wallets.set(k, {
+        coin: Math.max(0, Math.floor(+w.coin || 0)),
+        earned: Math.max(0, Math.floor(+w.earned || 0)),
+        spent: Math.max(0, Math.floor(+w.spent || 0)),
+      });
+    }
+    log('已载入钱包存档：' + wallets.size + ' 条');
+  } catch (e) { /* 没有存档文件是正常的 */ }
+}
+function saveWallets() {
+  try {
+    const obj = {};
+    for (const [k, v] of wallets) obj[k] = v;
+    fs.writeFileSync(WALLET_FILE, JSON.stringify(obj, null, 2));
+  } catch (e) { log('写钱包存档失败：' + e.message); }
+}
+function walletOf(acc) {
+  if (!wallets.has(acc)) wallets.set(acc, { coin: WALLET_START_COIN, earned: 0, spent: 0 });
+  return wallets.get(acc);
+}
+
 /* ── 半开连接的判定阈值 ──
    12 秒内没有任何数据往来 = 这条连接已经死了（弱网/手机息屏/切网） */
 const IDLE_ALIVE_MS = 12000;
@@ -443,6 +475,7 @@ function handleConn(socket) {
       send({
         t: 'welcome',
         you: { account: acc, display: session.display },
+        wallet: walletOf(acc),
         players: roomPlayers(),
         server: os.hostname(),
         build: currentBuild(),
@@ -544,6 +577,18 @@ function handleConn(socket) {
            「每个人手机上的动画轨迹对不上」的关键。 */
         send({ t: 'pong', ts: Date.now(), c1: msg.c1, s2: msg.__s2 || Date.now(), s3: Date.now(), epoch: TIME_EPOCH, st: startedAt });
         break;
+      case 'wallet': {         // 客户端上报雪币余额，落盘保存
+        const w = walletOf(session.account);
+        const c = Math.max(0, Math.floor(+msg.coin || 0));
+        const e = Math.max(0, Math.floor(+msg.earned || 0));
+        const sp = Math.max(0, Math.floor(+msg.spent || 0));
+        if (w.coin !== c || w.earned !== e || w.spent !== sp) {
+          w.coin = c; w.earned = e; w.spent = sp;
+          saveWallets();
+        }
+        send({ t: 'wallet_ok', coin: w.coin, earned: w.earned, spent: w.spent });
+        break;
+      }
       case 'chat': {
         const txt = String(msg.text || '').slice(0, 120);
         if (!txt) break;
@@ -595,6 +640,7 @@ setInterval(() => {
 }, 10000).unref?.();
 
 loadNames();
+loadWallets();
 
 server.listen(PORT, HOST, () => {
   log('多人服务端已启动', HOST + ':' + PORT, '账号:', [...ACCOUNTS.keys()].join(','));

@@ -16019,6 +16019,8 @@ function updateAerialHaze(dt,t){
         if (m.build) checkBuild(m.build);
         /* 服务端下发的纪元（时间基准），用它覆盖本地默认值 */
         if (m.epoch) TIME_EPOCH = m.epoch;
+        /* 雪币钱包以服务器存档为准：刷新页面、重登、换设备都还在 */
+        if (m.wallet) econSetWallet(m.wallet);
         MP.clearPeers();
         (m.players || []).forEach(pl => {
           if (pl.account !== MP.account) MP.addPeer(pl);
@@ -16035,6 +16037,13 @@ function updateAerialHaze(dt,t){
           MP.selfTag.material.needsUpdate = true;
         }
         if (window.MP_UI) MP_UI.onLogin(m.you);
+        break;
+      }
+      case 'wallet': {            // 服务器补发的钱包
+        econSetWallet(m);
+        break;
+      }
+      case 'wallet_ok': {         // 服务器已落盘确认
         break;
       }
       case 'update': {           // 服务端主动推送：线上有新版本了
@@ -20703,7 +20712,20 @@ function econMountCoin(){
     document.body.classList.add('wallet-float');
   }
 }
-function econPay(n){ECON.coin-=n;ECON.spent+=n;econPaint();}
+function econPay(n){ECON.coin-=n;ECON.spent+=n;econPaint();econSync();}
+/* 余额上报服务器：刷新页面、换设备、重新登录都还在 */
+function econSync(){
+  if(!window.MP||!MP.connected)return;
+  try{MP.send({t:'wallet',coin:ECON.coin,earned:ECON.earned,spent:ECON.spent});}catch(e){}
+}
+/* 服务器下发为准 */
+function econSetWallet(w){
+  if(!w||typeof w.coin!=='number')return;
+  ECON.coin=Math.max(0,Math.floor(w.coin));
+  if(typeof w.earned==='number')ECON.earned=Math.max(0,Math.floor(w.earned));
+  if(typeof w.spent==='number')ECON.spent=Math.max(0,Math.floor(w.spent));
+  econPaint();
+}
 
 /* ── 飘字（+N 雪币）──────────────────────────────────────── */
 const econFloats=[];
@@ -20723,7 +20745,7 @@ function econFloat(txt,color){
   econFloats.push({sp,life:0});
 }
 function econGain(n,why){
-  ECON.coin+=n;ECON.earned+=n;econPaint();
+  ECON.coin+=n;ECON.earned+=n;econPaint();econSync();
   econFloat('+'+n,0xffd98a);
   sfx.blip(1180,.10,.07);
   if(why)_recMsg(why+'  +'+n+' 雪币',2000);
