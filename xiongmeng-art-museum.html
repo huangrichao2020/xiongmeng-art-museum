@@ -946,39 +946,6 @@ function addNS(parent,geo,mat,x=0,y=0,z=0){
   m.castShadow=false;m.receiveShadow=false;parent.add(m);return m;
 }
 const BX=(w,h,d)=>new THREE.BoxGeometry(w,h,d);
-/* 双面牌匾：正反两面各一块，字都是正的。
-   单面的话从背面看要么被剔除（牌匾消失），要么字是镜像的 —— 都不行。 */
-function animeSignTex(w,h,cn,en,accent='#f6d690',bgTop='#0f1e36',bgBot='#1b3154'){
-  const [c,x]=cv(w,h);
-  const g=x.createLinearGradient(0,0,w,h);
-  g.addColorStop(0,bgTop);g.addColorStop(1,bgBot);
-  x.fillStyle=g;x.fillRect(0,0,w,h);
-  const rg=x.createRadialGradient(w*.82,h*.22,2,w*.82,h*.22,w*.48);
-  rg.addColorStop(0,'rgba(255,204,136,0.20)');rg.addColorStop(1,'rgba(255,204,136,0)');
-  x.fillStyle=rg;x.fillRect(0,0,w,h);
-  const pad=Math.max(5,Math.round(h*.07));
-  x.strokeStyle=accent;x.globalAlpha=.72;x.lineWidth=Math.max(2,Math.round(h*.035));
-  x.strokeRect(pad,pad,w-pad*2,h-pad*2);x.globalAlpha=1;
-  x.textAlign='center';
-  x.fillStyle='#fff4dc';
-  x.font='700 '+Math.round(h*.36)+'px '+HK;
-  x.fillText(cn,w/2,Math.round(h*.49));
-  x.fillStyle='#a8d8ff';
-  x.font='600 '+Math.max(11,Math.round(h*.165))+'px '+HK;
-  x.fillText(en,w/2,Math.round(h*.80));
-  return ctex(c);
-}
-function signPanel(parent,w,h,tex,x,y,z,em){
-  const mat=new THREE.MeshStandardMaterial({
-    map:tex,emissiveMap:tex,emissive:0xffffff,emissiveIntensity:Math.min(.68,em===undefined?.65:em),roughness:.32});
-  for(const s of [1,-1]){
-    const p=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);
-    p.position.set(x,y,z+s*.014);
-    if(s<0)p.rotation.y=Math.PI;
-    parent.add(p);
-  }
-  return mat;
-}
 /* ── 静态合批：把一片装饰里成百上千个小零件按材质合并成少数几个 mesh ──
    新增摊位/店铺/围栏后几何体涨到 7000+，draw call 直接压死帧；
    同一材质合并成一个 mesh，视觉完全不变，调用量能降一个量级。 */
@@ -3194,7 +3161,7 @@ strip.position.set(0,4.28,9.24);shop.add(strip);
   for(const v of steamVents){
     for(let i=0;i<v.n;i++){
       const smat=new THREE.SpriteMaterial({
-        map:roofSteamTex,color:0xf4f8ff,transparent:true,opacity:.55,
+        map:roofSteamTex,color:0xf0f4fa,transparent:true,opacity:.30,
         depthWrite:false,fog:false
       });
       const sp=new THREE.Sprite(smat);
@@ -4122,16 +4089,6 @@ function buildMiniBear(mat,pose){
   return g;
 }
 
-/* 展签牌：立柱 + 斜面铭牌 */
-function labelPost(parent,x,z,rot,col){
-  const g=new THREE.Group();g.position.set(x,F2,z);g.rotation.y=rot;parent.add(g);
-  add(g,new THREE.CylinderGeometry(.026,.03,.62,6),M(0x6d747b,{roughness:.5,metalness:.6}),0,.31,0);
-  const pl=add(g,BX(.34,.22,.035),M(0x2b3238,{roughness:.6}),0,.72,0);
-  pl.rotation.x=-.4;
-  add(g,BX(.28,.15,.012),M(col,{roughness:.8}),0,.723,.017);
-  return g;
-}
-
 /* 圆明园风古铜十二生肖兽首雕刻（0鼠 1牛 2虎 3兔 4龙 5蛇 6马 7羊 8猴 9鸡 10狗 11猪） */
 function buildZodiacHead(idx){
   const g=new THREE.Group();
@@ -4411,7 +4368,6 @@ function buildZodiacHead(idx){
   const ring2=add(g2b,new THREE.RingGeometry(1.32,1.39,48),new THREE.MeshBasicMaterial({
     color:0xbfe6f5,transparent:true,opacity:.14,depthWrite:false}),0,.035,0);
   ring2.rotation.x=-Math.PI/2;ring2.castShadow=false;
-  labelPost(shop2,-.15,-2.9,-1.0,bearMats.polar);
 }
 
 /* ══ 二层 · 蜂蜜熊角：小熊维尼 / 蜜蜂 / 蜂巢 ══ */
@@ -4535,7 +4491,6 @@ function buildBearFaceArt(col){
   const ring=add(g1,new THREE.RingGeometry(1.02,1.09,48),new THREE.MeshBasicMaterial({
     color:0xf0b268,transparent:true,opacity:.18,depthWrite:false}),0,.035,0);
   ring.rotation.x=-Math.PI/2;ring.castShadow=false;
-  labelPost(shop2,2.35,3.1,-.42,bearMats.honey);
 
   /* 蜂巢 + 绕飞的蜜蜂 */
   const g2=new THREE.Group();g2.position.set(-.6,F2,4.5);g2.rotation.y=.5;shop2.add(g2);
@@ -4544,7 +4499,6 @@ function buildBearFaceArt(col){
   for(const [bx,by,bz] of [[.5,1.25,.25],[-.45,1.6,-.2],[.15,1.95,.35]]){
     const bee=buildBee();bee.position.set(bx,by,bz);bee.rotation.y=R(-1.4,1.4);g2.add(bee);
   }
-  labelPost(shop2,-1.55,4.95,.5,bearMats.moss);
 
   /* 展台圆柱基座上的两只红衫小熊 */
   const g3=new THREE.Group();g3.position.set(2.9,F2,1.3);g3.rotation.y=-.9;shop2.add(g3);
@@ -4661,7 +4615,6 @@ function buildWoodSculpture(kind){
     const ring=add(sc,new THREE.RingGeometry(.68,.74,36),new THREE.MeshBasicMaterial({
       color:0xf0c98a,transparent:true,opacity:.18,depthWrite:false}),0,.025,0);
     ring.rotation.x=-Math.PI/2;ring.castShadow=false;
-    labelPost(shop2,sx+.62,sz+.55,rot,pCol);
   }
 }
 
@@ -7190,7 +7143,7 @@ const skylineMats=[];
      原作：z=-58 / -73 / -96 / -115 四排欧式坡屋顶商业楼共 30 栋 + 四块街区铺装广场，
      从中央广场往北看就是一排欧洲小城屋脊，跟「中国大学校园」完全不对味。
      现在整片推倒，按真实的贵大花溪校区重建：
-       · 南门：石材门柱 + 校名横梁 + 校训墙「明德至善 博学笃行」
+       · 南门：石材门柱 + 门楣横梁 + 两侧石墙
        · 中心图书馆「贵大之印」：两侧石材幕墙如峭壁，中部中国红蜂窝铝板遮阳构架
          以篆体「贵」「图」交错拼接（回转印章体），通高 10 层共享中庭，
          中庭南北通透，图书馆主轴正对南门
@@ -7463,18 +7416,6 @@ const skylineMats=[];
   /* 校区灰色金属构件共用一个材质 */
   const gzuMetal=M(0x9ea4a9,{roughness:.72,metalness:.18});
 
-  /* ── 2.5.8 校名 / 校训牌匾（红字 / 金字，透明底，贴在石材上） ── */
-  const gzuSignTex=(w,h,txt,fill,stroke)=>{
-    const [c,x]=cv(w,h);
-    x.clearRect(0,0,w,h);
-    x.textAlign='center';x.textBaseline='middle';
-    x.font='700 '+Math.round(h*.62)+'px '+HK;
-    x.lineWidth=Math.max(2,h*.05);
-    x.strokeStyle=stroke;x.strokeText(txt,w/2,h*.52);
-    x.fillStyle=fill;x.fillText(txt,w/2,h*.52);
-    const t=ctex(c);t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;return t;
-  };
-
   /* ══ 图书馆「贵大之印」 ══
      两翼：x[-31,-9] 与 [9,31]，z[-88,-60]，总高 32m（10 层 × 3.2m）
      中庭：x[-9,9] 通高 10 层，南北通透，主轴（花溪大道）从南门穿过中庭往北
@@ -7600,27 +7541,15 @@ const skylineMats=[];
       addNS(campus,BX(3.7,.22,3.7),snowTopM,s*12.5,10.34,gz);
       addNS(campus,BX(1.0,2.2,.14),libRedM,s*12.5,3.4,gz+1.76);   // 门柱上的红色印章板
     }
-    /* 门楣横梁 + 「贵州大学」 */
+    /* 门楣横梁 */
     addNS(campus,BX(28.6,2.0,3.0),gzuGranite,0,11.6,gz);
     addNS(campus,BX(29.2,.35,3.4),M(0xb5afa4,{roughness:.8}),0,12.75,gz);
     addNS(campus,BX(28.6,.26,3.2),snowTopM,0,13.05,gz);
-    const nameTex=gzuSignTex(1024,128,'贵州大学','#c02a2f','rgba(90,18,16,.85)');
-    for(const s of [1,-1]){
-      const p=new THREE.Mesh(new THREE.PlaneGeometry(15,1.9),new THREE.MeshStandardMaterial({
-        map:nameTex,emissiveMap:nameTex,transparent:true,roughness:.5,metalness:.1,
-        emissive:0xff8a72,emissiveIntensity:.85}));
-      p.position.set(0,11.6,gz+s*1.56);if(s<0)p.rotation.y=Math.PI;p.castShadow=false;campus.add(p);
-    }
-    /* 校训墙：明德至善 博学笃行 */
-    const mottoTex=gzuSignTex(1024,128,'明德至善  博学笃行','#d9b45e','rgba(60,44,14,.8)');
+    /* 校训墙（只留墙身，文字牌匾已删） */
     for(const s of [-1,1]){
       addNS(campus,BX(13,.42,1.5),gzuGraniteD,s*15.6,1.05,gz-2.6);
       addNS(campus,BX(13.2,.22,1.7),M(0xb0aaa0,{roughness:.8}),s*15.6,1.35,gz-2.6);
       addNS(campus,BX(13.0,.14,1.5),snowTopM,s*15.6,1.51,gz-2.6);
-      const p=new THREE.Mesh(new THREE.PlaneGeometry(11.4,1.42),new THREE.MeshStandardMaterial({
-        map:mottoTex,emissiveMap:mottoTex,transparent:true,roughness:.6,
-        emissive:0xffd894,emissiveIntensity:.60}));
-      p.position.set(s*15.6,1.05,gz-3.36);p.rotation.y=Math.PI;p.castShadow=false;campus.add(p);
     }
     /* 迎宾大道两侧旗杆 */
     for(let i=-1;i<=1;i++){
@@ -7749,11 +7678,6 @@ const skylineMats=[];
     for(let i=0;i<3;i++){
       addNS(campus,new THREE.CylinderGeometry(.42,.46,3.2,10),gzuMetal,cx-5+i*5,h+4.9,cz);
     }
-    /* 门头招牌 */
-    const st=gzuSignTex(512,128,'学生食堂','#d9b45e','rgba(60,44,14,.8)');
-    const sp=new THREE.Mesh(new THREE.PlaneGeometry(7.2,1.8),new THREE.MeshStandardMaterial({
-      map:st,transparent:true,roughness:.6,emissive:0x241a06,emissiveIntensity:.4}));
-    sp.position.set(cx,5.4,cz-d/2-2.35);sp.rotation.y=Math.PI;sp.castShadow=false;campus.add(sp);
   }
 
   /* ══ 运动场（西北）：塑胶跑道 + 足球场 + 看台 + 灯杆 ══ */
@@ -9979,73 +9903,7 @@ SK.glassTex=(()=>{
   return ctex(c);
 })();
 
-/* ── 招牌图集：横版 4×8（512×128）/ 竖版 4×4（256×420）── */
-const SIGN_ATLAS=(()=>{
-  const mk=(cols,rows,cw,ch)=>{
-    const [c,x]=cv(cols*cw,rows*ch);
-    const t=new THREE.CanvasTexture(c);
-    t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;
-    t.minFilter=THREE.LinearMipmapLinearFilter;t.magFilter=THREE.LinearFilter;
-    return {c,x,t,cols,rows,cw,ch,n:0};
-  };
-  const H=mk(4,8,512,128),V=mk(4,4,256,420);
-  const fit=(x,t,maxW,s)=>{let k=s;x.font='700 '+k+'px '+HK;
-    while(x.measureText(t).width>maxW&&k>9){k-=1;x.font='700 '+k+'px '+HK;}return k;};
-  const bgPaint=(x,w,h)=>{
-    const g=x.createLinearGradient(0,0,0,h);
-    g.addColorStop(0,'#0e1c33');g.addColorStop(.52,'#16294a');g.addColorStop(1,'#0a1526');
-    x.fillStyle=g;x.fillRect(0,0,w,h);
-    const rg=x.createRadialGradient(w*.76,h*.24,4,w*.76,h*.24,w*.62);
-    rg.addColorStop(0,'rgba(255,206,140,.24)');rg.addColorStop(1,'rgba(255,206,140,0)');
-    x.fillStyle=rg;x.fillRect(0,0,w,h);
-    x.fillStyle='rgba(255,255,255,.02)';
-    for(let i=0;i<h;i+=2)x.fillRect(0,i,w,1);
-    x.strokeStyle='rgba(246,214,144,.88)';x.lineWidth=4;x.strokeRect(8,8,w-16,h-16);
-    x.strokeStyle='rgba(246,214,144,.36)';x.lineWidth=2;x.strokeRect(15,15,w-30,h-30);
-    x.fillStyle='rgba(246,214,144,.8)';
-    for(const px of [17,w-17])for(const py of [17,h-17]){
-      x.beginPath();x.moveTo(px,py-6);x.lineTo(px+6,py);x.lineTo(px,py+6);x.lineTo(px-6,py);x.closePath();x.fill();
-    }
-  };
-  const drawH=(cn,en,accent)=>{
-    if(H.n>=H.cols*H.rows)return 0;
-    const i=H.n++,col=i%H.cols,row=(i/H.cols)|0,w=H.cw,h=H.ch;
-    H.x.save();H.x.translate(col*w,row*h);
-    bgPaint(H.x,w,h);
-    if(accent){H.x.fillStyle=accent;H.x.fillRect(17,h-22,w-34,6);}
-    H.x.textAlign='center';
-    const fs=fit(H.x,cn,w*.78,Math.round(h*.40));
-    H.x.font='700 '+fs+'px '+HK;
-    H.x.shadowColor='rgba(0,0,0,.6)';H.x.shadowBlur=7;H.x.shadowOffsetY=2;
-    H.x.fillStyle='#fff6e2';H.x.fillText(cn,w/2,Math.round(h*.50));
-    H.x.shadowBlur=0;H.x.shadowOffsetY=0;
-    H.x.fillStyle='rgba(246,214,144,.5)';H.x.fillRect(w*.33,h*.585,w*.34,2);
-    H.x.fillStyle='#a8d8ff';H.x.font='600 '+Math.round(h*.15)+'px '+HK;
-    H.x.fillText(en,w/2,Math.round(h*.79));
-    H.x.restore();return i;
-  };
-  const drawV=(cn,en,accent)=>{
-    if(V.n>=V.cols*V.rows)return 0;
-    const i=V.n++,col=i%V.cols,row=(i/V.cols)|0,w=V.cw,h=V.ch;
-    V.x.save();V.x.translate(col*w,row*h);
-    bgPaint(V.x,w,h);
-    if(accent){V.x.fillStyle=accent;V.x.fillRect(17,h-30,w-34,8);}
-    V.x.textAlign='center';
-    const chs=cn.split('');
-    const fs=Math.max(26,Math.min(58,Math.floor(h*.66/Math.max(1,chs.length)/1.16)));
-    const step=fs*1.18,block=chs.length*step,top=(h*.70-block)/2+fs*.78;
-    V.x.font='700 '+fs+'px '+HK;
-    chs.forEach((c2,i2)=>{
-      V.x.shadowColor='rgba(0,0,0,.6)';V.x.shadowBlur=6;V.x.shadowOffsetY=2;
-      V.x.fillStyle='#fff6e2';V.x.fillText(c2,w/2,Math.round(top+i2*step));
-    });
-    V.x.shadowBlur=0;V.x.shadowOffsetY=0;
-    V.x.fillStyle='#a8d8ff';V.x.font='600 16px '+HK;
-    V.x.fillText(en,w/2,h-48);
-    V.x.restore();return i;
-  };
-  return {H,V,drawH,drawV,flush(){H.t.needsUpdate=true;V.t.needsUpdate=true;}};
-})();
+
 
 /* ── 材质 ── */
 SK.M={};
@@ -10070,8 +9928,6 @@ SK.M.fabric =new THREE.MeshStandardMaterial({map:SK.fabTex,roughness:.88,metalne
   emissiveMap:SK.fabTex,emissive:0x6b5334,emissiveIntensity:.70});
 SK.M.snow  =new THREE.MeshStandardMaterial({color:0xf4f9ff,map:SK.snowTex,roughness:.90,metalness:0,
   envMapIntensity:.08,emissive:0x445c80,emissiveIntensity:1.45});
-SK.M.signH  =new THREE.MeshStandardMaterial({map:SIGN_ATLAS.H.t,emissiveMap:SIGN_ATLAS.H.t,emissive:0xffffff,emissiveIntensity:.52,roughness:.34});
-SK.M.signV  =new THREE.MeshStandardMaterial({map:SIGN_ATLAS.V.t,emissiveMap:SIGN_ATLAS.V.t,emissive:0xffffff,emissiveIntensity:.58,roughness:.34});
 const skGlass=(hex,int)=>new THREE.MeshStandardMaterial({
   color:0x141b22,map:SK.glassTex,emissiveMap:SK.glassTex,emissive:hex,
   emissiveIntensity:int,roughness:.16,metalness:.06});
@@ -10204,20 +10060,6 @@ SK.awning=(parent,x,y,z,w,d,cell,valance=true)=>{
   }
 };
 
-/* ── 招牌板：正面 + 背面（背面 U 镜像，文字不会反）── */
-SK.signBoard=(parent,w,h,idx,x,y,z,vert)=>{
-  const A=vert?SIGN_ATLAS.V:SIGN_ATLAS.H;
-  const mk=(back)=>{
-    const g=new THREE.PlaneGeometry(w,h);
-    SK.uvCell(g,idx%A.cols,(idx/A.cols)|0,A.cols,A.rows,back);
-    const m=new THREE.Mesh(g,vert?SK.M.signV:SK.M.signH);
-    m.position.set(x,y,z+(back?-.022:.022));
-    if(back)m.rotation.y=Math.PI;
-    m.castShadow=false;parent.add(m);
-  };
-  mk(false);mk(true);
-};
-
 
 /* ── 街边小店（北街 / 西段 / 东段）：教堂级立面 ── */
 SK.shopHouse=(parent,o)=>{
@@ -10287,10 +10129,8 @@ SK.shopHouse=(parent,o)=>{
   /* 台阶 */
   add(g,BX(1.9,.10,.55),SK.M.stone,0,.22,face+.30);
   add(g,BX(2.3,.09,.85),SK.M.stone,0,.11,face+.55);
-  /* 招牌：4:1 画幅配 4:1 图集格（绝不拉伸），挂在雨篷上方、檐口正下方 */
+  /* 檐口横匾已删（全场只保留艺术馆门牌），这里只留两道装饰线脚 */
   {
-    const si=SIGN_ATLAS.drawH(o.cn,o.en,o.accent);
-    SK.signBoard(g,2.88,.72,si,0,2.84,face+.12,false);
     add(g,BX(3.02,.08,.12),trimD,0,3.21,face+.14);
     add(g,BX(3.02,.08,.12),trimD,0,2.47,face+.14);
   }
@@ -10447,21 +10287,9 @@ SK.stallHouse=(parent,o)=>{
       s.scale.set(1,.6,1);s.castShadow=false;g.add(s);
     }
   }
-  /* 竖挑双面招牌（牌面架在立柱顶，绝不被杆子横穿）*/
+  /* 竖挑招牌与正面横匾已删（全场只保留艺术馆门牌），只留檐下线脚 */
   {
-    const vi=SIGN_ATLAS.drawV(o.cn,o.en,o.accent);
-    add(g,BX(.12,.52,.12),woodL,0,H+.52,0);
-    SK.signBoard(g,.66,1.06,vi,0,H+1.31,.02,true);
-    add(g,BX(.74,.09,.14),woodL,0,H+.78,.02);
-    const fin=add(g,new THREE.ConeGeometry(.09,.26,6),SK.M.gold,0,H+1.93,.02);
-    fin.castShadow=false;
-  }
-  /* 正面横匾（挂在垂帘上方）*/
-  {
-    const hi=SIGN_ATLAS.drawH(o.cn,o.en,o.accent);
-    SK.signBoard(g,2.10,.525,hi,0,H-.26,D/2+.30,false);
     add(g,BX(2.24,.08,.12),woodD,0,H+.02,D/2+.32);
-    for(const s of [-1,1])add(g,BX(.04,.14,.04),SK.M.iron,s*.9,H-.44,D/2+.31);
   }
   /* 檐下彩灯串 */
   for(let i=0;i<8;i++)
@@ -10977,17 +10805,7 @@ const pianoPlaza={
     pg.add(tgt);spot.target=tgt;
     pianoPlaza.spot=spot;
   }
-  /* ── 广场招牌：告诉路过的人这是什么（挪到广场北侧，不挡钢琴的视线） ── */
-  {
-    const sg=new THREE.Group();
-    sg.position.set(-48.6,0,-13.6);       // 挪到路边的雪地上，朝向来路，指向钢琴
-    sg.rotation.y=1.95;
-    plaza.add(sg);
-    add(sg,new THREE.CylinderGeometry(.07,.09,2.55,8),M(0x4b3322,{roughness:.85}),0,1.27,0);
-    add(sg,BX(2.05,.66,.07),M(0x1b2c48,{roughness:.5}),0,2.34,0);
-    signPanel(sg,1.94,.56,animeSignTex(768,256,'圣诞钢琴广场','CHRISTMAS PIANO PLAZA','#f6d690'),0,2.34,.045,.9);
-  }
-  /* 碰撞：钢琴 / 琴凳 / 两棵树 / 招牌柱 */
+  /* 碰撞：钢琴 / 琴凳 / 两棵树 */
   OUTDOOR_OBS.push([pg.position.x,pg.position.z,2.30]);
   OUTDOOR_OBS.push([treePos[0][0],treePos[0][1],.85]);
   OUTDOOR_OBS.push([treePos[1][0],treePos[1][1],.75]);
@@ -11079,7 +10897,7 @@ for(const sp of SHOPS){
 }
 /* ══ 艺术馆正门对面 · 圣诞游乐园（76m × 38m） ══
    大量复用现成构件：buildChristmasTree / buildSnowman / buildGiftBox / buildCandyCane /
-   buildPoohBear / labelPost / stallString / getBulbMat
+   buildPoohBear / stallString / getBulbMat
    灯光全靠自发光彩灯珠 + 地面光池 + Bloom，不新增点光源
    —— 点光源会让全场每个像素多算一轮光照，代价远高于这点亮度。 */
 const fair=new THREE.Group();fair.userData.tag='fair';scene.add(fair);
@@ -11190,7 +11008,7 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
         const d=add(g,BX(.045,.72,.045),giltM,bx,beamY,0);
         d.rotation.z=(i%2?.52:-.52);
       }
-      // 梁中两侧的拱形花格（中间留空给牌匾）
+      // 梁中两侧的拱形花格
       for(const s of [-1,1]){
         for(let i=0;i<9;i++){
           const a=Math.PI*(i/8);
@@ -11200,33 +11018,6 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       }
       // 梁顶积雪
       add(g,BX(span,.16,.30),snowM,0,beamY+.50,0).castShadow=false;
-    }
-    /* 牌匾：鎏金圆角框 + 酒红锦缎底 + 金字，挂在梁下正对大街 */
-    {
-      const c=cv(1024,150)[0],x=c.getContext('2d');
-      // 酒红锦缎底 + 斜向暗纹
-      const sg=x.createLinearGradient(0,0,1024,150);
-      sg.addColorStop(0,'#7d1f2b');sg.addColorStop(.5,'#5e1620');sg.addColorStop(1,'#8a2432');
-      x.fillStyle=sg;x.fillRect(0,0,1024,150);
-      x.strokeStyle='rgba(255,225,160,.16)';x.lineWidth=2;
-      for(let i=-150;i<1024;i+=22){x.beginPath();x.moveTo(i,0);x.lineTo(i+150,150);x.stroke();}
-      // 外金框 + 内金线
-      x.strokeStyle='#e8b653';x.lineWidth=9;x.strokeRect(9,9,1006,132);
-      x.strokeStyle='#f7dc9a';x.lineWidth=2.5;x.strokeRect(24,24,976,102);
-      // 四角小菱形装饰
-      x.fillStyle='#f7dc9a';
-      for(const [cx,cy] of [[42,42],[982,42],[42,108],[982,108]]){
-        x.beginPath();x.moveTo(cx,cy-9);x.lineTo(cx+9,cy);x.lineTo(cx,cy+9);x.lineTo(cx-9,cy);x.closePath();x.fill();
-      }
-      x.fillStyle='#ffe9b8';x.font='700 56px '+HK;x.textAlign='center';
-      x.fillText('熊萌 · 圣诞游乐园',512,74);
-      x.fillStyle='#f0c776';x.font='700 21px monospace';
-      x.fillText('XM CHRISTMAS FAIRGROUND  ·  2026',512,116);
-      const tex=ctex(c);
-      // 牌匾挂在花格梁正下方（大街一侧），不与格条重叠
-      signPanel(g,4.55,.66,tex,0,PH-.42,.62,.95);
-      // 两根金托架把牌匾吊在梁下
-      for(const s of [-1,1])add(g,BX(.07,.62,.07),giltM,s*1.85,PH-.02,.48);
     }
     /* 檐口瀑布灯串：贴着花格梁下沿两排密集小珠，形成"光帘" */
     for(let r=0;r<2;r++){
@@ -11333,16 +11124,10 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     /* 摩天轮骨架合批：轮圈 / 辐条 / 挂轴 / 灯珠全是刚体，整体旋转，
        并成十来个 mesh 后 draw call 从 150 降到 10 出头；吊篮各自转，不并。 */
     mergeStatic(wheel,new Set(amusement.cabs));
-    // 摩天轮登舱台 + 提示牌（放在支架外侧前方 z=3.6）
+    // 摩天轮登舱台（放在支架外侧前方 z=3.6）
     const wDeck=new THREE.Group();wDeck.position.set(0,0,3.6);g.add(wDeck);
     add(wDeck,BX(4.4,.22,2.2),M(0x6b472d,{roughness:.85}),0,.11,0);
     add(wDeck,BX(4.5,.06,2.3),snowM,0,.24,0).castShadow=false;
-    const wc=cv(384,96)[0],wx=wc.getContext('2d');
-    wx.fillStyle='#192836';wx.fillRect(0,0,384,96);wx.strokeStyle='#e8b653';wx.lineWidth=6;wx.strokeRect(6,6,372,84);
-    wx.fillStyle='#ffe8a6';wx.font='700 28px '+HK;wx.textAlign='center';wx.fillText('敞篷观景摩天轮',192,42);
-    wx.fillStyle='#9fe8ff';wx.font='700 18px '+HK;wx.fillText('点击或按 E 上舱俯瞰全城',192,76);
-    add(wDeck,BX(.10,1.6,.10),gldM,1.9,.8,.8);
-    signPanel(wDeck,1.9,.48,ctex(wc),1.9,1.72,.84,.92);
     wDeck.userData.keep=true;wDeck.userData.physObj={type:'wheel',ref:null};
     pool(g,8,.03,.16,0xffcf8f);
     OUTDOOR_OBS.push([27,36,5.0]);
@@ -11800,16 +11585,6 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     for(let yy=1.6;yy<=13.8;yy+=2.1)add(g,BX(2.2,.16,.18),gldM,0,yy,-1.25);
     add(g,BX(2.9,.42,.50),gldM,0,14.7,-1.25);
     addNS(g,new THREE.OctahedronGeometry(.60,0),new THREE.MeshBasicMaterial({color:0xffe484}),0,15.6,-1.25);
-    // 发光招牌灯箱
-    const [lc,lx]=cv(512,96);
-    lx.fillStyle='#1f1218';lx.fillRect(0,0,512,96);
-    lx.strokeStyle='#f5c96b';lx.lineWidth=6;lx.strokeRect(6,6,500,84);
-    lx.fillStyle='#ffe8a6';lx.font='700 32px '+HK;lx.textAlign='center';
-    lx.fillText('高空弹射跳伞 · SKY LAUNCH',256,58);
-    /* 标牌搬到地面：原来挂在 11.3m 高空（塔顶），现在做成塔前的小立牌，
-       落地牌面朝 -z（旋转 180° 后正对游乐园入口方向，游客走过去就能看到） */
-    for(const sx of [-1.05,1.05])add(g,BX(.11,1.05,.11),gldM,sx,.52,2.95);
-    signPanel(g,2.2,.42,ctex(lc),0,1.02,2.95,.95);
     // 弹射火箭双人座椅
     const seat=new THREE.Group();seat.position.set(0,.45,-.2);g.add(seat);
     add(seat,BX(1.55,.22,1.15),gldM,0,0,0);
@@ -11892,18 +11667,6 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
       /* 顶脊小金饰 */
       const fin=add(gb,new THREE.ConeGeometry(.10,.34,8),gilt2M,0,3.20+.62+.42,0);
       fin.castShadow=false;
-      /* Canvas 发光牌面（贴在金框前后表面 z = -0.175 / -0.305，不重面不闪烁） */
-      const gc=cv(512,320)[0],gx=gc.getContext('2d');
-      gx.fillStyle='#192836';gx.fillRect(0,0,512,320);
-      gx.strokeStyle='#e8b653';gx.lineWidth=10;gx.strokeRect(10,10,492,300);
-      gx.fillStyle='#ffe8aa';gx.font='700 44px '+HK;gx.textAlign='center';
-      gx.fillText('游乐园留言信箱',256,116);
-      gx.fillStyle='#9fe8ff';gx.font='700 24px '+HK;
-      gx.fillText('点击信箱 · 拆信读留言 / 匿名投递',256,184);
-      gx.fillStyle='#f4c56a';gx.font='700 18px monospace';
-      gx.fillText('GUESTBOOK MAILBOX · MAX 30 CHARS',256,244);
-      const gtex=ctex(gc);
-      signPanel(gb,1.62,1.00,gtex,0,2.05,-.17,.92);
       /* 红色圣诞邮筒（稳立于底座前侧 z=+0.26，拱顶沿 Z 轴正确对齐箱体） */
       add(gb,BX(.46,.88,.42),redBoxM,0,.98,.26);
       const mTop=add(gb,new THREE.CylinderGeometry(.23,.23,.42,14,1,false,0,Math.PI),redBoxM,0,1.42,.26);
@@ -12500,7 +12263,6 @@ const CIRCUS_ACTS=[
     add(ent,BX(4.9,.34,.34),goldM,0,4.30,0);
     for(let i=0;i<7;i++)addNS(ent,new THREE.SphereGeometry(.085,10,8),
       getBulbMat([0xff4d4d,0xffe078,0x48e58b][i%3],i),-2.1+i*.70,4.52,0);
-    signPanel(ent,4.8,1.34,animeSignTex(512,150,'熊萌马戏团','XIONGMENG CIRCUS · BIG TOP',"#ffd466","#1b0f12","#3d1a16"),0,3.42,.12,.92);
     /* 入口两侧的雪人守卫 */
     for(const sx of [-1,1]){
       const sm=buildSnowman(.92,{scarf:0xd23b32,hat:'santa',wave:sx<0,tilt:sx*.08});
@@ -12647,8 +12409,6 @@ mergeStatic(fair,amusement.dyn);
 for(const d of amusement.dyn)mergeStatic(d);
 /* 店铺街全是静态的：合批 */
 mergeStatic(shopRow);
-/* 招牌图集：所有招牌画完后统一上传（否则第一次渲染拿到的是空画布）*/
-SIGN_ATLAS.flush();
 mergeStatic(roofExpo);
 mergeStatic(animePark);
 mergeStatic(street);
@@ -13239,7 +12999,7 @@ const PANELS={
       ['通高中庭','十层共享中庭南北通透，主轴花溪大道从南门穿过中庭继续往北'],
       ['东西人工湖','花溪湖结冰，湖心六角亭与曲桥，湖畔香樟列植'],
       ['生活区','宿舍楼 / 教学楼 / 学生食堂 / 运动场 / 篮球场全在环校路以内'],
-      ['校门','石材门柱 + 校名横梁，校训墙刻「明德至善 博学笃行」'],
+      ['校门','石材门柱 + 门楣横梁，两侧设石墙'],
       ['由来','原先这一整片是欧式坡屋顶商业街区，30 栋连同四块铺装广场全部推倒重建']
     ]},
   fair:{eyebrow:'XM FAIRGROUND / 圣诞游乐园',title:'正门对面的圣诞游乐园',
@@ -13583,19 +13343,30 @@ function updateLightPool(){
    14. 圣诞雪境昼夜 24h 循环状态
    ════════════════════════════════════════════════════════════ */
 const TIMES=[
-  {k:'dawn', name:'晨',h:6.7, weather:'雪晓',sky:['#1e2d48','#6a6180','#c98c88','rgba(255,188,160,.40)'],fog:0x4e5268,fogD:.0102,
-   rainSky:['#161f30','#3a4354','#5b6070','rgba(150,170,195,.26)'],rainFog:0x3d4452,rainFogD:.0142},
+  {k:'dawn', name:'晨',h:6.7, weather:'雪晓',sky:['#1e2d48','#6a6180','#c98c88','rgba(255,182,158,.28)'],fog:0x3b4054,fogD:.0064,
+   rainSky:['#3c4a5e','#66758a','#939fb0','rgba(190,206,222,.30)'],rainFog:0x5a6678,rainFogD:.0116},
   {k:'noon', name:'昼',h:13.2,weather:'晴雪',sky:['#3a72b0','#78aad8','#cde2f2','rgba(255,244,215,.55)'],fog:0xb2c8da,fogD:.0068,
-   rainSky:['#5b6a78','#7d8a95','#9aa4ad','rgba(200,210,220,.36)'],rainFog:0x8b96a0,rainFogD:.0108},
-  {k:'dusk', name:'暮',h:17.5,weather:'雪霞',sky:['#263b68','#995878','#f0a46c','rgba(255,176,105,.65)'],fog:0x9b746a,fogD:.0082,
-   rainSky:['#1e2637','#463f50','#6b575c','rgba(176,136,116,.36)'],rainFog:0x65575b,rainFogD:.0128},
+   rainSky:['#93a0ab','#aeb9c2','#c6ced5','rgba(224,232,238,.40)'],rainFog:0xaab4be,rainFogD:.0084},
+  {k:'dusk', name:'暮',h:17.5,weather:'雪霞',sky:['#263b68','#995878','#f0a46c','rgba(255,170,110,.40)'],fog:0x6e5661,fogD:.0048,
+   rainSky:['#46485c','#716676','#998385','rgba(214,180,154,.38)'],rainFog:0x7e7075,rainFogD:.0100},
   {k:'night',name:'夜',h:21.5,weather:'雪夜',sky:WINTER_SKY,fog:WINTER_FOG,fogD:WINTER_FOG_D,
-   rainSky:['#0d1622','#18212e','#232c38','rgba(120,142,172,.18)'],rainFog:0x1c2532,rainFogD:.0148}
+   rainSky:['#1c2735','#2b3848','#3e4c5c','rgba(150,170,196,.22)'],rainFog:0x2c3846,rainFogD:.0118}
 ];
 /* 移动端默认开高画质档：低画质档会关掉 uHQ 抗闪烁柔光和 Bloom，
    在低像素比下远处路灯会闪成噪点，整屏发脏。桌面维持原样。 */
 const state={timeKey:'night',hour:21.5,lights:true,quality:IS_TOUCH_DEV,envDirty:true,stars:true,clean:true,weather:'snow'};
 let rainLevel=0,resetPerf=true;
+/* 白膜总控：屋顶蒸汽云团 / 地标体积光雾的浓度（随时段 + 天气变）。
+   傍晚是全场最暗的时候，任何"白色半透明团"都会在暗背景上变成白膜，
+   所以这两个系数必须随时段收，夜里也不开满。 */
+let mistK=1,steamK=1,steamCol=0xf0f4fa;
+/* 蒸汽白膜总控：云团不能是死白。
+   纯白半透明 sprite 在暗背景上会糊成一片"白膜"（实测傍晚 17:30 屋顶那团
+   白斑就是它，不是灯、不是雾）。所以颜色要跟着环境光走，浓度要跟着时段走。 */
+function setSteamLook(k,col){
+  steamK=k;steamCol=col;
+  if(window._roofSteamPuffs)for(const p of window._roofSteamPuffs)p.mat.color.setHex(col);
+}
 const rSeason=document.getElementById('r-season'),rWeather=document.getElementById('r-weather'),
       rTime=document.getElementById('r-time'),rTemp=document.getElementById('r-temp'),
       seasonW=document.getElementById('season-weather'),hourLbl=document.getElementById('hour-label'),
@@ -13651,36 +13422,46 @@ function applyTime(h){
   if(day){
     const warm=1-Math.abs(elev)*.55;
     key.color.setHSL(sunset?.06:dawn?.04:(.09-warm*.04), (sunset||dawn)?.72:.45, (sunset||dawn)?.60:(.60+elev*.14));
-    key.intensity=(sunset||dawn)?(1.15+elev*.9):(1.15+elev*1.35);
+    key.intensity=(sunset||dawn)?(1.90+elev*1.15):(1.15+elev*1.35);
     key.position.set(Math.cos(az)*40,12+elev*46,26);
     /* 雨天是阴天：方向光砍到四成，环境光抬一点 —— 有方向没阴影 = 阴天 */
-    if(rainy){key.color.setHex(0xb4c0cc);key.intensity*=.55;}
+    if(rainy){key.color.setHex(0xc2cdd8);key.intensity*=.72;}
     moon.intensity=0;
-    ambient.color.setHex(rainy?0x93a2b0:(sunset?0xb998a8:dawn?0xb8a4ba:0xb5cde3));
-    ambient.intensity=rainy?.96:((sunset||dawn)?.78:.88);
-    hemi.color.setHex(rainy?0x9aa6b2:(sunset?0xe8a088:dawn?0xdfa8b0:0xafd0f0));
-    hemi.groundColor.setHex(rainy?0x4c5259:(sunset?0x50404c:0x788a9a));
-    hemi.intensity=rainy?1.02:.92;
+    ambient.color.setHex(rainy?0xa9b7c4:(sunset?0x6f5c78:dawn?0x6e6478:0xb5cde3));
+    ambient.intensity=rainy?1.16:((sunset||dawn)?.56:.88);
+    hemi.color.setHex(rainy?0xbcc8d4:(sunset?0xc47c66:dawn?0xbe8792:0xafd0f0));
+    hemi.groundColor.setHex(rainy?0x606a74:(sunset?0x3a2f3c:(dawn?0x4a5462:0x788a9a)));
+    hemi.intensity=rainy?1.24:.66;
     paintSky(sky[0],sky[1],sky[2],sky[3]);
     scene.fog.color.setHex(fogC);scene.fog.density=fogD;
     scene.userData.baseFogD=fogD;scene.userData.baseFogCol=fogC;
-    skylineMats.forEach(m=>{m.emissiveIntensity=rainy?.16:((sunset||dawn)?.35:.08);});
-    GZU_EMI.forEach(it=>{it.m.emissiveIntensity=rainy?it.d*.35:((sunset||dawn)?it.n*.6:it.d);});
+    skylineMats.forEach(m=>{m.emissiveIntensity=rainy?.22:((sunset||dawn)?.15:.08);});
+    GZU_EMI.forEach(it=>{it.m.emissiveIntensity=rainy?it.d*.35:((sunset||dawn)?it.n*.38:it.d);});
   }else{
-    key.color.setHex(rainy?0x8fa2b8:0xa8ccf0);key.intensity=rainy?.14:.38;
+    key.color.setHex(rainy?0x9fb2c8:0xa8ccf0);key.intensity=rainy?.26:.38;
     key.position.set(-Math.cos(az)*36,40,-18);
-    moon.intensity=rainy?.14:.40;moon.color.setHex(0x86aee8);
+    moon.intensity=rainy?.30:.40;moon.color.setHex(0x86aee8);
     /* 夜里的环境光压低、压冷：暖色实用光源有 20 多盏，环境光再高就把暗部洗成灰，
        夜景会显脏。压下去之后暖光才跳得出来，暗部也才有冷调层次。 */
-    ambient.color.setHex(rainy?0x27313c:0x2d4160);ambient.intensity=rainy?.50:.47;
-    hemi.color.setHex(rainy?0x3b4a58:0x46668c);hemi.groundColor.setHex(rainy?0x141a20:0x16202c);
-    hemi.intensity=rainy?.58:.52;
+    ambient.color.setHex(rainy?0x38485c:0x2d4160);ambient.intensity=rainy?.78:.47;
+    hemi.color.setHex(rainy?0x5c7288:0x46668c);hemi.groundColor.setHex(rainy?0x222a33:0x16202c);
+    hemi.intensity=rainy?.88:.52;
     paintSky(sky[0],sky[1],sky[2],sky[3]);
     scene.fog.color.setHex(fogC);scene.fog.density=fogD;
     scene.userData.baseFogD=fogD;scene.userData.baseFogCol=fogC;
-    skylineMats.forEach(m=>{m.emissiveIntensity=rainy?.30:.62;});
+    skylineMats.forEach(m=>{m.emissiveIntensity=rainy?.42:.62;});
     GZU_EMI.forEach(it=>{it.m.emissiveIntensity=rainy?it.n*.45:it.n;});
   }
+  /* ── 白膜总闸 ──
+     蒸汽云团和地标光雾是画面里仅有的两块"大面积白色半透明"，
+     傍晚（最暗）必须收着放，否则整片天就是白膜；
+     白天可以满开，夜里留一点（夜里要有暖光跳出来，不能被白雾洗平）。 */
+  if(slot.k==='noon'){setSteamLook(1.00,0xf2f6fb);mistK=1.00;}
+  else if(slot.k==='dawn'){setSteamLook(.80,0xe9eff7);mistK=.85;}
+  else if(slot.k==='dusk'){setSteamLook(.42,0xd8ccce);mistK=.55;}
+  else{setSteamLook(.30,0xa7b7c9);mistK=.70;}
+  if(rainy){steamK*=.55;mistK*=.70;}
+
   key.target.position.set(0,2,0);
   state.envDirty=true;
   updateBrand();
@@ -13701,11 +13482,11 @@ function setWeather(w){
   if(snowFar)snowFar.visible=!rainy;
   if(rain)rain.visible=rainy;
   if(rainRipples)rainRipples.visible=rainy;
-  ground.material.color.setHex(rainy?0x8d97a4:0xd0ddeb);
-  ground.material.roughness=rainy?.42:.88;
-  ground.material.metalness=rainy?.10:.03;
-  ground.material.envMapIntensity=rainy?1.25:.85;
-  road.material.color.setHex(rainy?0x6d757f:0x8e99a4);
+  ground.material.color.setHex(rainy?0xa7b1bc:0xd0ddeb);
+  ground.material.roughness=rainy?.38:.88;
+  ground.material.metalness=rainy?.14:.03;
+  ground.material.envMapIntensity=rainy?1.55:.85;
+  road.material.color.setHex(rainy?0x7f8791:0x8e99a4);
   road.material.roughness=rainy?.22:.62;
   /* 湿度：雪天 12%（几乎干），雨天 92%（整片湿透）；uMarkAmt 是积水变暗量 */
   wetRegistry.forEach(r=>{
@@ -13713,10 +13494,11 @@ function setWeather(w){
     u.uWetAmt.value=r.base*(rainy?.92:.12);
     u.uMarkAmt.value=rainy?.50:0;
   });
-  lampPools.forEach(p=>{p.material.opacity=rainy?.16:.30;});
+  lampPools.forEach(p=>{p.material.opacity=rainy?.24:.30;});
   const b=document.getElementById('t-rain');
   if(b)b.classList.toggle('on',rainy);
   sfx.setRain(rainy?1:0);
+  renderer.toneMappingExposure=(state.quality?(IS_TOUCH_DEV?1.14:1.12):1.06)*(rainy?1.10:1);
   applyTime(state.hour);      // 天空/雾/灯光随天气一起换
 }
 
@@ -13757,7 +13539,7 @@ function applyQualityMode(on){
   bloom.strength=.28;
   bloom.radius=.72;
   bloom.threshold=.86;
-  renderer.toneMappingExposure=state.quality?(IS_TOUCH_DEV?1.14:1.12):1.06;
+  renderer.toneMappingExposure=(state.quality?(IS_TOUCH_DEV?1.14:1.12):1.06)*(state.weather==='rain'?1.10:1);
   renderer.shadowMap.needsUpdate=true;
 }
 document.getElementById('t-quality').onclick=function(){
@@ -14671,7 +14453,7 @@ const aerialHaze=(()=>{
     [  4.0, 4.5, 30.0, 17, 0xffc870, .11], // 4. 游乐园中心旋转木马暖金光雾中心
     [-18.0, 3.8, 38.6, 19, 0x6ac4ff, .09], // 5. 星夜皇家花样溜冰场光遇冰蓝光雾中心
     [ 27.0, 9.5, 36.0, 22, 0xffba66, .11], // 6. 摩天轮与高空跳伞塔暖琥珀光雾中心
-    [ 26.5, 4.8, -2.0, 18, 0xffcf7a, .10], // 7. 东侧动漫雪园核心雕塑群暖金光雾
+    [ 26.5, 4.8, -2.0, 12, 0xffcf7a, .10], // 7. 东侧动漫雪园核心雕塑群暖金光雾
     [ 50.0, 7.8, 30.0, 7, 0xffb45c, .09]  // 8. 露天马戏团旗杆暖金光雾（收紧，别在雪地上摊出一圈灰晕）
   ];
   for(const [x,y,z,sz,col,baseOp] of mistRing){
@@ -14833,7 +14615,7 @@ function updateAerialHaze(dt,t){
     const farFade=1.0-THREE.MathUtils.smoothstep(d,135,220);
     const pulse=0.92+0.08*Math.sin(t*1.1+m.phase);
     m.sp.position.y=m.y+Math.sin(t*.45+m.phase)*.22;
-    m.mat.opacity=m.baseOp*fgClear*farFade*mistHeightAtten*pulse;
+    m.mat.opacity=m.baseOp*fgClear*farFade*mistHeightAtten*pulse*mistK;
     m.sp.visible=m.mat.opacity>.004;
   }
 }
@@ -16668,7 +16450,7 @@ function animate(){
     /* 雪地上的假灯光：夜里全开；黄昏黎明留一点；白天全灭 */
     MUL_GLOW_K=state.lights?(nightNow?1.0:(state.timeKey==='dusk'||state.timeKey==='dawn'?.55:0.0)):0;
     /* 雨天光被水汽散开：灯晕压到六成，否则雨夜会又亮又刺 */
-    if(rainLevel>0)MUL_GLOW_K*=.60;
+    if(rainLevel>0)MUL_GLOW_K*=.78;
     for(let i=0;i<MUL_GLOW_POOL.length;i++){
       const it=MUL_GLOW_POOL[i];
       it.mat.opacity=it.base*MUL_GLOW_K;
@@ -16876,11 +16658,11 @@ function animate(){
       const driftX=u*1.25+Math.sin(t*2.6+p.wob+u*4.2)*.26*u;
       const driftZ=-u*.55+Math.cos(t*2.1+p.wob+u*3.6)*.22*u;
       p.sp.position.set(p.x0+driftX, p.y0+lift, p.z0+driftZ);
-      const radius=(0.38+Math.pow(u,.75)*2.15)*p.sc;
+      const radius=(0.30+Math.pow(u,.75)*1.72)*p.sc;
       p.sp.scale.set(radius, radius*(0.88+0.24*u), 1);
       const fadeIn=Math.min(1,u/.12);
       const fadeOut=Math.pow(1-u,1.35);
-      p.mat.opacity=0.62*fadeIn*fadeOut;
+      p.mat.opacity=0.62*fadeIn*fadeOut*steamK;
     }
   }
 
