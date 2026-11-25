@@ -6255,16 +6255,18 @@ let fireflyMat=null;
 {
   const scarfCols=[0xdc2f2f,0x1f8a4c,0x2563eb,0xeab308,0xc026d3,0xe11d48];
   const hats=['santa','beanie','top'];
+  /* 原来 25 只，砍到 9 只（全场雪人总数 52 → 26，正好砍掉一半）。
+     留下的都是站在「会有人走过来的地方」的：市集北侧两头、北街小店旁、
+     雪松大道南北两段、西侧环路、东侧环路、街道行道树两处。
+     被砍掉的主要是三种没人去的：±60 远处的野地、成对挤在一起的重复站位、
+     以及 z=-27 那排贴在环路边的。 */
   const spots=[
-    [-4.2,-13.2,1.06,0,true],[-2.9,-12.9,.95,-.25,false],[-3.55,-12.2,.62,.15,true],
-    [4.4,-13.6,1.02,.3,true],[5.6,-13.1,.86,-.2,false],
-    [-14.2,-12.8,.98,.2,true],[-22.5,-13.2,1.08,-.15,false],[-32.0,-12.6,.94,.35,true],
-    [8.7,-5.8,.92,-1.1,true],[8.7,-1.2,.84,-1.3,false],[8.7,4.2,.96,-1.0,true],
-    [-46.2,5.0,1.00,.8,true],[-47.2,6.0,.70,.4,false],
-    [44.2,-8.2,1.08,-.6,true],[45.3,-7.2,.75,-.35,false],[44.5,4.2,1.00,-.85,true],[45.6,5.2,.72,-.5,false],
-    [-19.5,9.35,.82,.1,true],[-18.2,9.35,.76,-.15,false],[11.1,9.35,.84,.2,true],
-    [-18.0,-27.2,1.05,.15,true],[6.0,-27.2,1.12,-.1,false],[30.0,-27.2,.98,-.25,true],
-    [-60.2,4.5,1.08,1.2,true],[60.2,4.5,1.08,-1.2,true]
+    [-4.2,-13.2,1.06,0,true],[5.6,-13.1,.86,-.2,false],
+    [-22.5,-13.2,1.08,-.15,false],
+    [8.7,-5.8,.92,-1.1,true],[8.7,4.2,.96,-1.0,true],
+    [-46.2,5.0,1.00,.8,true],
+    [44.2,-8.2,1.08,-.6,true],
+    [-19.5,9.35,.82,.1,true],[11.1,9.35,.84,.2,true]
   ];
   spots.forEach(([sx,sz,sc,ry,wv],idx)=>{
     const sm=buildSnowman(sc,{
@@ -6747,6 +6749,9 @@ function buildCat(breed='calico'){
 /* ════════════════════════════════════════════════════════════
    9. 背景：城市天际线 + 雪山群峰 + 云 + 空中圣诞老人雪橇队
    ════════════════════════════════════════════════════════════ */
+/* 校区自发光材质登记表：白天压到很暗（不然满墙橙色窗户像办公楼），
+   夜里再点亮。applyTime 里按昼夜统一改。 */
+const GZU_EMI=[];
 const skyline=new THREE.Group();scene.add(skyline);
 const skylineMats=[];
 {
@@ -6884,8 +6889,8 @@ const skylineMats=[];
     add(skyline,BX(k,.14,d),curbM,x-w/2+k/2,.05,z).castShadow=false;
     add(skyline,BX(k,.14,d),curbM,x+w/2-k/2,.05,z).castShadow=false;
   };
-  addBlockPlaza(-41,-65,68,26);addBlockPlaza(41,-65,68,26);
-  addBlockPlaza(-41,-104,68,28);addBlockPlaza(41,-104,68,28);
+  /* 北面四块街区铺装广场（z=-65 / -104）已随北侧街区一起推倒，
+     那一片现在改成贵州大学花溪校区的用地（见本块末尾的 campus 构建）。 */
   addBlockPlaza(104,-25,36,34);addBlockPlaza(104,24,36,40);
   addBlockPlaza(-104,-25,36,34);addBlockPlaza(-104,24,36,40);
   addBlockPlaza(-36,96,64,30);addBlockPlaza(44,96,64,30);
@@ -6951,14 +6956,22 @@ const skylineMats=[];
   for(let x=-112;x<=112;x+=28){
     if(Math.abs(x)<9)continue;
     addExtLamp(x,-51.2,0);addExtLamp(x,-40.8,0);
-    addExtLamp(x,-89.2,0);addExtLamp(x,80.2,0);
-    if(Math.abs(x)>16&&Math.abs(x)<65)addExtTree(x+14,-52.2);
+    /* z=-89.2 那排正贴着图书馆北墙，|x|<36 的两盏直接删掉 */
+    if(Math.abs(x)>36)addExtLamp(x,-89.2,0);
+    addExtLamp(x,80.2,0);
+    /* 沿路覆雪行道树：北面这排挪进校门两侧，避开校训墙 */
+    if(Math.abs(x)>16&&Math.abs(x)<65&&Math.abs(x+14)>20)addExtTree(x+14,-56.5);
   }
   for(let z=-110;z<=106;z+=24){
     if(Math.abs(z+46)<8||Math.abs(z-75)<8||Math.abs(z+2)<7)continue;
     addExtLamp(-85.2,z,Math.PI/2);addExtLamp(85.2,z,Math.PI/2);
   }
-  for(let z=-60;z>=-116;z-=18){addExtLamp(-5.2,z,Math.PI/2);addExtLamp(5.2,z,Math.PI/2);}
+  /* 主轴路（x=0）两侧的行道路灯：跳过图书馆中庭那一段（z=-88~-58），
+     否则灯杆会直接插进图书馆中庭里。 */
+  for(let z=-60;z>=-116;z-=18){
+    if(z>-90&&z<-58)continue;
+    addExtLamp(-5.2,z,Math.PI/2);addExtLamp(5.2,z,Math.PI/2);
+  }
 
   // ══ 2. 写实立体街区建筑群（立体壁柱、挑檐、门头灯箱、阳台、烟囱与坡屋顶，告别积木感） ══
   const shopBaseM=M(0x28313c,{roughness:.72,metalness:.18});
@@ -7055,6 +7068,9 @@ const skylineMats=[];
     [-14,122,14,27.0,12,2,2],[28,122,14,29.0,12,0,2],[-68,116,14,23.0,12,1,1],[72,116,14,24.0,12,2,1]
   ];
   for(const [x,z,w,h,d,mi,st] of cityLayout){
+    /* 北面整片（z<-50）推倒重建为贵州大学花溪校区：
+       只留下 |x|>=86 的两栋远楼给北面收个边，其余全清。 */
+    if(z<-50&&Math.abs(x)<86)continue;
     addCityBldg(x,z,w,h,d,skylineMats[mi%skylineMats.length],st);
   }
   // ══ 铺满直到地平线边缘（±188m）：远景中高层城市天际线（26~54m），全量合批几乎零开销 ══
@@ -7086,6 +7102,705 @@ const skylineMats=[];
     }
   }
   mergeStatic(skyline);
+/* ══ 2.5 贵州大学花溪校区（取代艺术馆背面北侧那整片边缘街区） ══
+     原作：z=-58 / -73 / -96 / -115 四排欧式坡屋顶商业楼共 30 栋 + 四块街区铺装广场，
+     从中央广场往北看就是一排欧洲小城屋脊，跟「中国大学校园」完全不对味。
+     现在整片推倒，按真实的贵大花溪校区重建：
+       · 南门：石材门柱 + 校名横梁 + 校训墙「明德至善 博学笃行」
+       · 中心图书馆「贵大之印」：两侧石材幕墙如峭壁，中部中国红蜂窝铝板遮阳构架
+         以篆体「贵」「图」交错拼接（回转印章体），通高 10 层共享中庭，
+         中庭南北通透，图书馆主轴正对南门
+       · 东西两侧人工湖（花溪湖）：结冰湖面 + 湖心亭 + 曲桥
+       · 宿舍楼 / 教学楼 / 食堂 / 运动场 / 香樟林荫道
+     配色纪律：红色只给遮阳构架和旗杆，其余全是石材与雪，别把整个北面染成一片红。 */
+  const campus=new THREE.Group();campus.userData.tag='campus';scene.add(campus);
+  const GZU_RED=0x9e2328;          // 贵大红（蜂窝铝板）：压暗一档，别让红压过石材
+  const GZU_RED_D=0x7a1a1e;        // 深红（背光侧 / 边缘）
+
+  /* 按真实米数铺贴的 UV：每个面按自己的水平/竖直方向除以贴图代表的米数，
+     这样石材幕墙的楼层线永远在 3.2m 一档，不会出现贴图被拉扁的情况。 */
+  const gzuUV=(g,w,h,d,tileW,tileH)=>{
+    const uv=g.attributes.uv,nrm=g.attributes.normal;
+    for(let i=0;i<uv.count;i++){
+      const nx=Math.abs(nrm.getX(i)),ny=Math.abs(nrm.getY(i));
+      const u=uv.getX(i),v=uv.getY(i);
+      if(nx>.5)uv.setXY(i,u*(d/tileW),v*(h/tileH));
+      else if(ny>.5)uv.setXY(i,u*(w/tileW),v*(d/tileH));
+      else uv.setXY(i,u*(w/tileW),v*(h/tileH));
+    }
+    uv.needsUpdate=true;return g;
+  };
+
+  /* ── 2.5.1 石材幕墙（图书馆 / 楼体主材）：暖灰石材 + 楼层横线 + 竖向分格 + 深凹窗洞 ── */
+  const gzuStone=(()=>{
+    const W=768,H=768;
+    const [c,x]=cv(W,H);
+    x.fillStyle='#b2a99a';x.fillRect(0,0,W,H);
+    for(let r=0;r<=4;r++){                       // 每 192px 一层（= 3.2m）
+      const y=r*192;
+      x.fillStyle='rgba(52,46,40,.36)';x.fillRect(0,y-2,W,4);
+      x.fillStyle='rgba(255,250,240,.20)';x.fillRect(0,y+2,W,2);
+    }
+    for(let cix=0;cix<=6;cix++){                 // 每 128px 一开间（= 3.0m）
+      const xx=cix*128;
+      x.fillStyle='rgba(52,46,40,.26)';x.fillRect(xx-1,0,2,H);
+    }
+    for(let i=0;i<9000;i++){                     // 石材颗粒
+      x.fillStyle=`rgba(${R(70,140)|0},${R(66,132)|0},${R(56,118)|0},${R(.03,.10).toFixed(3)})`;
+      x.fillRect(R(0,W),R(0,H),R(1,3),R(1,3));
+    }
+    const win=[];
+    for(let r=0;r<4;r++)for(let cix=0;cix<6;cix++){
+      const wx=cix*128+27, wy=r*192+44, ww=74, wh=102;
+      x.fillStyle='#8d8578';x.fillRect(wx-7,wy-7,ww+14,wh+14);
+      x.fillStyle='#191d24';x.fillRect(wx,wy,ww,wh);
+      x.fillStyle='rgba(255,255,255,.12)';x.fillRect(wx,wy,ww,3);
+      win.push([wx,wy,ww,wh]);
+    }
+    const t=ctex(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;
+    /* 自发光版：只有窗洞里透出暖光，石材本身不发光 */
+    const [c2,x2]=cv(W,H);
+    x2.fillStyle='#000000';x2.fillRect(0,0,W,H);
+    for(const [wx,wy,ww,wh] of win){
+      const g=x2.createLinearGradient(wx,wy,wx,wy+wh);
+      g.addColorStop(0,'#2a2f38');g.addColorStop(.28,'#f2cf9c');g.addColorStop(1,'#e8b87e');
+      x2.fillStyle=g;x2.fillRect(wx,wy,ww,wh);
+      x2.fillStyle='rgba(30,26,20,.55)';x2.fillRect(wx,wy+wh*.46,ww,5);
+      x2.fillRect(wx+ww/2-2,wy,4,wh);
+    }
+    const te=ctex(c2);te.wrapS=te.wrapT=THREE.RepeatWrapping;
+    return {map:t,emi:te};
+  })();
+  const gzuStoneM=(map,emi,inten)=>new THREE.MeshStandardMaterial({
+    map:map,emissiveMap:emi,emissive:0xffffff,emissiveIntensity:(inten===undefined?.52:inten),
+    color:0xffeeda,roughness:.82,metalness:.05});
+
+  /* ── 2.5.2 篆体「贵」「图」回转印章体遮阳屏（红色铝板，镂空处透出背后暖光玻璃） ──
+     alphaMap：黑底=镂空，白=铝板。每格一个篆体大字，隔格旋转 90°（回转），
+     贵 / 图 交错，正好是图书馆「贵大之印」的立意。 */
+  const gzuSealAlpha=(()=>{
+    const W=1024,H=832;
+    const [c,x]=cv(W,H);
+    x.fillStyle='#000';x.fillRect(0,0,W,H);
+    /* 6×4 格：每格一个篆体「贵」「图」，隔格旋转 90°（回转印章体）。
+       格子小到 3.7m 见方，整片立面才读得出「印章」而不是几块巨型红字。 */
+    const cols=8,rows=6;
+    const pw=W/cols, ph=H/rows;
+    const chars=['贵','图'];
+    for(let r=0;r<rows;r++)for(let cix=0;cix<cols;cix++){
+      const i=r*cols+cix;
+      const ox=cix*pw, oy=r*ph;
+      const rot=(i%2)?Math.PI/2:0;
+      x.save();
+      x.translate(ox+pw/2,oy+ph/2);x.rotate(rot);
+      /* 篆意大字：实心笔画（描边加粗，接近印篆的粗细） */
+      x.fillStyle='#fff';x.strokeStyle='#fff';x.lineWidth=Math.max(3,ph*.055);
+      x.textAlign='center';x.textBaseline='middle';
+      x.font='700 '+Math.round(ph*.62)+'px '+HK;
+      x.strokeText(chars[i%2],0,ph*.01);
+      x.fillText(chars[i%2],0,ph*.01);
+      x.restore();
+    }
+    const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.NoColorSpace;t.anisotropy=8;
+    return t;
+  })();
+
+  /* ── 2.5.2b 图书馆侧墙：大面积石材 + 窄竖缝窗（峭壁感，不要一格一格的办公室窗） ── */
+  const gzuStoneSide=(()=>{
+    const W=768,H=768;
+    const [c,x]=cv(W,H);
+    x.fillStyle='#b2a99a';x.fillRect(0,0,W,H);
+    for(let r=0;r<=4;r++){const y=r*192;
+      x.fillStyle='rgba(52,46,40,.32)';x.fillRect(0,y-2,W,4);
+      x.fillStyle='rgba(255,250,240,.18)';x.fillRect(0,y+2,W,2);}
+    for(let cix=0;cix<=6;cix++){const xx=cix*128;
+      x.fillStyle='rgba(52,46,40,.22)';x.fillRect(xx-1,0,2,H);}
+    for(let i=0;i<8000;i++){
+      x.fillStyle=`rgba(${R(70,140)|0},${R(66,132)|0},${R(56,118)|0},${R(.03,.09).toFixed(3)})`;
+      x.fillRect(R(0,W),R(0,H),R(1,3),R(1,3));}
+    const win=[];
+    for(let r=0;r<4;r++)for(let cix=0;cix<6;cix++){
+      const wx=cix*128+52, wy=r*192+30, ww=24, wh=132;
+      x.fillStyle='#8d8578';x.fillRect(wx-5,wy-5,ww+10,wh+10);
+      x.fillStyle='#191d24';x.fillRect(wx,wy,ww,wh);
+      win.push([wx,wy,ww,wh]);
+    }
+    const t=ctex(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;
+    const [c2,x2]=cv(W,H);
+    x2.fillStyle='#000';x2.fillRect(0,0,W,H);
+    for(const [wx,wy,ww,wh] of win){
+      const g=x2.createLinearGradient(wx,wy,wx,wy+wh);
+      g.addColorStop(0,'#2a2f38');g.addColorStop(.3,'#f4cf9a');g.addColorStop(1,'#e5b379');
+      x2.fillStyle=g;x2.fillRect(wx,wy,ww,wh);}
+    const te=ctex(c2);te.wrapS=te.wrapT=THREE.RepeatWrapping;
+    return {map:t,emi:te};
+  })();
+
+  /* ── 2.5.3 蜂窝铝板（顶部遮阳带）：六边形网格，红色细杆 ── */
+  const gzuHexAlpha=(()=>{
+    const W=768,H=384;
+    const [c,x]=cv(W,H);
+    x.fillStyle='#000';x.fillRect(0,0,W,H);
+    x.strokeStyle='#fff';x.lineWidth=9;x.lineCap='round';
+    const R0=34, dx=R0*1.5, dy=R0*Math.sqrt(3);
+    for(let row=-1;row<Math.ceil(H/dy)+1;row++){
+      for(let cix=-1;cix<Math.ceil(W/dx)+1;cix++){
+        const px=cix*dx+(row%2?dx*.5:0), py=row*dy;
+        x.beginPath();
+        for(let k=0;k<6;k++){
+          const a=Math.PI/6+k*Math.PI/3;
+          const vx=px+Math.cos(a)*R0*.86, vy=py+Math.sin(a)*R0*.86;
+          if(k===0)x.moveTo(vx,vy);else x.lineTo(vx,vy);
+        }
+        x.closePath();x.stroke();
+      }
+    }
+    const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.NoColorSpace;t.anisotropy=8;
+    t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(5,2);
+    return t;
+  })();
+
+  /* ── 2.5.4 宿舍楼立面：米黄墙 + 连续阳台栏板 + 窗 ── */
+  const gzuDorm=(()=>{
+    const W=768,H=768;
+    const [c,x]=cv(W,H);
+    x.fillStyle='#ded2b6';x.fillRect(0,0,W,H);
+    for(let i=0;i<7000;i++){
+      x.fillStyle=`rgba(${R(150,200)|0},${R(140,186)|0},${R(110,158)|0},${R(.03,.09).toFixed(3)})`;
+      x.fillRect(R(0,W),R(0,H),R(1,3),R(1,3));
+    }
+    const win=[];
+    for(let r=0;r<4;r++){
+      const fy=r*192;
+      x.fillStyle='rgba(120,104,80,.34)';x.fillRect(0,fy+2,W,6);   // 层间线
+      x.fillStyle='#efe6cf';x.fillRect(0,fy+118,W,30);            // 阳台栏板
+      x.fillStyle='rgba(120,104,80,.30)';x.fillRect(0,fy+146,W,4);
+      for(let cix=0;cix<6;cix++){
+        const wx=cix*128+34, wy=fy+36, ww=60, wh=76;
+        x.fillStyle='#8f8a78';x.fillRect(wx-5,wy-5,ww+10,wh+10);
+        x.fillStyle='#20252c';x.fillRect(wx,wy,ww,wh);
+        x.fillStyle='rgba(255,255,255,.14)';x.fillRect(wx,wy,ww,3);
+        x.fillStyle='#2f3742';x.fillRect(wx+ww/2-2,wy,4,wh);
+        win.push([wx,wy,ww,wh]);
+      }
+    }
+    const t=ctex(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;
+    const [c2,x2]=cv(W,H);
+    x2.fillStyle='#000';x2.fillRect(0,0,W,H);
+    for(const [wx,wy,ww,wh] of win){
+      const g=x2.createLinearGradient(wx,wy,wx,wy+wh);
+      g.addColorStop(0,'#232830');g.addColorStop(.3,'#ffd08a');g.addColorStop(1,'#ffae55');
+      x2.fillStyle=g;x2.fillRect(wx,wy,ww,wh);
+      x2.fillStyle='rgba(24,20,14,.6)';x2.fillRect(wx+ww/2-2,wy,4,wh);
+    }
+    const te=ctex(c2);te.wrapS=te.wrapT=THREE.RepeatWrapping;
+    return {map:t,emi:te};
+  })();
+
+  /* ── 2.5.5 教学楼立面：浅灰 + 通长窗带（板楼 + 外挂楼梯间） ── */
+  const gzuTeach=(()=>{
+    const W=768,H=768;
+    const [c,x]=cv(W,H);
+    x.fillStyle='#cfd2d2';x.fillRect(0,0,W,H);
+    for(let i=0;i<6000;i++){
+      x.fillStyle=`rgba(${R(120,190)|0},${R(124,194)|0},${R(126,196)|0},${R(.03,.08).toFixed(3)})`;
+      x.fillRect(R(0,W),R(0,H),R(1,3),R(1,3));
+    }
+    const win=[];
+    for(let r=0;r<4;r++){
+      const fy=r*192;
+      x.fillStyle='rgba(88,92,96,.34)';x.fillRect(0,fy+4,W,5);
+      x.fillStyle='#9aa0a6';x.fillRect(0,fy+52,W,74);          // 窗带底衬
+      x.fillStyle='#1e232b';x.fillRect(0,fy+58,W,62);
+      for(let cix=0;cix<12;cix++){
+        x.fillStyle='#39404a';x.fillRect(cix*64+29,fy+58,6,62);
+      }
+      x.fillStyle='rgba(255,255,255,.12)';x.fillRect(0,fy+58,W,3);
+      win.push([0,fy+58,W,62]);
+    }
+    const t=ctex(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;
+    const [c2,x2]=cv(W,H);
+    x2.fillStyle='#000';x2.fillRect(0,0,W,H);
+    for(const [wx,wy,ww,wh] of win){
+      const g=x2.createLinearGradient(wx,wy,wx,wy+wh);
+      g.addColorStop(0,'#252b33');g.addColorStop(.26,'#ffd89a');g.addColorStop(1,'#ffbe68');
+      x2.fillStyle=g;x2.fillRect(wx,wy,ww,wh);
+      x2.fillStyle='rgba(22,18,12,.5)';
+      for(let cix=0;cix<12;cix++)x2.fillRect(cix*64+29,wy,6,wh);
+    }
+    const te=ctex(c2);te.wrapS=te.wrapT=THREE.RepeatWrapping;
+    return {map:t,emi:te};
+  })();
+
+  /* ── 2.5.6 冻湖面：深青灰冰 + 裂纹 + 雪斑 ── */
+  const gzuIce=(()=>{
+    const [c,x]=cv(512,512);
+    x.fillStyle='#e9f1f7';x.fillRect(0,0,512,512);       // 湖面首先是一层雪
+    for(let i=0;i<46;i++){                               // 雪盖不住的地方露出深色冰面
+      const px=R(0,512),py=R(0,512),rx=R(22,86),ry=R(14,52),a=R(0,3.14);
+      x.fillStyle=`rgba(${R(96,126)|0},${R(118,146)|0},${R(132,158)|0},.92)`;
+      x.beginPath();x.ellipse(px,py,rx,ry,a,0,6.28);x.fill();
+      x.strokeStyle='rgba(214,236,250,.55)';x.lineWidth=1.4;  // 冰裂纹
+      for(let k=0;k<3;k++){
+        x.beginPath();
+        let qx=px+R(-rx*.6,rx*.6),qy=py+R(-ry*.6,ry*.6);x.moveTo(qx,qy);
+        for(let s=0;s<4;s++){qx+=R(-40,40);qy+=R(-32,32);x.lineTo(qx,qy);}
+        x.stroke();
+      }
+    }
+    for(let i=0;i<260;i++){                              // 雪堆 / 风吹雪纹
+      x.fillStyle=`rgba(255,255,255,${R(.25,.7).toFixed(3)})`;
+      x.beginPath();x.ellipse(R(0,512),R(0,512),R(10,46),R(6,24),R(0,3.14),0,6.28);x.fill();
+    }
+    const t=ctex(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(2,2);
+    return t;
+  })();
+
+  /* ── 2.5.7 塑胶跑道（红）+ 白线 ── */
+  const gzuTrack=(()=>{
+    const [c,x]=cv(512,512);
+    x.fillStyle='#a8473c';x.fillRect(0,0,512,512);
+    for(let i=0;i<5200;i++){
+      x.fillStyle=`rgba(${R(120,200)|0},${R(60,120)|0},${R(50,100)|0},${R(.03,.10).toFixed(3)})`;
+      x.fillRect(R(0,512),R(0,512),R(1,3),R(1,3));
+    }
+    x.strokeStyle='rgba(248,244,236,.85)';x.lineWidth=4;
+    for(let i=1;i<6;i++){x.beginPath();x.moveTo(0,i*512/6);x.lineTo(512,i*512/6);x.stroke();}
+    const tt=ctex(c);tt.wrapS=tt.wrapT=THREE.RepeatWrapping;tt.repeat.set(3,2);
+    return tt;
+  })();
+
+  /* 校区所有雪地光池共用一个材质：mergeStatic 是按材质分桶的，
+     每盏灯各建一个材质就等于多 9 个 draw call，白白浪费。 */
+  const gzuPoolM=new THREE.MeshBasicMaterial({
+    map:mulGlowTex,color:0xffffff,transparent:true,opacity:.44,
+    blending:THREE.MultiplyBlending,depthWrite:false,fog:false});
+  regNightGlow(gzuPoolM,.44);
+  /* 校区灰色金属构件共用一个材质 */
+  const gzuMetal=M(0x9ea4a9,{roughness:.72,metalness:.18});
+
+  /* ── 2.5.8 校名 / 校训牌匾（红字 / 金字，透明底，贴在石材上） ── */
+  const gzuSignTex=(w,h,txt,fill,stroke)=>{
+    const [c,x]=cv(w,h);
+    x.clearRect(0,0,w,h);
+    x.textAlign='center';x.textBaseline='middle';
+    x.font='700 '+Math.round(h*.62)+'px '+HK;
+    x.lineWidth=Math.max(2,h*.05);
+    x.strokeStyle=stroke;x.strokeText(txt,w/2,h*.52);
+    x.fillStyle=fill;x.fillText(txt,w/2,h*.52);
+    const t=ctex(c);t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;return t;
+  };
+
+  /* ══ 图书馆「贵大之印」 ══
+     两翼：x[-31,-9] 与 [9,31]，z[-88,-60]，总高 32m（10 层 × 3.2m）
+     中庭：x[-9,9] 通高 10 层，南北通透，主轴（花溪大道）从南门穿过中庭往北
+     东西外立面 = 石材幕墙（峭壁），南立面 = 玻璃幕墙 + 中国红遮阳构架 */
+  const LIB={x0:-31,x1:-9,zS:-60,zN:-88,h:32};
+  const libStoneM=gzuStoneM(gzuStone.map,gzuStone.emi,.42);
+  const libSideM=gzuStoneM(gzuStoneSide.map,gzuStoneSide.emi,.42);
+  GZU_EMI.push({m:libStoneM,n:.42,d:.07},{m:libSideM,n:.42,d:.07});
+  const libGlassM=new THREE.MeshStandardMaterial({
+    color:0x2a3442,roughness:.24,metalness:.30,
+    emissive:0xffb968,emissiveIntensity:.34,emissiveMap:gzuStone.emi});
+  GZU_EMI.push({m:libGlassM,n:.34,d:.05});
+  const sealM=new THREE.MeshStandardMaterial({
+    color:GZU_RED,alphaMap:gzuSealAlpha,alphaTest:.5,side:THREE.DoubleSide,
+    roughness:.42,metalness:.34,emissive:0x5c1214,emissiveIntensity:.55});
+  const hexM=new THREE.MeshStandardMaterial({
+    color:GZU_RED,alphaMap:gzuHexAlpha,alphaTest:.5,side:THREE.DoubleSide,
+    roughness:.46,metalness:.32,emissive:0x4e0f12,emissiveIntensity:.45});
+  const libRedM=M(GZU_RED,{roughness:.44,metalness:.32});
+  const libRedDM=M(GZU_RED_D,{roughness:.5,metalness:.28});
+  const snowTopM=M(0xeaf2f8,{roughness:.92});
+  const gzuDark=M(0x2b3138,{roughness:.7,metalness:.3});
+
+  for(const [wx0,wx1] of [[LIB.x0,LIB.x1],[9,31]]){
+    const w=wx1-wx0, cx=(wx0+wx1)/2, d=LIB.zS-LIB.zN, cz=(LIB.zS+LIB.zN)/2;
+    /* 石材主体 */
+    addNS(campus,gzuUV(new THREE.BoxGeometry(w,LIB.h,d),w,LIB.h,d,18,12.8),libStoneM,cx,LIB.h/2,cz);
+    /* 南立面主体就是石材幕墙（两侧如峭壁），只在底部 3 层做通高玻璃门厅 */
+    addNS(campus,gzuUV(new THREE.PlaneGeometry(w-1.2,9.4),w-1.2,9.4,0,18,12.8),libGlassM,cx,5.6,LIB.zS+0.06);
+    for(let k=0;k<6;k++){                                  // 门厅竖向分格
+      addNS(campus,BX(.22,9.4,.30),M(0x8e9096,{roughness:.6,metalness:.4}),cx-w/2+1.4+k*((w-2.8)/5),5.6,LIB.zS+0.16);
+    }
+    /* 遮阳屏（篆体「贵」「图」回转印章体）：离幕墙 1.6m */
+    const scrW=w-1.0, scrH=17.2, scrY=4.6+scrH/2, scrZ=LIB.zS+2.4;
+    addNS(campus,new THREE.PlaneGeometry(scrW,scrH),sealM,cx,scrY,scrZ);
+    addNS(campus,BX(scrW+.4,.20,.30),libRedDM,cx,scrY+scrH/2+.05,scrZ);     // 遮阳屏边框
+    addNS(campus,BX(scrW+.4,.20,.30),libRedDM,cx,scrY-scrH/2-.05,scrZ);
+    addNS(campus,BX(.20,scrH,.30),libRedDM,cx-scrW/2-.05,scrY,scrZ);
+    addNS(campus,BX(.20,scrH,.30),libRedDM,cx+scrW/2+.05,scrY,scrZ);
+    /* 顶部蜂窝铝板遮阳带 */
+    addNS(campus,new THREE.PlaneGeometry(w-1.0,8.0),hexM,cx,21.8+4.0,LIB.zS+2.4);
+    /* 「如瀑布泻下」的竖向红色鳍片：从顶部往下泻，长短不一 */
+    for(let i=0;i<5;i++){
+      const fx=wx0+1.6+i*((w-3.2)/4);
+      const len=2.6+((i*5)%4)*1.1;
+      addNS(campus,BX(.26,len,.42),libRedM,fx,29.8-len/2,LIB.zS+2.85);
+    }
+    /* 女儿墙 + 屋面雪 + 设备房 */
+    addNS(campus,BX(w+.5,.55,d+.5),gzuMetal,cx,LIB.h+.24,cz);
+    addNS(campus,BX(w-.9,.24,d-.9),snowTopM,cx,LIB.h+.60,cz);
+    addNS(campus,BX(w+.6,.22,.5),libRedM,cx,LIB.h+.62,cz+d/2+.1);      // 女儿墙红色压边
+    for(let k=0;k<3;k++){                                                // 屋面天窗
+      const tx=cx-w/2+5.0+k*6.2;
+      addNS(campus,BX(4.2,.7,11.0),gzuMetal,tx,LIB.h+1.05,cz+2);
+      addNS(campus,BX(3.4,.16,10.2),M(0x39506a,{roughness:.22,metalness:.4}),tx,LIB.h+1.44,cz+2);
+    }
+    addNS(campus,BX(1.4,.2,20.0),gzuMetal,cx,LIB.h+.82,cz-4);   // 检修步道
+    addNS(campus,BX(6.5,2.6,4.2),gzuMetal,cx+4,LIB.h+2.05,cz-3);
+    addNS(campus,BX(6.2,.2,3.9),snowTopM,cx+4,LIB.h+3.42,cz-3);
+    addNS(campus,BX(2.4,1.6,2.4),gzuDark,cx-6.5,LIB.h+1.4,cz+4);
+    addNS(campus,BX(1.2,1.2,1.2),M(0x6c7176,{roughness:.7}),cx-2.5,LIB.h+1.2,cz-9);
+    /* 东西外立面换成大面石材（峭壁感） */
+    const outer=(wx0<0)?LIB.x0:31;
+    const sideP=addNS(campus,gzuUV(new THREE.PlaneGeometry(d,LIB.h),d,LIB.h,0,18,12.8),libSideM,
+      outer+(wx0<0?-0.06:0.06),LIB.h/2,cz);
+    sideP.rotation.y=(wx0<0)?-Math.PI/2:Math.PI/2;
+  }
+  /* 中庭：通高共享中庭（x[-9,9]）—— 背墙玻璃透暖光，顶部红色格构 */
+  addNS(campus,gzuUV(new THREE.BoxGeometry(18.4,1.2,LIB.h),18.4,1.2,LIB.h,18,12.8),libStoneM,0,LIB.h/2,LIB.zN-0.6);
+  addNS(campus,gzuUV(new THREE.PlaneGeometry(17.4,9.4),17.4,9.4,0,18,12.8),libGlassM,0,5.6,LIB.zN+0.08);
+  for(let k=0;k<6;k++){
+    addNS(campus,BX(.22,9.4,.30),M(0x8e9096,{roughness:.6,metalness:.4}),-8.7+k*3.48,5.6,LIB.zN+0.18);
+  }
+  /* 中庭顶：红色格构（方格网），像一枚倒扣的印章 */
+  for(let i=-4;i<=4;i++){
+    addNS(campus,BX(.30,.34,26.4),libRedM,i*2.0,LIB.h+.4,(LIB.zS+LIB.zN)/2);
+  }
+  for(let j=0;j<5;j++){
+    addNS(campus,BX(18.4,.26,.30),libRedM,0,LIB.h+.4,LIB.zN+1.4+j*6.4);
+  }
+  addNS(campus,BX(18.6,.5,26.6),M(0x9aa0a4,{roughness:.8}),0,LIB.h+.75,(LIB.zS+LIB.zN)/2);
+  addNS(campus,BX(18.0,.22,26.0),snowTopM,0,LIB.h+1.12,(LIB.zS+LIB.zN)/2);
+  /* 中庭两侧的竖向红鳍：沿中庭纵向排成两列，上半段悬垂（只在楼内） */
+  for(const s of [-1,1]){
+    for(let k=0;k<6;k++){
+      const fz=LIB.zS-3.0-k*4.4;
+      addNS(campus,BX(.26,10.0,.40),libRedDM,s*8.7,25.0,fz);
+    }
+  }
+  /* 图书馆正门（东侧礼仪入口面向花二干道）：台阶 + 雨篷 + 门厅暖光 */
+  {
+    const ez=LIB.zS;
+    addNS(campus,BX(30,1.0,3.2),M(0xc9c4bb,{roughness:.84}),0,.5,ez+1.6);
+    addNS(campus,BX(28,.16,2.6),M(0xdad5cc,{roughness:.8}),0,1.06,ez+1.6);
+    addNS(campus,BX(14,.40,3.8),M(0x8d1f24,{roughness:.5,metalness:.3}),0,5.5,ez+2.1);
+    addNS(campus,BX(13.2,.16,3.2),snowTopM,0,5.78,ez+2.1);
+    /* 门厅：左右石材门柱 + 门楣 + 三扇透暖光的玻璃门（中间留空，门才看得见） */
+    addNS(campus,BX(1.5,5.6,1.1),M(0x8b8378,{roughness:.82}),-6.0,2.8,ez+0.5);
+    addNS(campus,BX(1.5,5.6,1.1),M(0x8b8378,{roughness:.82}),6.0,2.8,ez+0.5);
+    addNS(campus,BX(13.6,1.1,1.1),M(0x7c7469,{roughness:.82}),0,5.5,ez+0.5);
+    const doorGlow=new THREE.MeshStandardMaterial({
+      color:0x223040,emissive:0xffbe76,emissiveIntensity:.52,roughness:.28,side:THREE.DoubleSide});
+    for(let k=-1;k<=1;k++){
+      addNS(campus,BX(3.4,4.2,.12),doorGlow,k*3.9,2.2,ez+0.08);
+      addNS(campus,BX(.14,4.3,.22),M(0x9aa0a6,{roughness:.5,metalness:.5}),k*3.9-1.8,2.2,ez+0.14);
+    }
+  }
+  /* 图书馆门前的暖光（只照亮门前这一片，够用就行，不给全场加光） */
+  {
+    const libL=new THREE.PointLight(0xffc98c,52,30,1.7);
+    libL.position.set(0,2.4,LIB.y0+2.2);scene.add(libL);
+    shopLights.push({l:libL,base:52,street:false,delay:1.7});
+  }
+
+  /* ══ 南门 + 校训墙 + 迎宾道 ══ */
+  const gzuGranite=M(0x9c968c,{roughness:.86});
+  const gzuGraniteD=M(0x7e796f,{roughness:.88});
+  {
+    const gz=-52;
+    for(const s of [-1,1]){
+      addNS(campus,BX(3.4,9.6,3.4),gzuGranite,s*12.5,4.8,gz);
+      addNS(campus,BX(3.9,.7,3.9),M(0xb5afa4,{roughness:.8}),s*12.5,9.9,gz);
+      addNS(campus,BX(3.7,.22,3.7),snowTopM,s*12.5,10.34,gz);
+      addNS(campus,BX(1.0,2.2,.14),libRedM,s*12.5,3.4,gz+1.76);   // 门柱上的红色印章板
+    }
+    /* 门楣横梁 + 「贵州大学」 */
+    addNS(campus,BX(28.6,2.0,3.0),gzuGranite,0,11.6,gz);
+    addNS(campus,BX(29.2,.35,3.4),M(0xb5afa4,{roughness:.8}),0,12.75,gz);
+    addNS(campus,BX(28.6,.26,3.2),snowTopM,0,13.05,gz);
+    const nameTex=gzuSignTex(1024,128,'贵州大学','#c02a2f','rgba(90,18,16,.85)');
+    for(const s of [1,-1]){
+      const p=new THREE.Mesh(new THREE.PlaneGeometry(15,1.9),new THREE.MeshStandardMaterial({
+        map:nameTex,emissiveMap:nameTex,transparent:true,roughness:.5,metalness:.1,
+        emissive:0xff8a72,emissiveIntensity:.85}));
+      p.position.set(0,11.6,gz+s*1.56);if(s<0)p.rotation.y=Math.PI;p.castShadow=false;campus.add(p);
+    }
+    /* 校训墙：明德至善 博学笃行 */
+    const mottoTex=gzuSignTex(1024,128,'明德至善  博学笃行','#d9b45e','rgba(60,44,14,.8)');
+    for(const s of [-1,1]){
+      addNS(campus,BX(13,.42,1.5),gzuGraniteD,s*15.6,1.05,gz-2.6);
+      addNS(campus,BX(13.2,.22,1.7),M(0xb0aaa0,{roughness:.8}),s*15.6,1.35,gz-2.6);
+      addNS(campus,BX(13.0,.14,1.5),snowTopM,s*15.6,1.51,gz-2.6);
+      const p=new THREE.Mesh(new THREE.PlaneGeometry(11.4,1.42),new THREE.MeshStandardMaterial({
+        map:mottoTex,emissiveMap:mottoTex,transparent:true,roughness:.6,
+        emissive:0xffd894,emissiveIntensity:.60}));
+      p.position.set(s*15.6,1.05,gz-3.36);p.rotation.y=Math.PI;p.castShadow=false;campus.add(p);
+    }
+    /* 迎宾大道两侧旗杆 */
+    for(let i=-1;i<=1;i++){
+      addNS(campus,new THREE.CylinderGeometry(.11,.13,9.2,10),M(0xe8e8e8,{roughness:.35,metalness:.5}),i*3.4,4.6,gz-8.5);
+      addNS(campus,new THREE.SphereGeometry(.16,10,8),M(0xf0d68a,{roughness:.3,metalness:.7}),i*3.4,9.3,gz-8.5);
+      if(i!==0){
+        const fl=new THREE.Mesh(new THREE.PlaneGeometry(1.6,1.1),new THREE.MeshStandardMaterial({
+          color:0xc02a2f,side:THREE.DoubleSide,roughness:.8,emissive:0x3a0c0a,emissiveIntensity:.4}));
+        fl.position.set(i*3.4+.85,8.3,gz-8.5);fl.castShadow=false;campus.add(fl);
+      }
+    }
+  }
+
+  /* ══ 东西人工湖（花溪湖）：结冰湖面 + 湖心亭 + 曲桥 + 湖岸 ══ */
+  const gzuIceM=new THREE.MeshStandardMaterial({map:gzuIce,color:0xcfdae2,roughness:.34,metalness:.16});
+  const gzuBankM=M(0x8d8b85,{roughness:.9});
+  for(const s of [-1,1]){
+    const cx=s*47, cz=-74, rx=10, rz=11;
+    /* 湖岸：用几块偏移的椭圆拼出不规则轮廓，再压一层雪 */
+    for(const [ox,oz,rrx,rrz] of [[0,0,rx+1.5,rz+1.5],[rx*.55,rz*.42,rx*.62,rz*.52],
+                                  [-rx*.58,-rz*.38,rx*.58,rz*.50],[-rx*.30,rz*.62,rx*.50,rz*.38]]){
+      const bank=new THREE.Mesh(new THREE.CircleGeometry(1,40),gzuBankM);
+      bank.rotation.x=-Math.PI/2;bank.scale.set(rrx,rrz,1);bank.position.set(cx+ox,.03,cz+oz);
+      bank.receiveShadow=true;bank.castShadow=false;campus.add(bank);
+      const sn=new THREE.Mesh(new THREE.CircleGeometry(1,40),snowTopM);
+      sn.rotation.x=-Math.PI/2;sn.scale.set(rrx*.96,rrz*.96,1);sn.position.set(cx+ox,.045,cz+oz);
+      sn.castShadow=false;campus.add(sn);
+    }
+    const ice=new THREE.Mesh(new THREE.CircleGeometry(1,56),gzuIceM);
+    ice.rotation.x=-Math.PI/2;ice.scale.set(rx,rz,1);ice.position.set(cx,.07,cz);
+    ice.receiveShadow=true;ice.castShadow=false;campus.add(ice);
+    /* 冰面上的雪斑（几块不规则白） */
+    for(let i=0;i<7;i++){
+      const a=R(0,6.28),rr=R(.25,.86);
+      const sp=new THREE.Mesh(new THREE.CircleGeometry(1,18),M(0xf2f7fb,{roughness:.94}));
+      sp.rotation.x=-Math.PI/2;sp.scale.set(R(1.2,3.4),R(.9,2.6),1);
+      sp.position.set(cx+Math.cos(a)*rx*rr,.09,cz+Math.sin(a)*rz*rr);
+      sp.castShadow=false;sp.receiveShadow=false;campus.add(sp);
+    }
+    /* 湖心亭：六角小亭 */
+    const pav=new THREE.Group();pav.position.set(cx,.07,cz);campus.add(pav);
+    const roofM=M(0x6d4a3a,{roughness:.86});
+    for(let i=0;i<4;i++){
+      const a=i*Math.PI/2+Math.PI/4;
+      addNS(pav,new THREE.CylinderGeometry(.10,.12,3.4,8),M(0x8c2f2a,{roughness:.6}),Math.cos(a)*1.55,1.7,Math.sin(a)*1.55);
+    }
+    const cone=new THREE.Mesh(new THREE.ConeGeometry(2.5,1.5,6),roofM);
+    cone.position.y=3.9;cone.rotation.y=Math.PI/6;cone.castShadow=false;cone.receiveShadow=false;pav.add(cone);
+    const csnow=new THREE.Mesh(new THREE.ConeGeometry(2.42,1.34,6),snowTopM);
+    csnow.position.y=3.94;csnow.rotation.y=Math.PI/6;csnow.castShadow=false;pav.add(csnow);
+    const plinth=new THREE.Mesh(new THREE.CylinderGeometry(2.2,2.4,.36,6),gzuBankM);
+    plinth.position.y=.18;plinth.castShadow=false;plinth.receiveShadow=true;pav.add(plinth);
+    /* 曲桥：从湖岸伸向湖心 */
+    for(let i=0;i<5;i++){
+      const t=i/4;
+      const bx=cx+s*(rx-1.2-t*(rx-3.6));
+      const bz=cz-Math.sin(t*Math.PI)*3.0;
+      addNS(campus,BX(2.4,.22,2.2),M(0xa8783f,{roughness:.86}),bx,.30,bz);
+      if(i<4){
+        const t2=(i+1)/4;
+        addNS(campus,BX(2.4,.22,2.2),M(0xa8783f,{roughness:.86}),
+          cx+s*(rx-1.2-t2*(rx-3.6)),.30,cz-Math.sin(t2*Math.PI)*3.0);
+      }
+      addNS(campus,BX(.14,.9,.14),M(0x8c2f2a,{roughness:.6}),bx-1.05,.75,bz);
+      addNS(campus,BX(.14,.9,.14),M(0x8c2f2a,{roughness:.6}),bx+1.05,.75,bz);
+    }
+  }
+
+  /* ══ 宿舍楼 ×2（东） ══ */
+  const dormM=gzuStoneM(gzuDorm.map,gzuDorm.emi,.30);
+  GZU_EMI.push({m:dormM,n:.30,d:.05});
+  const dormTrimM=M(0xc9bfa4,{roughness:.84});
+  for(const dz of [-99,-113]){
+    const w=34,d=12,h=18.6,cx=32,cz=dz;
+    addNS(campus,gzuUV(new THREE.BoxGeometry(w,h,d),w,h,d,18,12.4),dormM,cx,h/2,cz);
+    addNS(campus,BX(w+.5,.6,d+.5),dormTrimM,cx,h+.3,cz);
+    addNS(campus,BX(w-.4,.24,d-.4),snowTopM,cx,h+.72,cz);
+    /* 阳台：每层外挑一段 */
+    for(let r=0;r<6;r++){
+      addNS(campus,BX(w-.8,1.05,1.5),M(0xd8cdb2,{roughness:.84}),cx,1.55+r*3.1,cz-d/2-.7);
+      addNS(campus,BX(w-.6,.16,1.7),M(0xbdb195,{roughness:.84}),cx,2.15+r*3.1,cz-d/2-.7);
+    }
+    /* 屋顶水箱 + 太阳能板 */
+    addNS(campus,new THREE.CylinderGeometry(.85,.85,1.7,12),M(0xb8bcc0,{roughness:.6,metalness:.3}),cx-9,h+1.6,cz);
+    for(let i=0;i<4;i++){
+      const p=addNS(campus,BX(2.6,.12,1.5),M(0x1e2b3c,{roughness:.35,metalness:.5}),cx+3+i*3.0,h+.9,cz-2.2);
+      p.rotation.x=-.32;
+    }
+    addNS(campus,BX(4.2,2.2,3.4),gzuMetal,cx+11,h+1.4,cz+2.4);
+    addNS(campus,BX(4.0,.2,3.2),snowTopM,cx+11,h+2.6,cz+2.4);
+  }
+
+  /* ══ 教学楼 ×2（西）+ 外挂楼梯间 ══ */
+  const teachM=gzuStoneM(gzuTeach.map,gzuTeach.emi,.26);
+  GZU_EMI.push({m:teachM,n:.26,d:.05});
+  const teachTrimM=M(0xb4b8bb,{roughness:.82});
+  for(const dz of [-99,-113]){
+    const w=40,d=13,h=21,cx=-30,cz=dz;
+    addNS(campus,gzuUV(new THREE.BoxGeometry(w,h,d),w,h,d,18,12.8),teachM,cx,h/2,cz);
+    addNS(campus,BX(w+.5,.6,d+.5),teachTrimM,cx,h+.3,cz);
+    addNS(campus,BX(w-.4,.24,d-.4),snowTopM,cx,h+.72,cz);
+    /* 两部外挂楼梯间（竖井 + 斜向楼梯暗示） */
+    for(const s of [-1,1]){
+      addNS(campus,BX(4.2,h,.9),gzuMetal,cx+s*11,h/2,cz-d/2-.45);
+      for(let r=0;r<7;r++){
+        addNS(campus,BX(4.4,.14,1.2),gzuMetal,cx+s*11,1.5+r*3.0,cz-d/2-.62);
+      }
+    }
+    addNS(campus,BX(5.0,2.4,4.0),gzuMetal,cx+6,h+1.5,cz+2.0);
+    addNS(campus,BX(4.8,.2,3.8),snowTopM,cx+6,h+2.8,cz+2.0);
+  }
+
+  /* ══ 食堂（东北）+ 排烟管 + 大挑檐 ══ */
+  {
+    const cx=64,cz=-99,w=24,d=20,h=8.2;
+    addNS(campus,gzuUV(new THREE.BoxGeometry(w,h,d),w,h,d,18,12.8),gzuStoneM(gzuStone.map,gzuStone.emi,.40),cx,h/2,cz);
+    /* 一层通高玻璃 */
+    addNS(campus,BX(w-3.0,3.4,.12),new THREE.MeshStandardMaterial({
+      color:0x2a3442,emissive:0xffc07a,emissiveIntensity:.55,roughness:.3}),cx,2.0,cz-d/2-.08);
+    /* 大挑檐 + 屋面 */
+    addNS(campus,BX(w+4.5,.55,d+4.5),gzuMetal,cx,h+.4,cz);
+    addNS(campus,BX(w+4.0,.24,d+4.0),snowTopM,cx,h+.8,cz);
+    addNS(campus,BX(w-4,2.4,d-4),gzuMetal,cx,h+1.9,cz);
+    addNS(campus,BX(w-4.4,.2,d-4.4),snowTopM,cx,h+3.2,cz);
+    /* 排烟管 */
+    for(let i=0;i<3;i++){
+      addNS(campus,new THREE.CylinderGeometry(.42,.46,3.2,10),gzuMetal,cx-5+i*5,h+4.9,cz);
+    }
+    /* 门头招牌 */
+    const st=gzuSignTex(512,128,'学生食堂','#d9b45e','rgba(60,44,14,.8)');
+    const sp=new THREE.Mesh(new THREE.PlaneGeometry(7.2,1.8),new THREE.MeshStandardMaterial({
+      map:st,transparent:true,roughness:.6,emissive:0x241a06,emissiveIntensity:.4}));
+    sp.position.set(cx,5.4,cz-d/2-2.35);sp.rotation.y=Math.PI;sp.castShadow=false;campus.add(sp);
+  }
+
+  /* ══ 运动场（西北）：塑胶跑道 + 足球场 + 看台 + 灯杆 ══ */
+  {
+    const cx=-56,cz=-105;
+    const outer=new THREE.Mesh(new THREE.RingGeometry(14.0,17.5,64),new THREE.MeshStandardMaterial({
+      map:gzuTrack,color:0xd8d2c8,roughness:.88}));
+    outer.rotation.x=-Math.PI/2;outer.scale.set(1,1,.60);outer.position.set(cx,.06,cz);
+    outer.receiveShadow=true;outer.castShadow=false;campus.add(outer);
+    /* 跑道白线 */
+    for(let i=0;i<4;i++){
+      const r=14.4+i*.9;
+      const ln=new THREE.Mesh(new THREE.RingGeometry(r,r+.14,64),M(0xf2eee6,{roughness:.7}));
+      ln.rotation.x=-Math.PI/2;ln.scale.set(1,1,.60);ln.position.set(cx,.08,cz);
+      ln.castShadow=false;ln.receiveShadow=false;campus.add(ln);
+    }
+    /* 足球场 */
+    const pitch=new THREE.Mesh(new THREE.CircleGeometry(1,48),M(0x4a6b3e,{roughness:.94}));
+    pitch.rotation.x=-Math.PI/2;pitch.scale.set(13.2,7.6,1);pitch.position.set(cx,.05,cz);
+    pitch.receiveShadow=true;pitch.castShadow=false;campus.add(pitch);
+    const mid=new THREE.Mesh(new THREE.RingGeometry(2.6,2.78,36),M(0xf2eee6,{roughness:.7}));
+    mid.rotation.x=-Math.PI/2;mid.position.set(cx,.07,cz);mid.castShadow=false;campus.add(mid);
+    const box=new THREE.Mesh(new THREE.RingGeometry(3.4,3.56,36),M(0xf2eee6,{roughness:.7}));
+    box.rotation.x=-Math.PI/2;box.scale.set(1,1,.58);box.position.set(cx,.07,cz);box.castShadow=false;campus.add(box);
+    /* 球门 */
+    for(const s of [-1,1]){
+      const gx=cx+s*12.6;
+      addNS(campus,BX(.16,2.5,.16),M(0xf2f2f0,{roughness:.5}),gx,1.25,cz-3.4);
+      addNS(campus,BX(.16,2.5,.16),M(0xf2f2f0,{roughness:.5}),gx,1.25,cz+3.4);
+      addNS(campus,BX(.16,.16,6.8),M(0xf2f2f0,{roughness:.5}),gx,2.5,cz);
+    }
+    /* 看台（北侧三层台阶 + 顶棚） */
+    for(let r=0;r<3;r++){
+      addNS(campus,BX(26,.7,1.9),M(0xb0aca2,{roughness:.86}),cx,1.0+r*.7,cz-11.4-r*1.9);
+    }
+    addNS(campus,BX(27,.3,6.6),M(0x8f9499,{roughness:.8}),cx,4.6,cz-14.2);
+    addNS(campus,BX(26.4,.2,6.2),snowTopM,cx,4.86,cz-14.2);
+    /* 4 根灯杆：夜里灯头发光 + 雪地乘法光池（白天自动淡出） */
+    for(const [lx,lz] of [[cx-15,cz-9],[cx+15,cz-9],[cx-15,cz+9],[cx+15,cz+9]]){
+      addNS(campus,new THREE.CylinderGeometry(.14,.19,10.5,10),gzuMetal,lx,5.25,lz);
+      addNS(campus,BX(1.5,.16,.16),M(0x585f66,{roughness:.6,metalness:.4}),lx,10.4,lz);
+      for(const o of [-.55,.55]){
+        addNS(campus,BX(.72,.22,.46),M(0xfff0c4,{roughness:.4,emissive:0xffd88c,emissiveIntensity:.8}),lx+o,10.1,lz);
+      }
+      const pool=new THREE.Mesh(new THREE.CircleGeometry(1,28),gzuPoolM);
+      pool.rotation.x=-Math.PI/2;pool.scale.set(7.5,7.5,1);pool.position.set(lx,.05,lz);
+      pool.renderOrder=2;pool.userData.noReflect=true;campus.add(pool);
+    }
+  }
+
+  /* ══ 篮球场 ×1（东北角）+ 围网 ══ */
+  {
+    const cx=62,cz=-114;
+    const court=new THREE.Mesh(new THREE.PlaneGeometry(18,12),M(0x2f5f7a,{roughness:.92}));
+    court.rotation.x=-Math.PI/2;court.position.set(cx,.05,cz);court.receiveShadow=true;court.castShadow=false;campus.add(court);
+    for(const s of [-1,1]){
+      addNS(campus,BX(18,.03,.12),M(0xf2eee6,{roughness:.7}),cx,.07,cz+s*4.2);
+      addNS(campus,BX(.12,.03,12),M(0xf2eee6,{roughness:.7}),cx+s*6.8,.07,cz);
+      /* 篮架 */
+      addNS(campus,new THREE.CylinderGeometry(.11,.13,3.6,8),gzuMetal,cx+s*6.6,1.8,cz);
+      addNS(campus,BX(.12,.12,1.5),M(0x4d545a,{roughness:.6,metalness:.4}),cx+s*6.6,3.5,cz);
+      addNS(campus,BX(1.8,1.05,.10),M(0xf0f0ee,{roughness:.55}),cx+s*6.6,3.5,cz-.75);
+      addNS(campus,new THREE.TorusGeometry(.30,.045,6,16),M(0xe07a2a,{roughness:.5}),cx+s*6.6,2.95,cz-1.3);
+    }
+    /* 围网立柱 */
+    for(let i=0;i<=6;i++){
+      for(const s of [-1,1]){
+        addNS(campus,new THREE.CylinderGeometry(.07,.09,3.4,6),gzuMetal,cx-9+i*3,1.7,cz+s*6);
+      }
+    }
+  }
+
+  /* ══ 香樟林荫道 + 草坪（雪下仍见一点绿） ══ */
+  const gzuLeafM=M(0x2f4a34,{roughness:.9,flatShading:true});
+  const gzuTrunkM=M(0x4a3a2a,{roughness:.92});
+  const gzuLawnM=M(0x53684a,{roughness:.95});
+  const gzuSnowCapM=M(0xeef4f8,{roughness:.94});
+  const gzuTree=(x,z,s)=>{
+    const g=new THREE.Group();g.position.set(x,0,z);g.scale.setScalar(s);campus.add(g);
+    addNS(g,new THREE.CylinderGeometry(.16,.24,3.0,7),gzuTrunkM,0,1.5,0);
+    addNS(g,new THREE.IcosahedronGeometry(1.55,1),gzuLeafM,0,3.9,0);
+    addNS(g,new THREE.IcosahedronGeometry(1.15,1),gzuLeafM,.6,3.3,.4);
+    addNS(g,new THREE.IcosahedronGeometry(1.35,1),gzuSnowCapM,0,4.55,-.1);
+    return g;
+  };
+  /* 主轴两侧行道树 */
+  for(let z=-58;z>=-88;z-=5.5){
+    gzuTree(-11.2,z,.92+R(-.06,.06));
+    gzuTree(11.2,z,.92+R(-.06,.06));
+  }
+  /* 环校路 / 宿舍区 / 教学区绿荫 */
+  for(let x=-70;x<=70;x+=11){
+    if(Math.abs(x)<14)continue;
+    gzuTree(x,-91.4,.86+R(-.08,.08));
+  }
+  /* 广场草坪块 */
+  for(const [lx,lz,lw,ld] of [[-24,-66,10,7],[24,-66,10,7],[-64,-72,8,9],[64,-72,8,9]]){
+    const lawn=new THREE.Mesh(new THREE.PlaneGeometry(lw,ld),gzuLawnM);
+    lawn.rotation.x=-Math.PI/2;lawn.position.set(lx,.035,lz);lawn.receiveShadow=true;lawn.castShadow=false;campus.add(lawn);
+    const sn=new THREE.Mesh(new THREE.PlaneGeometry(lw*.92,ld*.9),gzuSnowCapM);
+    sn.rotation.x=-Math.PI/2;sn.position.set(lx,.045,lz);sn.castShadow=false;campus.add(sn);
+  }
+
+  /* 主轴路灯：暖灯头 + 人行道上的乘法光池（白天自动淡出） */
+  {
+    const poleM=M(0x3c444c,{roughness:.55,metalness:.45});
+    for(const lz of [-60,-72,-84]){
+      for(const sx of [-1,1]){
+        const lx=sx*6.3;
+        addNS(campus,new THREE.CylinderGeometry(.10,.14,5.2,8),poleM,lx,2.6,lz);
+        addNS(campus,BX(.9,.14,.14),poleM,lx-sx*.42,5.15,lz);
+        addNS(campus,BX(.66,.20,.40),M(0xfff0c4,{roughness:.4,emissive:0xffd88c,emissiveIntensity:.9}),lx-sx*.42,4.98,lz);
+        const pool=new THREE.Mesh(new THREE.CircleGeometry(1,26),gzuPoolM);
+        pool.rotation.x=-Math.PI/2;pool.scale.set(6.2,6.2,1);pool.position.set(lx-sx*.5,.14,lz);
+        pool.renderOrder=2;pool.userData.noReflect=true;campus.add(pool);
+      }
+    }
+  }
+
+  /* 校区铺装主轴（花溪大道两侧人行道，把沥青马路和雪地之间接上） */
+  for(const s of [-1,1]){
+    addNS(campus,BX(4.6,.10,72),M(0xa8b0b6,{roughness:.9}),s*6.3,.05,-84);
+    addNS(campus,BX(4.4,.08,72),M(0xc4ccd2,{roughness:.88}),s*6.3,.12,-84);
+  }
+  /* 图书馆前的开阔广场 */
+  {
+    const pl=new THREE.Mesh(new THREE.PlaneGeometry(66,10),M(0xb9c0c6,{roughness:.9}));
+    pl.rotation.x=-Math.PI/2;pl.position.set(0,.04,-56);pl.receiveShadow=true;pl.castShadow=false;campus.add(pl);
+  }
+  mergeStatic(campus);
+
 
   // ══ 3. 游乐园左侧璀璨圣诞教堂 (-49, 0, 36) ══
   const lmGroup=new THREE.Group();scene.add(lmGroup);
@@ -7753,11 +8468,12 @@ const skylineMats=[];
   // 将原本零散丑陋的地面扁平雪堆，统一替换为俏皮可爱的冬日小雪人
   const driftScarf=[0xdc2f2f,0x1f8a4c,0x2563eb,0xeab308,0xc026d3,0xe11d48];
   const driftHats=['santa','beanie','top'];
+  /* 原来 16 只，砍到 6 只：教堂/剧院后场与北段环路之间各留两只当雪地点缀，
+     其余十只全是空旷地带里没人会走到的小雪人，纯属凑数。 */
   const drifts=[
-    [-58,24,0.86],[-40,24,0.74],[-59,36,0.90],[-39,36,0.78],
-    [47,24,0.76],[64,24,0.86],[46,36,0.74],[65,36,0.90],
-    [-33,20,0.82],[45,20,0.82],[-33,56,0.86],[45,56,0.86],
-    [-16,9.5,0.76],[18,9.5,0.76],[-22,-25,0.82],[22,-25,0.82]
+    [-33,20,0.82],[45,20,0.82],
+    [-16,9.5,0.76],[18,9.5,0.76],
+    [-22,-25,0.82],[22,-25,0.82]
   ];
   drifts.forEach(([dx,dz,sc],idx)=>{
     const sm=buildSnowman(sc,{
@@ -12283,7 +12999,16 @@ const PANELS={
       ['四间铺面','熊萌咖啡 / 熊萌文创 / 姜饼甜品屋 / 特展票务处'],
       ['门脸','双坡屋顶积雪 + 烟囱冒烟，窗里透出各色暖光，檐下挂满彩灯'],
       ['临街','门前石阶与长椅，坐着看雪、等人'],
-      ['位置','隔着北段马路正对艺术馆背面，楼群剪影在前，更深一层']
+      ['位置','隔着北段马路正对艺术馆背面，贵州大学花溪校区的图书馆剪影在前，更深一层']
+    ]},
+  campus:{eyebrow:'GZU HUAXI CAMPUS / 贵州大学花溪校区',title:'艺术馆背面的大学校园',
+    rows:[
+      ['中心图书馆','「贵大之印」：两侧石材幕墙如峭壁，中部中国红蜂窝铝板遮阳构架以篆体「贵」「图」交错拼接'],
+      ['通高中庭','十层共享中庭南北通透，主轴花溪大道从南门穿过中庭继续往北'],
+      ['东西人工湖','花溪湖结冰，湖心六角亭与曲桥，湖畔香樟列植'],
+      ['生活区','宿舍楼 / 教学楼 / 学生食堂 / 运动场 / 篮球场全在环校路以内'],
+      ['校门','石材门柱 + 校名横梁，校训墙刻「明德至善 博学笃行」'],
+      ['由来','原先这一整片是欧式坡屋顶商业街区，30 栋连同四块铺装广场全部推倒重建']
     ]},
   fair:{eyebrow:'XM FAIRGROUND / 圣诞游乐园',title:'正门对面的圣诞游乐园',
     rows:[
@@ -12330,7 +13055,8 @@ const VIEWS={
   street:   {pos:[22,5.8,25],tgt:[12.5,1.2,13.5],label:'飘雪圣诞街'},
   market:   {pos:[-46.5,11.5,16.0],tgt:[-30.0,1.6,-2.0],label:'圣诞市集'},
   shops:    {pos:[-15.0,8.0,-13.5],tgt:[0,2.2,-28.0],label:'北街小店'},
-  fair:     {pos:[5.0,19.0,60.0],tgt:[1.0,2.5,35.0],label:'圣诞游乐园'}
+  fair:     {pos:[5.0,19.0,60.0],tgt:[1.0,2.5,35.0],label:'圣诞游乐园'},
+  campus:   {pos:[4,15,-33],tgt:[0,15,-74],label:'贵州大学花溪校区'}
 };
 /* 漫游模式下的站位（第一��称落脚点，含地面高度与朝向） */
 const SPOTS={
@@ -12612,6 +13338,7 @@ function applyTime(h){
     scene.fog.color.setHex(slot.fog);scene.fog.density=slot.fogD;
     scene.userData.baseFogD=slot.fogD;scene.userData.baseFogCol=slot.fog;
     skylineMats.forEach(m=>{m.emissiveIntensity=(sunset||dawn)?.35:.08;});
+    GZU_EMI.forEach(it=>{it.m.emissiveIntensity=(sunset||dawn)?it.n*.6:it.d;});
   }else{
     key.color.setHex(0xa8ccf0);key.intensity=.38;
     key.position.set(-Math.cos(az)*36,40,-18);
@@ -12624,6 +13351,7 @@ function applyTime(h){
     scene.fog.color.setHex(WINTER_FOG);scene.fog.density=WINTER_FOG_D;
     scene.userData.baseFogD=WINTER_FOG_D;scene.userData.baseFogCol=WINTER_FOG;
     skylineMats.forEach(m=>{m.emissiveIntensity=.62;});
+    GZU_EMI.forEach(it=>{it.m.emissiveIntensity=it.n;});
   }
   key.target.position.set(0,2,0);
   state.envDirty=true;
@@ -13053,6 +13781,8 @@ cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.toFixed(2),z:+cam
   shot:(id)=>{try{return xmSetShot(id);}catch(e){return{ok:false,error:String(e)};}},
   /* 调试：开关落雪（做画面比对测试时先关掉，否则雪花位移会把逐像素对比全污染） */
   snow:(on)=>{if(snow)snow.visible=on;if(snowFar)snowFar.visible=on;return on;},
+  /* 调试：拿到场景本体（探针用来逐对象体检、查是谁在挡镜头） */
+  scene:()=>scene,
   /* 调试：开关阴影、单独隐藏某个装置 */
   shadows:(on)=>{renderer.shadowMap.enabled=on;scene.traverse(o=>{if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.needsUpdate=true);else o.material.needsUpdate=true;}});return on;},
   hideRide:(i)=>{if(amusement.dyn[i])amusement.dyn[i].visible=false;return i;},
@@ -16228,7 +16958,7 @@ function animate(){
 const XM_SHOTS=[
   /* ── 静态风景机位 ── */
   {id:'museum-gate',   name:'艺术馆正门',   kind:'static',pos:[24,4.6,23],   look:[6,6.2,2],    fov:58,move:'sway', desc:'玻璃幕墙、暖金灯带与门前雪松'},
-  {id:'plaza-night',  name:'中央广场夜景', kind:'static',pos:[9,6.2,20],    look:[-2,3.2,-6], fov:64,move:'drift',desc:'环城大道、远景楼群与雪幕'},
+  {id:'plaza-night',  name:'中央广场夜景', kind:'static',pos:[9,6.2,20],    look:[-2,3.2,-6], fov:64,move:'drift',desc:'环城大道、远景校区与雪幕'},
   {id:'fair-gate',    name:'游乐园鎏金门楼',kind:'static',pos:[-7,3.2,26],  look:[4,3.4,19.5], fov:58,move:'sway', desc:'鎏金花格门楼与积雪顶'},
   {id:'church-front', name:'教堂正门',     kind:'static',pos:[-49,4.2,12], look:[-49,7.6,26],fov:54,move:'sway', desc:'哥特立面、尖拱门与红毯大道'},
   {id:'circus-front',name:'露天马戏团',   kind:'static',pos:[27.5,8.2,30],look:[50,3.2,30],fov:58,move:'sway',desc:'条纹篷顶与场内表演'},
