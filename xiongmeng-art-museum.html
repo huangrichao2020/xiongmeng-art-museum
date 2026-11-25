@@ -97,6 +97,15 @@
     backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
   }
   #railToggle:hover{color:var(--accent);border-color:var(--line-strong)}
+  /* 纯净模式下的常驻时间牌：贴在 ≡ 圆钮下方，点它等于展开侧栏。
+     有了它，用户一眼能看见"现在是几点"，也知道时间还能切。 */
+  #cleanClock{
+    display:none;font-family:var(--mono);font-size:10px;letter-spacing:.10em;color:var(--muted);
+    padding:4px 8px;background:rgba(9,16,24,.74);border:1px solid var(--line);border-radius:2px;
+    cursor:pointer;white-space:nowrap;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  }
+  body.clean #cleanClock{display:block}
+  #cleanClock:hover{color:var(--accent);border-color:var(--line-strong)}
   #rail .seasons{display:grid;grid-template-columns:repeat(4,32px);gap:5px}
   #rail .seasons button{width:32px;height:32px;padding:0;font-size:13px;border-radius:3px}
   #rail .seasons button small{display:none}
@@ -157,8 +166,11 @@
 
   /* ---------- 沉浸视角 ---------- */
   body.fp #hint,body.fp #tip{display:none!important}
-  /* 纯净模式：画面上只留操作控件（摇杆 / 跳 / 返回 / 声音），其余 UI 全部隐去 */
-  body.clean #rail,body.clean #info,body.clean #hint,
+  /* 纯净模式：画面上只留操作控件（摇杆 / 跳 / 返回 / 声音），其余 UI 全部隐去。
+     注意：#rail 绝不能一起藏 —— 侧栏里就是晨/昼/暮/夜四个时段按钮和 24 小时滑块，
+     藏掉等于把整个时间系统废掉，用户再也切不回清晨/黄昏/夜晚。
+     改成只收起侧栏内容（body.rail-min），≡ 圆钮和时间牌留在屏上，点一下就展开。 */
+  body.clean #info,body.clean #hint,
   body.clean #tip,body.clean #cross,body.clean #dock,body.clean #panel{display:none!important}
   /* 纯净时仍要能走能转头：操作控件不受 clean 影响 */
   body.clean.walk #joystick,body.clean.walk #w-run,
@@ -745,6 +757,7 @@
 
 <aside id="rail">
   <button id="railToggle" title="展开 / 收起">≡</button>
+  <button id="cleanClock" title="时段 / 天气">21:30</button>
   <div id="railBody">
     <div class="seasons" id="seasons"></div>
     <input id="hour" type="range" min="0" max="24" step="0.1" value="21.5" />
@@ -755,6 +768,7 @@
       <button id="t-sound" class="on">圣诞音</button>
       <button id="t-stars" class="on">流星雨</button>
       <button id="t-lights" class="on">圣诞灯</button>
+      <button id="t-rain" title="切换雪 / 雨">雨天</button>
       <button id="t-rotate">环绕</button>
       <button id="t-reset">复位</button>
     </div>
@@ -9042,7 +9056,134 @@ function buildSnow(n){
   scene.add(snowFar);
 }
 buildSnow(720);
-const rain=null,ripples=null,eaveDrips=null,rainGlass=[];
+/* ══ 雨天：雨丝 + 地面涟漪 ══════════════════════════════════════
+   雨丝用 InstancedBufferGeometry + 自定义 shader 画：每条雨丝的落点、长度、
+   朝向全在 GPU 里算，CPU 每帧只改一个 uTime。
+   620 条雨丝 = 1 个 draw call、0 次 CPU 矩阵运算（用 InstancedMesh 每帧 compose
+   620 个矩阵在手机上纯属浪费）。
+   地面涟漪同理：位置跟着相机走，永远落在看得见的那片地面上。 */
+/* 雨丝的形状在 fragment shader 里现算（横向收窄 + 竖向两头渐隐），
+   不用贴图 —— 一张贴图反而多一次纹理采样和带宽。 */
+/* 涟漪遮罩：白=乘 1（不改地面），环带压到 0.59（=地面被雨点砸出的一圈暗纹） */
+const rainRippleTex=(()=>{
+  const [c,g]=cv(64,64);
+  g.fillStyle='#ffffff';g.fillRect(0,0,64,64);
+  const grd=g.createRadialGradient(32,32,6,32,32,30);
+  grd.addColorStop(0,'rgba(255,255,255,1)');
+  grd.addColorStop(.60,'rgba(186,186,186,1)');
+  grd.addColorStop(.86,'rgba(255,255,255,1)');
+  grd.addColorStop(1,'rgba(255,255,255,1)');
+  g.fillStyle=grd;g.fillRect(0,0,64,64);
+  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.NoColorSpace;return t;
+})();
+const RAIN_N=1000,RIPPLE_N=120;
+let rain=null,rainMat=null,rainRipples=null,rippleMat=null;
+function buildRain(){
+  if(rain){scene.remove(rain);rain.geometry.dispose();}
+  if(rainRipples){scene.remove(rainRipples);rainRipples.geometry.dispose();}
+  const quad=new THREE.PlaneGeometry(1,1);
+  /* ── 雨丝 ── */
+  const g=new THREE.InstancedBufferGeometry();
+  g.index=quad.index;
+  g.setAttribute('position',quad.attributes.position);
+  g.setAttribute('uv',quad.attributes.uv);
+  const off=new Float32Array(RAIN_N*3),par=new Float32Array(RAIN_N*3);
+  for(let i=0;i<RAIN_N;i++){
+    off[i*3]=R(-74,74);off[i*3+1]=R(0,34);off[i*3+2]=R(-48,48);
+    par[i*3]=R(15,26);      // 下落速度 m/s
+    par[i*3+1]=R(.70,1.90);  // 雨丝长度
+    par[i*3+2]=R(.016,.038); // 雨丝粗细
+  }
+  g.setAttribute('aOff',new THREE.InstancedBufferAttribute(off,3));
+  g.setAttribute('aPar',new THREE.InstancedBufferAttribute(par,3));
+  g.instanceCount=RAIN_N;
+  rainMat=new THREE.ShaderMaterial({
+    uniforms:{
+      uTime:{value:0},uOpacity:{value:0},uSpan:{value:34},uTilt:{value:.17},
+      uColor:{value:new THREE.Color(0xcfe4ff)},
+      uB:{value:new THREE.Vector4(-9.6,-11.6,12.1,7.6)},   // 馆体范围：雨不落进室内
+      fogColor:{value:new THREE.Color(0xffffff)},fogDensity:{value:.00025}
+    },
+    transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:true,
+    vertexShader:`
+      attribute vec3 aOff; attribute vec3 aPar;
+      uniform float uTime,uSpan,uTilt;
+      uniform vec4 uB;
+      varying float vA; varying float vDepth; varying vec2 vUv;
+      void main(){
+        float speed=aPar.x,len=aPar.y,wid=aPar.z;
+        float u=fract((aOff.y-uTime*speed)/uSpan);       // 0..1 落程
+        vec3 wp=vec3(aOff.x,u*uSpan,aOff.z);
+        if(wp.x>uB.x&&wp.x<uB.z&&wp.z>uB.y&&wp.z<uB.w){gl_Position=vec4(2.,2.,2.,1.);return;}
+        vec3 up=normalize(vec3(sin(uTilt),cos(uTilt),0.0));   // 风把雨吹斜
+        vec3 vd=normalize(cameraPosition-wp);
+        vec3 rt=normalize(cross(up,vd));                        // 绕 Y 轴面向相机
+        vec3 pos=wp+rt*((uv.x-0.5)*wid)+up*((uv.y-0.5)*len);
+        vec4 mv=modelViewMatrix*vec4(pos,1.0);
+        vDepth=-mv.z;
+        vUv=uv;
+        vA=.28+.72*u;                                          // 越接近地面越密
+        gl_Position=projectionMatrix*mv;
+      }`,
+    fragmentShader:`
+      uniform vec3 uColor; uniform float uOpacity;
+      uniform vec3 fogColor; uniform float fogDensity;
+      varying float vA; varying float vDepth; varying vec2 vUv;
+      void main(){
+        float edge=1.0-abs(vUv.x-0.5)*2.0;                 // 横向收窄成一条线
+        float tail=smoothstep(0.0,0.30,vUv.y)*smoothstep(1.0,0.55,vUv.y);
+        float f=1.0-exp(-fogDensity*fogDensity*vDepth*vDepth);
+        float a=edge*edge*tail*vA*uOpacity*(1.0-f);
+        if(a<0.004)discard;
+        gl_FragColor=vec4(uColor,a);
+      }`
+  });
+  rain=new THREE.Mesh(g,rainMat);
+  rain.frustumCulled=false;rain.visible=false;rain.userData.noReflect=true;
+  scene.add(rain);
+  /* ── 地面涟漪 ── */
+  const rg=new THREE.InstancedBufferGeometry();
+  rg.index=quad.index;
+  rg.setAttribute('position',quad.attributes.position);
+  rg.setAttribute('uv',quad.attributes.uv);
+  const rOff=new Float32Array(RIPPLE_N*2),rPh=new Float32Array(RIPPLE_N);
+  for(let i=0;i<RIPPLE_N;i++){
+    rOff[i*2]=R(-26,26);rOff[i*2+1]=R(-26,26);rPh[i]=rng();
+  }
+  rg.setAttribute('aXZ',new THREE.InstancedBufferAttribute(rOff,2));
+  rg.setAttribute('aPhase',new THREE.InstancedBufferAttribute(rPh,1));
+  rg.instanceCount=RIPPLE_N;
+  rippleMat=new THREE.ShaderMaterial({
+    uniforms:{
+      uTime:{value:0},uOpacity:{value:0},uRate:{value:.62},uMap:{value:rainRippleTex},
+      uCenter:{value:new THREE.Vector2(0,0)}
+    },
+    transparent:true,depthWrite:false,side:THREE.DoubleSide,blending:THREE.MultiplyBlending,
+    vertexShader:`
+      attribute vec2 aXZ; attribute float aPhase;
+      uniform float uTime,uRate; uniform vec2 uCenter;
+      varying vec2 vUv; varying float vA;
+      void main(){
+        float u=fract(uTime*uRate+aPhase);
+        float s=.20+u*1.30;
+        vUv=uv; vA=(1.0-u)*(1.0-u);
+        vec3 p=vec3(uCenter.x+aXZ.x+(uv.x-0.5)*s,.035,uCenter.y+aXZ.y+(uv.y-0.5)*s);
+        gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.0);
+      }`,
+    fragmentShader:`
+      uniform sampler2D uMap; uniform float uOpacity;
+      varying vec2 vUv; varying float vA;
+      void main(){
+        float m=texture2D(uMap,vUv).r;
+        gl_FragColor=vec4(vec3(mix(1.0,m,vA*uOpacity)),1.0);
+      }`
+  });
+  rainRipples=new THREE.Mesh(rg,rippleMat);
+  rainRipples.frustumCulled=false;rainRipples.visible=false;rainRipples.userData.noReflect=true;
+  scene.add(rainRipples);
+}
+buildRain();
+const eaveDrips=null,rainGlass=[];
 
 /* ══ 冬夜疏朗星点 + 大规模平行星尘流星雨（每颗流星 620 颗粒子，屏幕恒为左上→右下 45° 斜划） ══ */
 let stars=null,starMat=null;
@@ -12443,7 +12584,7 @@ mergeStatic(animePark);
 mergeStatic(street);
 mergeStatic(westGarden);
 const sfx={
-  ctx:null,master:null,musicBus:null,on:false,noiseBuf:null,windGain:null,
+  ctx:null,master:null,musicBus:null,on:false,noiseBuf:null,windGain:null,rainGain:null,rainAmt:0,
   nextCar:7,songIdx:0,stepIdx:0,nextNoteT:0,nextStepT:0,curChord:[48,60,64,67],timerId:null,
   // 欢快游乐园圣诞 BGM（Jingle Bells + We Wish You a Merry Christmas 轻快串联）
   // (MIDI音高, 节拍数, 可选伴奏和弦MIDI数组)
@@ -12858,7 +12999,28 @@ const sfx={
     }
   },
   pump(){},
-  setRain(){},
+  /* 雨声：一条带通白噪当雨幕底噪。
+     增益压得很低（0.030）—— 雨是背景音，不该盖过圣诞旋律。
+     切到雨天时把雪天的风声压掉一点，免得两层噪声叠着糊。 */
+  setRain(v){
+    v=Math.max(0,Math.min(1,v||0));
+    this.rainAmt=v;
+    if(!this.ctx||!this.noiseBuf)return;
+    const c=this.ctx;
+    if(!this.rainGain){
+      const src=c.createBufferSource();src.buffer=this.noiseBuf;src.loop=true;
+      const hp=c.createBiquadFilter();hp.type='highpass';hp.frequency.value=430;
+      const bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1250;bp.Q.value=.5;
+      const g=c.createGain();g.gain.value=0;
+      src.connect(hp);hp.connect(bp);bp.connect(g);g.connect(this.master);
+      src.start();
+      this.rainGain=g;
+    }
+    const t=c.currentTime;
+    this.rainGain.gain.cancelScheduledValues(t);
+    this.rainGain.gain.setTargetAtTime(v*0.030,t,.8);
+    if(this.windGain)this.windGain.gain.setTargetAtTime(v>0.02?0.003:0.010,t,1.4);
+  },
   setHum(){},
   setOn(on){
     this.on=on;
@@ -13265,18 +13427,104 @@ renderer.domElement.addEventListener('pointerup',e=>{
   }
 });
 
+/* ══ 点光源池：把 20 多盏点光收敛成固定数量的"槽位" ═════════════════
+   实测（本机 1280×860 广场机位，静止 2 秒取帧率）：
+     点光 23 盏 → 19 fps ｜ 19 盏 → 28 ｜ 15 盏 → 34 ｜ 11 盏 → 42 ｜ 0 盏 → 52
+   每一盏点光都要在**每个片元**里跑一次光照循环，灯越多整场越慢。
+   这才是"越改越卡"的真正原因（draw call 只占小头）。
+
+   做法：大部分点光降级成"候选"（不进渲染状态），场景里只留固定数量的槽位灯，
+   每 8 帧按「离相机近 + 亮」挑 K 个候选填进槽位，其余槽位强度归零。
+   槽位数量恒定 → shader 里的灯循环长度恒定 → 不会触发着色器重编译卡顿。
+
+   为什么不是把灯删掉：删了就真的黑了；槽位是"谁离你近谁负责亮"，
+   走位的时候画面照样有光，只是不再同时点亮二十多个光源。 */
+const LP={on:false,slots:[],cands:[],K:8,cd:0,cur:[],
+  probe:new THREE.Vector3(),dir:new THREE.Vector3()};
+function initLightPool(){
+  if(LP.on)return;
+  const all=[];
+  scene.traverse(o=>{ if(o.isPointLight) all.push(o); });
+  for(const l of all){
+    /* 馆内主灯和玩家身前的随行补光常驻（玩家大部分时间就在馆里），
+       判定：直接挂在场景根下、且就在馆子附近 */
+    const fixed=(l.parent===scene)&&(Math.hypot(l.position.x,l.position.z)<20);
+    if(fixed)continue;
+    LP.cands.push({l,wp:new THREE.Vector3(),score:-1});
+    l.visible=false;          // 候选灯不进渲染状态，但矩阵照常更新，位置照样跟得住
+  }
+  for(let i=0;i<LP.K;i++){
+    const s=new THREE.PointLight(0xffffff,0,20,1.5);
+    s.userData.lpSlot=true;
+    scene.add(s);
+    LP.slots.push(s);
+  }
+  LP.on=true;
+}
+function updateLightPool(){
+  if(!LP.on)return;
+  /* 打分探针：取相机前方 4m 的地面点，而不是相机本身。
+     相机在 60m 高的沙盘位时，量相机位置会选出一堆"离得远但很亮"的灯，
+     结果脚下这一片反而没人照 —— 探针落在地面才准。 */
+  camera.getWorldDirection(LP.dir);
+  LP.probe.set(camera.position.x+LP.dir.x*4,.8,camera.position.z+LP.dir.z*4);
+  const cp=LP.probe;
+  /* 归属每 8 帧换一次，亮度每帧都抄（候选灯的强度在跳） */
+  if((LP.cd++%8)===0){
+    for(const c of LP.cands){
+      c.l.getWorldPosition(c.wp);
+      const d=c.wp.distanceTo(cp);
+      const dist=c.l.distance||10;
+      let sc=0;
+      if(d<dist){
+        const q=1-Math.pow(d/dist,4);
+        sc=c.l.intensity/(d*d+1)*q*q;    // 和 three 的物理衰减同口径
+      }
+      c.score=sc;
+    }
+    LP.cands.sort((a,b)=>b.score-a.score);
+    const best=LP.cands.length?LP.cands[0].score:0;
+    /* 上次占位的灯只要还不太弱就留着，避免走位时灯一盏盏闪 */
+    const keep=[],used=new Set();
+    for(const c of LP.cur){
+      if(c&&c.score>best*0.12){keep.push(c);used.add(c);}
+    }
+    for(const c of LP.cands){
+      if(keep.length>=LP.K)break;
+      if(used.has(c))continue;
+      if(c.score<=0)break;
+      keep.push(c);used.add(c);
+    }
+    LP.cur=keep;
+  }
+  for(let i=0;i<LP.K;i++){
+    const s=LP.slots[i],c=LP.cur[i];
+    if(!c){s.intensity=0;continue;}
+    c.l.getWorldPosition(c.wp);
+    s.position.copy(c.wp);
+    s.color.copy(c.l.color);
+    s.intensity=c.l.intensity;
+    s.distance=c.l.distance;
+    s.decay=c.l.decay;
+  }
+}
+
 /* ════════════════════════════════════════════════════════════
    14. 圣诞雪境昼夜 24h 循环状态
    ════════════════════════════════════════════════════════════ */
 const TIMES=[
-  {k:'dawn', name:'晨',h:6.7, weather:'雪晓',sky:['#1e2d48','#6a6180','#c98c88','rgba(255,188,160,.40)'],fog:0x4e5268,fogD:.0102},
-  {k:'noon', name:'昼',h:13.2,weather:'晴雪',sky:['#3a72b0','#78aad8','#cde2f2','rgba(255,244,215,.55)'],fog:0xb2c8da,fogD:.0068},
-  {k:'dusk', name:'暮',h:17.5,weather:'雪霞',sky:['#263b68','#995878','#f0a46c','rgba(255,176,105,.65)'],fog:0x9b746a,fogD:.0082},
-  {k:'night',name:'夜',h:21.5,weather:'雪夜',sky:WINTER_SKY,fog:WINTER_FOG,fogD:WINTER_FOG_D}
+  {k:'dawn', name:'晨',h:6.7, weather:'雪晓',sky:['#1e2d48','#6a6180','#c98c88','rgba(255,188,160,.40)'],fog:0x4e5268,fogD:.0102,
+   rainSky:['#161f30','#3a4354','#5b6070','rgba(150,170,195,.26)'],rainFog:0x3d4452,rainFogD:.0142},
+  {k:'noon', name:'昼',h:13.2,weather:'晴雪',sky:['#3a72b0','#78aad8','#cde2f2','rgba(255,244,215,.55)'],fog:0xb2c8da,fogD:.0068,
+   rainSky:['#5b6a78','#7d8a95','#9aa4ad','rgba(200,210,220,.36)'],rainFog:0x8b96a0,rainFogD:.0108},
+  {k:'dusk', name:'暮',h:17.5,weather:'雪霞',sky:['#263b68','#995878','#f0a46c','rgba(255,176,105,.65)'],fog:0x9b746a,fogD:.0082,
+   rainSky:['#1e2637','#463f50','#6b575c','rgba(176,136,116,.36)'],rainFog:0x65575b,rainFogD:.0128},
+  {k:'night',name:'夜',h:21.5,weather:'雪夜',sky:WINTER_SKY,fog:WINTER_FOG,fogD:WINTER_FOG_D,
+   rainSky:['#0d1622','#18212e','#232c38','rgba(120,142,172,.18)'],rainFog:0x1c2532,rainFogD:.0148}
 ];
 /* 移动端默认开高画质档：低画质档会关掉 uHQ 抗闪烁柔光和 Bloom，
    在低像素比下远处路灯会闪成噪点，整屏发脏。桌面维持原样。 */
-const state={timeKey:'night',hour:21.5,lights:true,quality:IS_TOUCH_DEV,envDirty:true,stars:true,clean:true};
+const state={timeKey:'night',hour:21.5,lights:true,quality:IS_TOUCH_DEV,envDirty:true,stars:true,clean:true,weather:'snow'};
 let rainLevel=0,resetPerf=true;
 const rSeason=document.getElementById('r-season'),rWeather=document.getElementById('r-weather'),
       rTime=document.getElementById('r-time'),rTemp=document.getElementById('r-temp'),
@@ -13300,24 +13548,29 @@ function updateBrand(){
 }
 function initWinter(){
   rSeason.textContent='圣诞';
-  ground.material.color.setHex(0xd0ddeb);
   ground.material.userData.noToon=true;
   road.material.color.setHex(0x8e99a4);road.material.roughness=.62;
   roadFar.material.color.setHex(0x8e99a4);roadFar.material.roughness=.62;
-  wetRegistry.forEach(r=>{r.m.userData.u.uWetAmt.value=r.base*.12;});
   clouds.forEach(c=>{c.material.opacity=.22;});
   lampPools.forEach(p=>{p.material.opacity=.30;});
-  if(snow)snow.visible=true;
-  if(snowFar)snowFar.visible=true;
+  /* 雪/雨两套地表参数交给 setWeather 统一处理，别在这里再写一份 */
+  setWeather(state.weather||'snow');
 }
 function applyTime(h){
   state.hour=h;
   if(hourInput&&Math.abs(parseFloat(hourInput.value)-h)>.05)hourInput.value=String(h);
   const slot=timeSlotFor(h);
   state.timeKey=slot.k;
-  rWeather.textContent=slot.weather;
-  if(seasonW)seasonW.textContent=slot.weather;
+  const rainy=state.weather==='rain';
+  const sky   =rainy?slot.rainSky:slot.sky;
+  const fogC  =rainy?slot.rainFog:slot.fog;
+  const fogD  =rainy?slot.rainFogD:slot.fogD;
+  rWeather.textContent=rainy?slot.name+'雨':slot.weather;
+  if(seasonW)seasonW.textContent=rainy?slot.name+'雨':slot.weather;
   rTime.textContent=fmtHour(h);if(hourLbl)hourLbl.textContent=fmtHour(h);
+  /* 纯净模式下常驻的时间牌：一眼看见现在几点、什么天气，也告诉用户还能切 */
+  const cc=document.getElementById('cleanClock');
+  if(cc)cc.textContent=slot.name+' '+fmtHour(h)+(rainy?' 雨':' 雪');
   document.querySelectorAll('#seasons button').forEach(b=>b.classList.toggle('on',b.dataset.k===slot.k));
 
   const elev=Math.sin(((h-6)/12)*Math.PI);
@@ -13330,32 +13583,71 @@ function applyTime(h){
     key.color.setHSL(sunset?.06:dawn?.04:(.09-warm*.04), (sunset||dawn)?.72:.45, (sunset||dawn)?.60:(.60+elev*.14));
     key.intensity=(sunset||dawn)?(1.15+elev*.9):(1.15+elev*1.35);
     key.position.set(Math.cos(az)*40,12+elev*46,26);
+    /* 雨天是阴天：方向光砍到四成，环境光抬一点 —— 有方向没阴影 = 阴天 */
+    if(rainy){key.color.setHex(0xb4c0cc);key.intensity*=.55;}
     moon.intensity=0;
-    ambient.color.setHex(sunset?0xb998a8:dawn?0xb8a4ba:0xb5cde3);ambient.intensity=(sunset||dawn)?.78:.88;
-    hemi.color.setHex(sunset?0xe8a088:dawn?0xdfa8b0:0xafd0f0);
-    hemi.groundColor.setHex(sunset?0x50404c:0x788a9a);hemi.intensity=.92;
-    paintSky(slot.sky[0],slot.sky[1],slot.sky[2],slot.sky[3]);
-    scene.fog.color.setHex(slot.fog);scene.fog.density=slot.fogD;
-    scene.userData.baseFogD=slot.fogD;scene.userData.baseFogCol=slot.fog;
-    skylineMats.forEach(m=>{m.emissiveIntensity=(sunset||dawn)?.35:.08;});
-    GZU_EMI.forEach(it=>{it.m.emissiveIntensity=(sunset||dawn)?it.n*.6:it.d;});
+    ambient.color.setHex(rainy?0x93a2b0:(sunset?0xb998a8:dawn?0xb8a4ba:0xb5cde3));
+    ambient.intensity=rainy?.96:((sunset||dawn)?.78:.88);
+    hemi.color.setHex(rainy?0x9aa6b2:(sunset?0xe8a088:dawn?0xdfa8b0:0xafd0f0));
+    hemi.groundColor.setHex(rainy?0x4c5259:(sunset?0x50404c:0x788a9a));
+    hemi.intensity=rainy?1.02:.92;
+    paintSky(sky[0],sky[1],sky[2],sky[3]);
+    scene.fog.color.setHex(fogC);scene.fog.density=fogD;
+    scene.userData.baseFogD=fogD;scene.userData.baseFogCol=fogC;
+    skylineMats.forEach(m=>{m.emissiveIntensity=rainy?.16:((sunset||dawn)?.35:.08);});
+    GZU_EMI.forEach(it=>{it.m.emissiveIntensity=rainy?it.d*.35:((sunset||dawn)?it.n*.6:it.d);});
   }else{
-    key.color.setHex(0xa8ccf0);key.intensity=.38;
+    key.color.setHex(rainy?0x8fa2b8:0xa8ccf0);key.intensity=rainy?.14:.38;
     key.position.set(-Math.cos(az)*36,40,-18);
-    moon.intensity=.40;moon.color.setHex(0x86aee8);
+    moon.intensity=rainy?.14:.40;moon.color.setHex(0x86aee8);
     /* 夜里的环境光压低、压冷：暖色实用光源有 20 多盏，环境光再高就把暗部洗成灰，
        夜景会显脏。压下去之后暖光才跳得出来，暗部也才有冷调层次。 */
-    ambient.color.setHex(0x2d4160);ambient.intensity=.47;
-    hemi.color.setHex(0x46668c);hemi.groundColor.setHex(0x16202c);hemi.intensity=.52;
-    paintSky(WINTER_SKY[0],WINTER_SKY[1],WINTER_SKY[2],WINTER_SKY[3]);
-    scene.fog.color.setHex(WINTER_FOG);scene.fog.density=WINTER_FOG_D;
-    scene.userData.baseFogD=WINTER_FOG_D;scene.userData.baseFogCol=WINTER_FOG;
-    skylineMats.forEach(m=>{m.emissiveIntensity=.62;});
-    GZU_EMI.forEach(it=>{it.m.emissiveIntensity=it.n;});
+    ambient.color.setHex(rainy?0x27313c:0x2d4160);ambient.intensity=rainy?.50:.47;
+    hemi.color.setHex(rainy?0x3b4a58:0x46668c);hemi.groundColor.setHex(rainy?0x141a20:0x16202c);
+    hemi.intensity=rainy?.58:.52;
+    paintSky(sky[0],sky[1],sky[2],sky[3]);
+    scene.fog.color.setHex(fogC);scene.fog.density=fogD;
+    scene.userData.baseFogD=fogD;scene.userData.baseFogCol=fogC;
+    skylineMats.forEach(m=>{m.emissiveIntensity=rainy?.30:.62;});
+    GZU_EMI.forEach(it=>{it.m.emissiveIntensity=rainy?it.n*.45:it.n;});
   }
   key.target.position.set(0,2,0);
   state.envDirty=true;
   updateBrand();
+}
+
+/* ── 天气切换：雪 / 雨 ─────────────────────────────────────────
+   雨不是"把雪换成雨"这么简单，四件事必须一起换：
+     1) 粒子：关掉两层飞雪，打开雨丝 + 地面涟漪
+     2) 地面：雪白地 → 湿灰地（镜面感来自 roughness 压低 + 环境反射）
+     3) 天空：每个时段配一套阴雨天的天色和更浓的雾
+     4) 灯：雨天光被水汽散开，夜里灯晕压暗一截，不然整场发闷还刺眼 */
+function setWeather(w){
+  w=(w==='rain')?'rain':'snow';
+  const rainy=w==='rain';
+  state.weather=w;
+  rainLevel=rainy?1:0;
+  if(snow)snow.visible=!rainy;
+  if(snowFar)snowFar.visible=!rainy;
+  if(rain)rain.visible=rainy;
+  if(rainRipples)rainRipples.visible=rainy;
+  ground.material.color.setHex(rainy?0x8d97a4:0xd0ddeb);
+  ground.material.roughness=rainy?.42:.88;
+  ground.material.metalness=rainy?.10:.03;
+  ground.material.envMapIntensity=rainy?1.25:.85;
+  road.material.color.setHex(rainy?0x6d757f:0x8e99a4);
+  road.material.roughness=rainy?.22:.62;
+  /* 湿度：雪天 12%（几乎干），雨天 92%（整片湿透）；uMarkAmt 是积水变暗量 */
+  wetRegistry.forEach(r=>{
+    const u=r.m.userData.u;
+    u.uWetAmt.value=r.base*(rainy?.92:.12);
+    u.uMarkAmt.value=rainy?.50:0;
+  });
+  lampPools.forEach(p=>{p.material.opacity=rainy?.16:.30;});
+  const b=document.getElementById('t-rain');
+  if(b)b.classList.toggle('on',rainy);
+  sfx.setRain(rainy?1:0);
+  applyTime(state.hour);      // 天空/雾/灯光随天气一起换
 }
 
 /* UI 构建：4 个一日时段快捷按钮（晨 / 昼 / 暮 / 夜） */
@@ -13420,6 +13712,13 @@ document.getElementById('t-rotate').onclick=function(){
 document.getElementById('t-stars').onclick=function(){
   state.stars=!state.stars;this.classList.toggle('on',state.stars);
 };
+/* 雪 / 雨 切换：一次换掉粒子、地面、天空雾和灯光 */
+document.getElementById('t-rain').onclick=function(){
+  const rainy=state.weather!=='rain';
+  setWeather(rainy?'rain':'snow');
+  this.classList.toggle('on',rainy);
+  sfx.blip(rainy?300:660,.10,.06);
+};
 document.getElementById('t-fp').onclick=function(){
   if(fp.on)exitWalk();else enterWalk();
 };
@@ -13455,6 +13754,11 @@ addEventListener('keydown',e=>{
   else if(k==='r')jumpView('home');
 });
 document.getElementById('railToggle').onclick=()=>{
+  document.body.classList.toggle('rail-min');
+  sfx.blip(620,.06,.05);
+};
+/* 纯净模式下的时间牌：点它展开侧栏（等同 ≡ 圆钮），保证时间系统永远够得着 */
+document.getElementById('cleanClock').onclick=()=>{
   document.body.classList.toggle('rail-min');
   sfx.blip(620,.06,.05);
 };
@@ -13774,7 +14078,20 @@ cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.toFixed(2),z:+cam
 },
   /* 调试用：直接设雨量，验反射通道的跳过与隔帧逻辑 */
   rain:()=>+rainLevel.toFixed(3),
-  setRain:(v)=>{rainLevel=Math.max(0,Math.min(1,v));sfx.setRain(rainLevel);return +rainLevel.toFixed(3);},
+  setRain:(v)=>{setWeather(v>=.5?'rain':'snow');return +rainLevel.toFixed(3);},
+  weather:()=>state.weather,
+  /* 调试：点灯池开关（A/B 看夜景观感有没有被牺牲） */
+  lp:(on)=>{
+    if(on===false){
+      LP.slots.forEach(s=>{s.visible=false;s.intensity=0;});
+      LP.cands.forEach(c=>{c.l.visible=true;});
+      LP.cur=[];
+    }else{
+      LP.slots.forEach(s=>{s.visible=true;});
+      LP.cands.forEach(c=>{c.l.visible=false;});
+    }
+    return {slots:LP.slots.length,cands:LP.cands.length,cur:LP.cur.length};
+  },
   refl:()=>({enabled:planar.enabled,uReflOn:wetShared.uReflOn.value,quality:state.quality,adapted:!!adapted,renders:planar.renders||0}),
   /* 性能观测：draw call / 三角面数 */
   /* 调试：切到某个导演机位（XM_SHOTS 里的 id），用来拍定点画面 */
@@ -13855,7 +14172,7 @@ cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.toFixed(2),z:+cam
     return (wheelSys.bump&&wheelSys.bump.car)||null;
   },
   bumpers:()=>amusement.bumper,
-  perf:()=>{let lights=0;scene.traverse(o=>{if(o.isPointLight||o.isSpotLight)lights++;});
+  perf:()=>{let lights=0;scene.traverse(o=>{if((o.isPointLight||o.isSpotLight)&&o.visible)lights++;});
     return {calls:renderer.info.render.calls,tris:renderer.info.render.triangles,
             geo:renderer.info.memory.geometries,tex:renderer.info.memory.textures,lights};}
 };
@@ -13878,6 +14195,10 @@ function setClean(on){
   state.clean=on;
   document.body.classList.toggle('clean',on);
   document.body.classList.remove('off');
+  /* 纯净模式只收起侧栏内容，不动 #rail 本身 —— 侧栏里是晨/昼/暮/夜四个时段按钮
+     和 24 小时滑块。之前 CSS 把 #rail 整体 display:none，≡ 圆钮也跟着没了，
+     用户点不到任何时段入口，等于时间系统被废掉。现在保留 ≡ 圆钮 + 时间牌。 */
+  document.body.classList.toggle('rail-min',on);
   const el=document.getElementById('fphint');
   if(!on)el.style.opacity='0';
   const btn=document.getElementById('t-clean');
@@ -16275,6 +16596,8 @@ function animate(){
     const glowScale=(nightNow?1.0:(state.timeKey==='dusk'||state.timeKey==='dawn'?.78:.40))*lOn;
     /* 雪地上的假灯光：夜里全开；黄昏黎明留一点；白天全灭 */
     MUL_GLOW_K=state.lights?(nightNow?1.0:(state.timeKey==='dusk'||state.timeKey==='dawn'?.55:0.0)):0;
+    /* 雨天光被水汽散开：灯晕压到六成，否则雨夜会又亮又刺 */
+    if(rainLevel>0)MUL_GLOW_K*=.60;
     for(let i=0;i<MUL_GLOW_POOL.length;i++){
       const it=MUL_GLOW_POOL[i];
       it.mat.opacity=it.base*MUL_GLOW_K;
@@ -16430,6 +16753,9 @@ function animate(){
     if(intro.active&&!s.street)k*=Math.max(0,Math.min(1,(intro.t-s.delay)/.9));
     s.l.intensity=s.base*k;
   });
+  /* 点光源池：把候选灯的当前亮度抄进槽位（候选灯的强度是上面这行在跳的） */
+  if(!LP.on)initLightPool();
+  updateLightPool();
   /* 龙猫自发光：跟同一套昼夜/入场系数走 —— 夜里从暗部里透出来，白天几乎不发光 */
   {
     const gK=lampK*(intro.active?Math.max(0,Math.min(1,(intro.t-2.4)/1.2)):1);
@@ -16644,8 +16970,18 @@ function animate(){
   /* 草浪风场 + 雪地干燥材质参数 */
   sharedStyle.uWindTime.value=t;
   wetShared.uTime.value=tLocal;
-  wetShared.uRain.value=0;
+  wetShared.uRain.value=rainLevel;      // 雨天：地面湿度/雨痕扰动/反射扰动全部由它驱动
   wetShared.uReflOn.value=0;
+  /* 雨丝与涟漪：全部参数在 shader 里，CPU 每帧只推时间 */
+  if(rainMat&&rainLevel>0){
+    rainMat.uniforms.uTime.value=tLocal;
+    rainMat.uniforms.uOpacity.value=rainLevel*.90;
+  }
+  if(rippleMat&&rainLevel>0){
+    rippleMat.uniforms.uTime.value=tLocal;
+    rippleMat.uniforms.uOpacity.value=rainLevel*.85;
+    rippleMat.uniforms.uCenter.value.set(camera.position.x,camera.position.z);
+  }
 
   /* 游乐园：摩天轮 / 海盗船 / 旋转木马 / 雪地飞索 / 碰碰车 */
   if(amusement.wheel){
