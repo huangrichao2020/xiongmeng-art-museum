@@ -7034,15 +7034,20 @@ const skylineMats=[];
   /* 北片 z∈[-148,-52] 整段让给鸟巢：x=0 这几条南北向主干道在这里断开，
      不然马路会从鸟巢中间穿过去、把主体育场劈成两半。 */
   addStreetSeg(0,-191,8.4,86,Math.PI/2);      // z -234..-148
-  addStreetSeg(0,45,8.4,194,Math.PI/2);       // z  -52..142
-  addStreetSeg(0,105,8.4,315,Math.PI/2);      // z  -52..263
+  /* 南段 x=0 主轴：z∈[16,60] 让给游乐园。
+     游乐园地面占 x∈[-32,44]、z∈[19,57]，而这条主轴上叠着 5 段马路，
+     全部横穿游乐园 —— 地面是 y=0.01 的薄板，马路路面在 0.02、路缘 0.055，
+     于是马路直接压在游乐园地面上，看着就是「地面多了很多马路」。
+     现在把这一段彻底断开（每条拆成南北两截），并把游乐园地面板抬高盖住路缘。 */
+  addStreetSeg(0,-18,8.4,68,Math.PI/2);       // z  -52..16
+  addStreetSeg(0,101,8.4,82,Math.PI/2);       // z   60..142
   addStreetSeg(-80,0,8.4,376,0);
   addStreetSeg(80,0,8.4,376,0);
   addStreetSeg(0,-210,8.0,124,Math.PI/2);     // z -272..-148
-  addStreetSeg(0,26,8.0,156,Math.PI/2);       // z  -52..104
+  addStreetSeg(0,-18,8.0,68,Math.PI/2);       // z  -52..16
+  addStreetSeg(0,82,8.0,44,Math.PI/2);        // z   60..104
   addStreetSeg(0,-230,8.0,164,Math.PI/2);     // z -312..-148
-  addStreetSeg(0,6,8.0,116,Math.PI/2);        // z  -52..64
-  addStreetSeg(0,125,8.0,354,Math.PI/2);      // z  -52..302
+  addStreetSeg(0,181,8.0,242,Math.PI/2);      // z   60..302
   addStreetSeg(-124,0,8.0,376,0);
   addStreetSeg(124,0,8.0,376,0);
   addStreetSeg(0,-118,8.0,148,0);
@@ -10995,10 +11000,10 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
     return g;};
 
   /* ── 场地：76 × 38 米整块压雪乐园 ── */
-  add(fair,BX(76,.12,38),M(0xefeee9,{roughness:.95}),6,-.05,38).castShadow=false;
-  add(fair,BX(10,.05,34),M(0xf8f7f2,{roughness:.92}),5,.018,37).castShadow=false;
-  add(fair,BX(68,.04,5.5),M(0xf8f7f2,{roughness:.92}),6,.016,22).castShadow=false;
-  add(fair,BX(64,.04,5),M(0xf8f7f2,{roughness:.92}),6,.016,54).castShadow=false;
+  add(fair,BX(76,.12,38),M(0xefeee9,{roughness:.95}),6,.03,38).castShadow=false;
+  add(fair,BX(10,.05,34),M(0xf8f7f2,{roughness:.92}),5,.098,37).castShadow=false;
+  add(fair,BX(68,.04,5.5),M(0xf8f7f2,{roughness:.92}),6,.096,22).castShadow=false;
+  add(fair,BX(64,.04,5),M(0xf8f7f2,{roughness:.92}),6,.096,54).castShadow=false;
 
   /* ── 已去掉游乐园四周外围栏，保留正门牌坊，全园四面畅通无阻 ── */
 
