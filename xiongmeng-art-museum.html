@@ -11881,8 +11881,7 @@ const circus={
 };
 const CIRCUS_ACTS=[
   {cn:'变魔术 · 礼帽里变出兔子',en:'MAGIC'},
-  {cn:'扔苹果 · 绕圈循环抛接',en:'APPLE JUGGLE'},
-  {cn:'杂技 · 走钢丝与空中吊环',en:'ACROBATICS'},
+  {cn:'杂技 · 走钢丝',en:'TIGHTROPE'},
   {cn:'小丑 · 彩球飞舞',en:'CLOWN'}
 ];
 {
@@ -12050,7 +12049,7 @@ const CIRCUS_ACTS=[
     const spar=add(g,new THREE.CylinderGeometry(.028,.028,2.2,6),goldM,1.05,8.62,0);
     spar.rotation.z=Math.PI/2;
   }
-  /* ── 旗杆吊灯：一圈暖光球，兼作场内主光 ── */
+  /* ── 旗杆吊灯：一圈暖光球 ── */
   const chandMat=new THREE.MeshBasicMaterial({color:0xffe3ae});
   {
     const ch=new THREE.Group();ch.position.set(0,5.42,0);g.add(ch);
@@ -12059,6 +12058,37 @@ const CIRCUS_ACTS=[
       const a=i/6*Math.PI*2;
       addNS(ch,new THREE.SphereGeometry(.125,10,8),chandMat,Math.cos(a)*.44,-.20,Math.sin(a)*.44);
     }
+  }
+  /* ── 场内柔光照明（替代之前那盏会乱晃的射灯）──
+     上一轮把射灯、地面扫光、追光斑全关了，夜里帐篷内变得很暗。
+     这次不复活任何「会动」的光：改成三盏位置固定的暖色点光源，
+     分别吊在篷顶下、表演区上方、观众区后方 —— 光是恒定的，
+     不会在帐篷里来回乱扫，只是把场内的暗部提亮。
+     lpFixed 标记让它们常驻渲染状态，不被点灯池降级成候选灯。 */
+  {
+    const lampSpecs=[
+      // [x, y, z, 颜色, 强度, 照射距离]
+      [ 0.0, 5.10, 0.0, 0xffd9a0, 210, 17],   // 篷顶下：吊灯同位置，照亮表演区中心
+      [ 0.0, 3.30,-3.2, 0xffcf95, 120, 14],   // 表演区前侧偏低一点，补熊和道具的下半身
+      [ 0.0, 4.20, 5.6, 0xffc98c,  95, 15],   // 观众区后方，把外圈的小熊照出来
+    ];
+    for(const [lx,ly,lz,col,inten,dist] of lampSpecs){
+      const pl=new THREE.PointLight(col,inten,dist,1.5);
+      pl.position.set(lx,ly,lz);
+      pl.userData.lpFixed=true;      // 常驻，不进灯池
+      pl.castShadow=false;
+      g.add(pl);
+      shopLights.push({l:pl,base:inten,street:false,delay:1.4});
+    }
+    /* 地面暖光池（软边贴图，不是硬边圆盘）：把表演圈的地面提亮一点，
+       让人看得见表演区是块平地而不是黑洞 */
+    const floorPool=new THREE.Mesh(new THREE.CircleGeometry(1,48),
+      new THREE.MeshBasicMaterial({map:glowTex,color:0xffca88,transparent:true,opacity:.20,
+        blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+    floorPool.rotation.x=-Math.PI/2;floorPool.position.set(0,.028,0);
+    floorPool.scale.set(7.4,7.4,1);floorPool.castShadow=false;
+    floorPool.userData.noReflect=true;
+    g.add(floorPool);
   }
   {
     /* 场内主光已按要求关掉：一盏从旗杆压下来的暖金聚光，
@@ -12161,35 +12191,9 @@ const CIRCUS_ACTS=[
     OUTDOOR_OBS.push([CX+Math.cos(135*Math.PI/180)*3.95,CZ+Math.sin(135*Math.PI/180)*3.95,1.85]);
   }
 
-  /* ── ② 扔苹果 ── */
-  {
-    const st=station(225,3.95);
-    /* 苹果桶 */
-    add(st,new THREE.CylinderGeometry(.42,.36,.54,14),woodM,.92,.27,.30);
-    addNS(st,new THREE.TorusGeometry(.42,.035,6,16),steelM,.92,.46,.30).rotation.x=Math.PI/2;
-    const appleM=M(0xd0342c,{roughness:.42,metalness:.05});
-    const stemM=M(0x5b4128,{roughness:.8});
-    const leafM=M(0x3f8f45,{roughness:.7});
-    for(let i=0;i<5;i++){
-      const a=i/5*Math.PI*2;
-      addNS(st,new THREE.SphereGeometry(.115,10,8),appleM,.92+Math.cos(a)*.20,.60,.30+Math.sin(a)*.20);
-    }
-    /* 抛苹果的熊 */
-    const bear=makePerson(0xd8a13c,0xf6e0c4,{scale:1.08});
-    st.add(bear);
-    /* 环绕循环的苹果 */
-    const apples=[];
-    for(let i=0;i<6;i++){
-      const ap=new THREE.Group();
-      ap.userData.keep=true;       // 会绕着熊转：不能被合批烘死
-      add(ap,new THREE.SphereGeometry(.125,14,10),appleM,0,0,0);
-      add(ap,new THREE.CylinderGeometry(.014,.010,.075,5),stemM,0,.145,0);
-      add(ap,new THREE.BoxGeometry(.10,.012,.045),leafM,.05,.165,0);
-      st.add(ap);apples.push(ap);
-    }
-    circus.jug={bear:bear,apples:apples};
-    OUTDOOR_OBS.push([CX+Math.cos(225*Math.PI/180)*3.95,CZ+Math.sin(225*Math.PI/180)*3.95,1.20]);
-  }
+  /* ── ② 扔苹果整幕已按要求删除 ──
+     抛苹果的熊连同苹果桶、飞苹果一起清空，
+     节目表从四幕变成三幕（变魔术 / 走钢丝 / 小丑）。 */
 
   /* ── ③ 杂技：走钢丝 + 空中吊环 ── */
   {
@@ -12224,31 +12228,12 @@ const CIRCUS_ACTS=[
     }
     OUTDOOR_OBS.push([CX+Math.cos(315*Math.PI/180)*3.95,CZ+Math.sin(315*Math.PI/180)*3.95,1.40]);
   }
-  /* 空中吊环：从中央旗杆吊下来的一副秋千，熊用双脚勾住横杆倒挂在上面 */
-  {
-    const trap=new THREE.Group();trap.position.set(0,8.30,0);g.add(trap);
-    trap.userData.keep=true;   // 整副吊环会摆：绳子/横杆必须留在组内跟着转
-    const RL=5.05;
-    for(const s of [-1,1]){
-      const r0=new THREE.Vector3(s*.44,0,0),r1=new THREE.Vector3(s*.44,-RL,0);
-      const mid=r0.clone().add(r1).multiplyScalar(.5);
-      const dir=r1.clone().sub(r0).normalize();
-      const rp=add(trap,new THREE.CylinderGeometry(.026,.026,RL,6),ropeM,mid.x,mid.y,mid.z);
-      rp.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);
-      rp.castShadow=false;
-    }
-    const bar=add(trap,new THREE.CylinderGeometry(.05,.05,1.0,8),M(0xd9c49b,{roughness:.7}),0,-RL,0);
-    bar.rotation.z=Math.PI/2;
-    /* 倒挂：整只熊绕 X 轴翻 180°，脚尖正好勾在横杆上，头朝下吊着 */
-    /* 小熊站在横杆上（不是倒挂）：倒挂时熊头和手几乎同高，
-       远看就是一个说不清的白团子；站在杆上张开双臂才读得出「在走钢丝」 */
-    const acroBear=makePerson(0x7a4e8c,0xf0dcbe,{scale:.92});
-    acroBear.position.set(0,-RL+.05,0);
-    trap.add(acroBear);
-    acroBear.userData.armL.rotation.z=1.30;
-    acroBear.userData.armR.rotation.z=-1.30;
-    circus.acro.trap=trap;circus.acro.bear=acroBear;
-  }
+  /* ── 空中吊环整组已按要求删除 ──
+     原来吊环熊用双脚勾在横杆上倒挂在中央旗杆下，
+     实测它距旗杆中轴只有 0.26~0.49m（熊自身半径就有 0.26m），
+     整只熊几乎埋在旗杆里来回穿模。
+     现在熊、吊绳、横杆一起删掉，旗杆下清空，只留走钢丝那一幕。 */
+
 
   /* ── ④ 小丑 ── */
   {
@@ -12330,7 +12315,7 @@ function circusClap(){
 function updateCircus(dt,t){
   const c=circus;
   if(!c.g)return;
-  const act=Math.floor(t/8)%4;   // 节目表按服务器时间切 → 各端看到的是同一幕
+  const act=Math.floor(t/9)%3;   // 节目表按服务器时间切 → 各端看到的是同一幕（三幕循环）
   circus.act=act;
   if(act!==c.act){
     c.act=act;
@@ -12351,7 +12336,7 @@ function updateCircus(dt,t){
   {
     const m=c.magic;
     if(m.hat&&m.rabbit&&m.mage){
-      const ph=(t%8)/8;
+      const ph=(t%9)/9;
       let lift=0,up=0;
       if(act===0&&ph>0.10&&ph<0.68){
         const u=(ph-0.10)/0.58;
@@ -12368,58 +12353,31 @@ function updateCircus(dt,t){
       m.mage.rotation.y=Math.sin(t*.85)*.16;
     }
   }
-  /* ② 扔苹果：苹果绕着人转圈（循环） */
-  {
-    const j=c.jug;
-    if(j.bear&&j.apples){
-      const on=(act===1);
-      const spd=on?2.0:1.05;
-      const rr=on?1.32:1.02;
-      for(let i=0;i<j.apples.length;i++){
-        const a=t*spd+i*Math.PI*2/j.apples.length;
-        const ap=j.apples[i];
-        ap.position.set(Math.cos(a)*rr,1.26+Math.sin(a*2)*(on?.44:.18),Math.sin(a)*rr);
-        ap.rotation.x=a*1.5;ap.rotation.z=a*.9;
-      }
-      const u=j.bear.userData;
-      u.armL.rotation.x=-1.45+Math.sin(t*spd)*.78;
-      u.armR.rotation.x=-1.45-Math.sin(t*spd)*.78;
-      j.bear.position.y=Math.abs(Math.sin(t*spd))*.06;
-      j.bear.rotation.y=Math.sin(t*.7)*.12;
-    }
-  }
-  /* ③ 杂技：钢丝上往返走，吊环来回摆 */
+  /* ② 扔苹果整幕已删除（熊 + 飞苹果一并清空） */
+  /* ② 杂技：钢丝上往返走（吊环整组已删除） */
   {
     const a=c.acro;
     if(a.walker){
-      const fast=(act===2)?1:.42;
+      const fast=(act===1)?1:.42;
       const u=(t*.26*fast)%2;
       const s=u<1?u:2-u;
       a.walker.position.x=-2.55+s*5.10;
       a.walker.rotation.z=Math.sin(t*2.3)*.06;
       a.walker.rotation.y=Math.sin(t*1.1)*.12;
       const w=a.walker.userData;
-      w.armL.rotation.z=1.18+Math.sin(t*3.1)*.13;
-      w.armR.rotation.z=-1.18-Math.sin(t*3.1)*.13;
+      /* 平举保持平衡：armL 在左侧要朝 -X 张、armR 在右侧要朝 +X 张。
+         原来两个符号写反了，两只手臂都朝身体中心伸，全插进躯干里 —— 远看就是「没手」。 */
+      w.armL.rotation.z=-1.18-Math.sin(t*3.1)*.13;
+      w.armR.rotation.z=1.18+Math.sin(t*3.1)*.13;
       w.legL.rotation.x=Math.sin(t*7*fast)*.55;
       w.legR.rotation.x=-Math.sin(t*7*fast)*.55;
     }
-    if(a.trap){
-      a.trap.rotation.z=Math.sin(t*.9)*.30;
-      a.trap.rotation.x=Math.sin(t*.62+1.1)*.06;
-      const b=a.bear.userData;
-      b.armL.rotation.z=1.30+Math.sin(t*2.1)*.18;
-      b.armR.rotation.z=-1.30-Math.sin(t*2.1)*.18;
-      b.legL.rotation.x=Math.sin(t*1.7)*.22;
-      b.legR.rotation.x=-Math.sin(t*1.7)*.22;
-      a.bear.rotation.z=Math.sin(t*1.3)*.05;
-    }
   }
-  /* ④ 小丑：彩球飞 */
+  /* ③ 小丑：彩球飞 */
   {
     const cl=c.clown;
     if(cl.bear&&cl.balls){
-      const on=(act===3);
+      const on=(act===2);
       const spd=on?3.5:1.7;
       for(let i=0;i<cl.balls.length;i++){
         const a=t*spd+i*Math.PI*2/3;
@@ -12438,7 +12396,8 @@ function updateCircus(dt,t){
   for(let i=0;i<c.aud.length;i++){
     const a=c.aud[i];
     const u=a.p.userData;
-    u.armL.rotation.z=1.05;u.armR.rotation.z=-1.05;
+    /* 鼓掌张臂也要朝外：armL 用负角、armR 用正角 */
+    u.armL.rotation.z=-1.05;u.armR.rotation.z=1.05;
     u.armL.rotation.x=-1.45+Math.sin(t*4.2+a.ph)*.50;
     u.armR.rotation.x=-1.45-Math.sin(t*4.2+a.ph)*.50;
     a.p.position.y=a.y0+Math.max(0,Math.sin(t*2.1+a.ph))*.07;
@@ -13325,9 +13284,12 @@ function initLightPool(){
   scene.traverse(o=>{ if(o.isPointLight) all.push(o); });
   for(const l of all){
     /* 馆内主灯和玩家身前的随行补光常驻（玩家大部分时间就在馆里），
-       判定：直接挂在场景根下、且就在馆子附近 */
+       判定：直接挂在场景根下、且就在馆子附近。
+       另外 userData.lpFixed 的灯也常驻 —— 马戏团帐篷内的柔光属于
+       「这个场景本来就该亮」的照明，不能被灯池降级成候选灯，
+       否则站在帐篷外看，里面就是一团黑。 */
     const fixed=(l.parent===scene)&&(Math.hypot(l.position.x,l.position.z)<20);
-    if(fixed)continue;
+    if(fixed||l.userData.lpFixed)continue;
     LP.cands.push({l,wp:new THREE.Vector3(),score:-1});
     l.visible=false;          // 候选灯不进渲染状态，但矩阵照常更新，位置照样跟得住
   }
@@ -14037,13 +13999,14 @@ cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.toFixed(2),z:+cam
     spotOn:!!circus.light,
     hatY:+circus.magic.hat.position.y.toFixed(3),
     rabbit:circus.magic.rabbit.visible,
-    apple0:[+circus.jug.apples[0].position.x.toFixed(2),+circus.jug.apples[0].position.y.toFixed(2)],
-    walkerX:+circus.acro.walker.position.x.toFixed(2),
-    trapZ:+circus.acro.trap.rotation.z.toFixed(3),
+    apple0:circus.jug.apples&&circus.jug.apples.length
+      ?[+circus.jug.apples[0].position.x.toFixed(2),+circus.jug.apples[0].position.y.toFixed(2)]:null,
+    walkerX:circus.acro.walker?+circus.acro.walker.position.x.toFixed(2):null,
+    trapZ:circus.acro.trap?+circus.acro.trap.rotation.z.toFixed(3):null,
     ball0:[+circus.clown.balls[0].position.x.toFixed(2),+circus.clown.balls[0].position.y.toFixed(2)],
     who:{
       mage:(()=>{const v=new THREE.Vector3();circus.magic.mage.getWorldPosition(v);return [+v.x.toFixed(1),+v.z.toFixed(1)];})(),
-      juggler:(()=>{const v=new THREE.Vector3();circus.jug.bear.getWorldPosition(v);return [+v.x.toFixed(1),+v.z.toFixed(1)];})(),
+      juggler:circus.jug.bear?(()=>{const v=new THREE.Vector3();circus.jug.bear.getWorldPosition(v);return [+v.x.toFixed(1),+v.z.toFixed(1)];})():null,
       walker:(()=>{const v=new THREE.Vector3();circus.acro.walker.getWorldPosition(v);return [+v.x.toFixed(1),+v.y.toFixed(1),+v.z.toFixed(1)];})(),
       clown:(()=>{const v=new THREE.Vector3();circus.clown.bear.getWorldPosition(v);return [+v.x.toFixed(1),+v.z.toFixed(1)];})(),
       aud0:(()=>{const v=new THREE.Vector3();circus.aud[0].p.getWorldPosition(v);return [+v.x.toFixed(1),+v.z.toFixed(1)];})()
