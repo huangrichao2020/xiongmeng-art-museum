@@ -1131,6 +1131,28 @@ function _autoMergeTick(){
     return;
   }
   if(_autoMerge.phase===2){
+    /* 合批前的全场物件快照（只在 ?audit=1 时记录）：
+       合批会把同材质的零件并成一个大 mesh，之后再想查「某个东西挡在马路上」
+       就查不出来了 —— 合并后的包围盒大得没法用。 */
+    if(location.search.indexOf('audit')>=0&&!window.__xmPreMerge){
+      try{
+        scene.updateMatrixWorld(true);
+        const list=[];
+        scene.traverse(o=>{
+          if(!o.isMesh||!o.geometry)return;
+          if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();
+          const b=o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld);
+          const pt=[];let q=o;for(let i=0;i<4&&q;i++){pt.push((q.userData&&q.userData.tag)||q.type);q=q.parent;}
+          list.push({tag:(o.userData&&o.userData.tag)||'',nm:o.name||'',
+            gt:o.geometry.type,chain:pt.join('<'),inst:o.isInstancedMesh?o.count:0,
+            mn:[+b.min.x.toFixed(2),+b.min.y.toFixed(2),+b.min.z.toFixed(2)],
+            mx:[+b.max.x.toFixed(2),+b.max.y.toFixed(2),+b.max.z.toFixed(2)],
+            c:(o.material&&o.material.color)?'#'+o.material.color.getHexString():'',
+            v:o.geometry.attributes.position.count});
+        });
+        window.__xmPreMerge=list;
+      }catch(e){window.__xmPreMergeError=String(e);}
+    }
     const q=_autoMerge.queue;
     if(q&&q.length){
       /* 一帧只合一组是个坑：场景顶层有 178 组，合批本身只要 124ms，
@@ -5724,21 +5746,28 @@ const animePark=new THREE.Group();animePark.userData.tag='park';scene.add(animeP
    ════════════════════════════════════════════════════════════ */
 const street=new THREE.Group();street.userData.tag='street';scene.add(street);
 
-/* 行道树（圣诞常青雪松：缀满雪帽、红金彩球与发光暖灯珠，与路灯、停车场出入口严格错位） */
-const treeX=[-24,-17.8,-6,5.5,14.5,21.5,32.5,39.5];
+/* 行道树（圣诞常青雪松：缀满雪帽、红金彩球与发光暖灯珠，与路灯、停车场出入口严格错位）
+     站位与体量是按「站在马路中间能不能看过去」定的：
+       · 原来 8 棵密排 × 7m 高，站在南段马路上往北看，一棵树正好堵在正前方
+         （x=-24 那棵在马路中线前 6m，从眼高一直挡到 24° 仰角），
+         马路变成一条看不到头的隧道。
+       · 现在：间距拉开（-24 挪到 -29.5，和下一棵隔 11.7m）、整排降一档
+         （树高 7m → 5.4m、冠幅收 12%），人眼 1.6m 站着能从树冠下沿看穿过去，
+         树还保留街道气氛，但不再把视线堵死。 */
+const treeX=[-29.5,-17.8,-6,5.5,14.5,21.5,32.5,39.5];
 {
   const TZ=9.35;
   const bark=M(0x4a3525,{roughness:.92,flatShading:false});
   const pitM=M(0x525b64,{roughness:.85});
   const soilM=M(0xe6eef6,{roughness:.94});
-  const trunk=new THREE.InstancedMesh(new THREE.CylinderGeometry(.045,.135,5.0,10),bark,treeX.length);
+  const trunk=new THREE.InstancedMesh(new THREE.CylinderGeometry(.045,.135,4.0,10),bark,treeX.length);
   const treeLeafMat=M(0xffffff,{map:cypressTex,roughness:.80,flatShading:false});
   const TIERS=6;
   const leaf=new THREE.InstancedMesh(new THREE.ConeGeometry(1,1.35,14),treeLeafMat,treeX.length*TIERS);
   const sCap=new THREE.InstancedMesh(new THREE.ConeGeometry(.95,.55,14),snowCapM,treeX.length*TIERS);
   const m4=new THREE.Matrix4(),col=new THREE.Color(),q=new THREE.Quaternion(),e3=new THREE.Euler();
-  const tierY=[2.65,3.45,4.25,5.00,5.72,6.40];
-  const tierR=[.82,.72,.61,.49,.37,.24];
+  const tierY=[2.07,2.69,3.32,3.90,4.46,4.99];
+  const tierR=[.72,.63,.54,.43,.32,.21];
   const tierH=[1.05,1.02,.98,.95,.92,.96];
   const stBulbCols=[0xff4f4f,0xffe078,0x45d67e];
   const stBulbGeo=new THREE.SphereGeometry(.055,6,5);
@@ -5746,7 +5775,7 @@ const treeX=[-24,-17.8,-6,5.5,14.5,21.5,32.5,39.5];
     add(street,BX(1.25,.22,1.25),pitM,x,.24,TZ);
     add(street,BX(.95,.25,.95),soilM,x,.25,TZ).castShadow=false;
     const hVar=R(.94,1.08);
-    m4.compose(new THREE.Vector3(x,2.5*hVar,TZ),q.identity(),new THREE.Vector3(1,hVar,1));
+    m4.compose(new THREE.Vector3(x,2.0*hVar,TZ),q.identity(),new THREE.Vector3(1,hVar,1));
     trunk.setMatrixAt(i,m4);
     for(let c=0;c<TIERS;c++){
       const rr=tierR[c]*R(.92,1.08), hh=tierH[c]*hVar;
@@ -15091,16 +15120,44 @@ cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.toFixed(2),z:+cam
     });
     return out;
   },
+  /* 调试：切第一人称漫游（玩家真实视角，排查"站在马路上被什么挡住"要用这个） */
+  walk:(on)=>{try{on?fpEnter(true):fpExit();return{ok:true,on:fp.on};}catch(e){return{ok:false,error:String(e)};}},
+  /* 调试：从某点朝若干方向打射线，列出视线被什么挡住（距离 + 颜色 + 标签） */
+  sight:(o,yaws,pitches,maxD)=>{
+    const out=[];
+    for(const yw of yaws)for(const pt of pitches){
+      const d=new THREE.Vector3(-Math.sin(yw)*Math.cos(pt),Math.sin(pt),-Math.cos(yw)*Math.cos(pt)).normalize();
+      const rc=new THREE.Raycaster(new THREE.Vector3(o[0],o[1],o[2]),d);
+      rc.camera=camera;      // Sprite.raycast 需要 camera，否则会抛
+      const hits=rc.intersectObjects(scene.children,true);
+      for(const h of hits){
+        if(h.distance<0.5||h.distance>(maxD||60))continue;
+        const m=h.object.material;
+        if(m&&m.blending===THREE.AdditiveBlending)continue;   // 加色光斑不算遮挡
+        out.push({yaw:Math.round(yw*57.3),pit:Math.round(pt*57.3),d:+h.distance.toFixed(1),
+          c:(m&&m.color)?'#'+m.color.getHexString():'',
+          op:(m&&m.transparent)?+(m.opacity||1).toFixed(2):1,
+          tag:(h.object.userData&&h.object.userData.tag)||''});
+      }
+    }
+    return out;
+  },
   /* 调试：沙盘模式直接摆相机（不走漫游、不走飞镜头动画） */  camSet:(pos,tgt,fov)=>{
     try{
-      if(fp.on)exitWalk();
+      /* 必须用 fpExit()（真正的"退出第一人称"）：exitWalk() 只退子模式，
+         fp.on 还开着的话，每帧第三人称跟随会把相机 lerp 回角色身后，
+         拍出来的东西根本不是我们摆的位置。 */
+      if(fp.on)fpExit();
+      fp.on=false;fp.locked=false;
       camTween=null;
       intro.active=false;intro.t=intro.dur;   // 开场动画会一直把相机往 HOME 拉，必须先停掉
       camera.position.set(pos[0],pos[1],pos[2]);
       controls.target.set(tgt[0],tgt[1],tgt[2]);
       if(fov){camera.fov=fov;camera.updateProjectionMatrix();}
       camera.lookAt(controls.target);
-      return{ok:true,pos:[pos[0],pos[1],pos[2]],tgt:[tgt[0],tgt[1],tgt[2]]};
+      controls.update();
+      return{ok:true,pos:[pos[0],pos[1],pos[2]],tgt:[tgt[0],tgt[1],tgt[2]],
+        now:[+camera.position.x.toFixed(2),+camera.position.y.toFixed(2),+camera.position.z.toFixed(2)]};
     }catch(e){return{ok:false,error:String(e)};}
   },
   /* 调试：开关落雪（做画面比对测试时先关掉，否则雪花位移会把逐像素对比全污染） */

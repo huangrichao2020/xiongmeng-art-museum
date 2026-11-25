@@ -23,9 +23,10 @@ const EXE = path.join(os.homedir(), "Library/Caches/ms-playwright/chromium-1248/
   });
   await hideUI();
   const shots = [
-    ['box', [6.0, 3.2, 26.5], [5.88, 3.5, 20.95], 42],
-    ['box2', [9.5, 4.2, 25.0], [5.88, 3.4, 20.95], 44],
-    ['nest', [-46, 26, -86], [-46, 8, -112], 46]
+    ['road_north', [0, 1.7, 15.6], [0, 3.2, -26], 62],
+    ['road_east', [0, 1.7, 15.2], [34, 3.0, 11.5], 62],
+    ['road_west', [-6, 1.7, 14.0], [-34, 3.0, 11.5], 62],
+    ['road_board', [22, 1.7, 16.5], [9.6, 2.8, 14.0], 55]
   ];
   for (const [name, pos, tgt, fov] of shots) {
     const r = await pg.evaluate(([p, t, f]) => {
