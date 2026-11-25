@@ -13737,7 +13737,7 @@ const PANELS={
       ['小吃一条街','爆米花 / 棉花糖 / 热巧克力 / 烤香肠 / 圣诞糖果 / 热红酒，六摊连排挂灯串'],
       ['人','十几只维尼小熊在排队、围观圣诞树、吃小吃、在园子里溜达'],
       ['雪币经济','每个设施都收门票钱：摩天轮 25 / 云霄飞车 40 / 直升机 60 / 热气球 50；站到发光上车点才让上'],
-      ['打工挣钱','售票处卖票一张 +6；摄影摊等小熊站好、对准了按空格拍照 +14~25；礼物包装台包一份礼物 +12']
+      ['打工挣钱','售票处上岗卖票，一张 +6；摄影摊上岗等小熊站好、对准了按空格拍照，一张 +14~25']
     ]}
 };
 const info=document.getElementById('info');
@@ -20691,7 +20691,7 @@ const updateFireworks=fwSys;
    游乐场经济系统
    ── 雪币钱包：每个设施都收票价，钱不够上不去
    ── 固定上车光点：每个设施门口一圈发光光点，站进去才让上
-   ── 打工：售票处卖票 / 摄影摊给小熊拍照 / 礼物包装台包礼物
+   ── 打工：售票处卖票 / 摄影摊给小熊拍照
    ══════════════════════════════════════════════════════════════════════ */
 const ECON={coin:60,earned:0,spent:0,shots:0,good:0,jobCd:0,ticketBuyer:null};
 /* 设施表：id / 名字 / 票价 / 上车光点坐标 / 光点颜色 */
@@ -20708,7 +20708,6 @@ const ECON_RIDES=[
 const ECON_JOBS=[
   {id:'ticket',name:'游乐园售票处',pay:6,bx:13.6,bz:27.8,gx:13.6,gz:25.2,color:0xffd27a,tip:'卖一张门票'},
   {id:'photo', name:'圣诞摄影摊',  pay:25,bx:19.8,bz:30.8,gx:19.8,gz:28.0,color:0xffb0d0,tip:'开张，给小熊拍照'},
-  {id:'wrap',  name:'礼物包装台',  pay:12,bx:12.4,bz:34.8,gx:12.4,gz:32.2,color:0x9ff0c0,tip:'包一份圣诞礼物'},
 ];
 const ECON_PAD_R=2.55;          // 光点触发半径（米）
 const ECON_JOB_R=3.30;          // 工位触发半径
@@ -20975,18 +20974,6 @@ function econBuildAll(){
   }
   econCameraProp(ECON_JOBS[1].gx+1.5,ECON_JOBS[1].gz-.4);
   econBackdrop(ECON_PHOTO_SPOT[0],ECON_PHOTO_SPOT[1]-1.35);
-  /* 礼物包装台 */
-  stalls.push(econBuildStall({bx:ECON_JOBS[2].bx,bz:ECON_JOBS[2].bz,name:'礼物包装台',
-    h:2.75,w:3.2,d:2.4,fab:3,accent:'#2f8f6b',goods:'gift'}));
-  {
-    const g=stalls[2];
-    const spool=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.20,14),
-      new THREE.MeshStandardMaterial({color:0xd23b32,roughness:.6}));
-    spool.rotation.z=Math.PI/2;spool.position.set(.78,1.14,.42);g.add(spool);
-    const spool2=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.20,14),
-      new THREE.MeshStandardMaterial({color:0xe8c24a,roughness:.6}));
-    spool2.rotation.z=Math.PI/2;spool2.position.set(.78,1.14,.68);g.add(spool2);
-  }
   /* 工位光点 */
   for(const J of ECON_JOBS){
     econMakePad(J.gx,J.gz,J.name,'打工 +'+J.pay,J.color,2.35,true);
@@ -21186,30 +21173,6 @@ function econPhotoShoot(){
   }
 }
 
-/* ── 打工 ③：礼物包装台 ────────────────────────────────── */
-const econWrapBox={g:null,t:0,on:false};
-function econWrapGift(){
-  if(ECON.jobCd>0)return;
-  ECON.jobCd=1.1;
-  econGain(12,'包好一份圣诞礼物');
-  if(econWrapBox.g){econWrapBox.on=true;econWrapBox.t=0;}
-}
-function econBuildWrapBox(){
-  const J=ECON_JOBS[2];
-  const g=new THREE.Group();g.position.set(J.bx,J.bz,0);g.rotation.y=Math.PI;scene.add(g);
-  const redM=new THREE.MeshStandardMaterial({color:0xd23b32,roughness:.55});
-  const whiteM=new THREE.MeshStandardMaterial({color:0xf2f0e6,roughness:.6});
-  const box=new THREE.Mesh(new THREE.BoxGeometry(.42,.36,.42),redM);
-  box.position.set(.95,1.30,.42);g.add(box);
-  const lid=new THREE.Mesh(new THREE.BoxGeometry(.44,.07,.44),whiteM);
-  lid.position.set(.95,1.51,.42);g.add(lid);
-  const rb=new THREE.Mesh(new THREE.BoxGeometry(.07,.38,.44),whiteM);
-  rb.position.set(.95,1.30,.42);g.add(rb);
-  g.scale.setScalar(.001);g.visible=false;
-  g.userData.keep=true;
-  econWrapBox.g=g;
-}
-
 /* ── 每帧更新 ───────────────────────────────────────────── */
 let econLastPrompt='',econLastMsg='';
 function econUpdate(dt){
@@ -21226,14 +21189,6 @@ function econUpdate(dt){
       if(f.sp.material.map)f.sp.material.map.dispose();
       f.sp.material.dispose();econFloats.splice(i,1);
     }
-  }
-  /* 包装台上的礼物盒：长出来 → 停一下 → 收走 */
-  if(econWrapBox.on&&econWrapBox.g){
-    econWrapBox.t+=dt;
-    const s=econWrapBox.t<.34?econWrapBox.t/.34:(econWrapBox.t<1.5?1:Math.max(.001,1-(econWrapBox.t-1.5)/.3));
-    econWrapBox.g.visible=s>.02;
-    econWrapBox.g.scale.setScalar(Math.max(.001,s));
-    if(econWrapBox.t>1.85){econWrapBox.on=false;econWrapBox.g.visible=false;}
   }
   /* 光点呼吸：夜里最亮，白天压暗 */
   const night=Math.sin(((state.hour-6)/12)*Math.PI)<=0.03;
@@ -21259,10 +21214,6 @@ function econUpdate(dt){
           ECON.ticketBuyer=n;
         }
         ECON_SHIFT.next=ECON_SHIFT.t+R(3.0,5.4);
-      }else if(_shift==='wrap'&&ECON_SHIFT.t>ECON_SHIFT.next){
-        econGain(12,'包好一份圣诞礼物');
-        if(econWrapBox.g){econWrapBox.on=true;econWrapBox.t=0;}
-        ECON_SHIFT.next=ECON_SHIFT.t+R(2.4,4.0);
       }
     }
   }
@@ -21406,7 +21357,6 @@ function econInteract(){
 
 
 econBuildAll();
-econBuildWrapBox();
 /* 调试出口：探针和联机面板要看钱包 / 上车点 / 打工状态 */
 window.ECON=ECON;window.ECON_RIDES=ECON_RIDES;window.ECON_JOBS=ECON_JOBS;
 window.__fp=fp;
