@@ -14947,15 +14947,33 @@ const joyEl=document.getElementById('joystick'),stickEl=document.getElementById(
    之前是线性输出，推 8px 只有 0.24 速度，人几乎不动，就感觉"要用力滑"。 */
 const JOY_R=26;
 function joyApply(x,y){
-  const R=JOY_R;
-  let dx=x-joy.cx,dy=y-joy.cy;
-  const len=Math.hypot(dx,dy);
-  if(len>R){dx=dx/len*R;dy=dy/len*R;}
-  const raw=Math.min(1,len/R);
-  if(raw<.06){joy.dx=joy.dy=joy.mag=0;stickEl.style.transform='translate(0,0)';return;}
-  const k=Math.sqrt(raw)/raw;      // 曲线系数：小位移放大
-  joy.dx=dx/R*k;joy.dy=dy/R*k;
-  joy.mag=Math.min(1,Math.sqrt(raw));
+  let dx,dy,len;
+  if(joy.src==='screen'){
+    /* 左半屏的动态摇杆：手指按哪就是摇杆中心，往哪滑往哪走 */
+    dx=x-joy.cx;dy=y-joy.cy;len=Math.hypot(dx,dy);
+    if(len>JOY_R){dx=dx/len*JOY_R;dy=dy/len*JOY_R;}
+    const raw=Math.min(1,len/JOY_R);
+    if(raw<.06){joy.dx=joy.dy=joy.mag=0;stickEl.style.transform='translate(0,0)';return;}
+    const k=Math.sqrt(raw)/raw;      // 曲线系数：小位移放大
+    joy.dx=dx/JOY_R*k;joy.dy=dy/JOY_R*k;
+    joy.mag=Math.min(1,Math.sqrt(raw));
+    stickEl.style.transform='translate('+(dx*k)+'px,'+(dy*k)+'px)';
+    return;
+  }
+  /* 左下角固定摇杆：手指按在圆上哪一点，就朝那个方向走。
+     不用先按回中间再往边上滑 —— 按住不动，人就一直朝那个方向走。 */
+  dx=x-joy.cx;dy=y-joy.cy;len=Math.hypot(dx,dy);
+  if(len<3){                      // 正中心没有方向可判，给个很小的死区
+    joy.dx=joy.dy=joy.mag=0;
+    stickEl.style.transform='translate(0,0)';
+    return;
+  }
+  /* 幅度：离中心越远越快，但保底 0.5 —— 按在边缘附近也走得动 */
+  const mag=Math.max(.5,Math.sqrt(Math.min(1,len/JOY_R)));
+  joy.dx=dx/len*mag;joy.dy=dy/len*mag;
+  joy.mag=mag;
+  /* 内圈跳到手指所在的方向上 */
+  const k=Math.min(1,len/JOY_R);
   stickEl.style.transform='translate('+(dx*k)+'px,'+(dy*k)+'px)';
 }
 function joyReset(){joy.active=false;joy.dx=joy.dy=joy.mag=0;stickEl.style.transform='translate(0,0)';}
