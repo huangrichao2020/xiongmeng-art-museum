@@ -242,6 +242,8 @@
   body.touch .wtools button{min-width:40px;height:38px;padding:0 6px;border-radius:19px;font-size:11.5px}
   /* 联机登录卡片打开时，右上角工具条被卡片压住 → 干脆藏起来 */
   body.mp-login-open .wtools{display:none}
+  /* 个人面板展开时同理：它会盖住右上角工具条，直接把工具条收起来 */
+  body.mp-open .wtools{display:none}
   /* 触屏：沉浸内的 .wtop 隐藏，统一用常驻 .wtools，避免两套按钮叠在一起 */
   body.touch .wtop{display:none!important}
 
@@ -661,7 +663,10 @@
 
   /* 蛋仔风格 HUD：默认收成一颗「个人」按钮，点开才展开个人信息 */
   #mp-panel{
-    position:fixed;z-index:8800;left:14px;top:14px;width:190px;
+    /* 右上角：原来放在左上角 (14,14)，正好压在「≡ 圆钮」和时间牌上
+       （z-index 8800 vs 29 → 圆钮被完全盖死，点不到，时间系统入口又没了）。
+       左上角整列归时间系统，个人按钮挪到右上角工具条下面。 */
+    position:fixed;z-index:8800;right:14px;top:62px;width:190px;
     font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
     user-select:none;
   }
@@ -744,7 +749,7 @@
   .mp-btn.on{background:linear-gradient(180deg,#8ee8b4,#43c47c);box-shadow:0 3px 0 #2e9a5f}
   .mp-btn2{background:linear-gradient(180deg,#ff9db4,#f2708f);box-shadow:0 3px 0 #cf5271}
   @media(max-width:700px){
-    #mp-panel{width:162px;left:10px;top:10px}
+    #mp-panel{width:162px;right:10px;top:58px}
     .mp-avatar,.mp-badge{width:26px;height:26px;font-size:12px}
   }
 </style>
@@ -768,9 +773,8 @@
       <button id="t-sound" class="on">圣诞音</button>
       <button id="t-stars" class="on">流星雨</button>
       <button id="t-lights" class="on">圣诞灯</button>
-      <button id="t-rain" title="切换雪 / 雨">雨天</button>
-      <button id="t-rotate">环绕</button>
-      <button id="t-reset">复位</button>
+      <button id="t-snow" class="on" title="飞雪开关">下雪</button>
+      <button id="t-rain" title="下雨开关">下雨</button>
     </div>
     <div id="railState"><b id="r-season">圣诞</b> · <i id="r-weather">飞雪</i> · <span id="r-time">21:30</span></div>
   </div>
@@ -9673,7 +9677,10 @@ function makePerson(color,skin,opts={}){
   legL.userData.keep=true;legR.userData.keep=true;
   armL.userData.keep=true;armR.userData.keep=true;
   if(opts.scale)g.scale.setScalar(opts.scale);
-  g.userData={legL,legR,armL,armR};
+  /* 整个小人标 keep：身体合批后是一张 mesh，如果它被外层合批（游乐园/马戏团）
+     摘走并烘进世界坐标，人一移动就只剩四肢在动 —— 看起来就是「身体和手脚分离」。
+     身体本身已在 makePerson 内部合批成一张 mesh，标 keep 不会多出 draw call。 */
+  g.userData={legL,legR,armL,armR,keep:true};
   return g;
 }
 const npcs=[];
@@ -11997,14 +12004,11 @@ const CIRCUS_ACTS=[
     }
   }
   {
-    /* 场内主光：一盏从旗杆压下来的暖金聚光。
-       用聚光而不是点光源 —— 聚光的锥角把光限制在竞技圈里，
-       帐篷外的雪地和马路一点都吃不到，邻居灰阶不受影响。 */
-    const spot=new THREE.SpotLight(0xffd9a0,720,26,.80,.70,1.5);
-    spot.position.set(0,8.70,0);
-    const tgt=new THREE.Object3D();tgt.position.set(0,0.55,0);g.add(tgt);
-    spot.target=tgt;g.add(spot);
-    circus.light=spot;
+    /* 场内主光已按要求关掉：一盏从旗杆压下来的暖金聚光，
+       加上贴地旋转的扫光扇和追着表演者跑的光斑，在夜里会变成一团
+       来回乱扫的怪光（看起来像舞台上乱晃的射灯）。
+       现在场内只留吊灯那圈自发光暖球（MeshBasic，不吃光照，永远亮着），
+       环境光/半球光负责整体照明，不再有任何动态射灯。 */
   }
 
   /* ── 八根拉绳 + 地钉：把大帐篷撑在地上的样子 ── */
@@ -12022,28 +12026,10 @@ const CIRCUS_ACTS=[
     addNS(g,new THREE.SphereGeometry(.075,8,6),goldM,p2.x,.62,p2.z);
   }
 
-  /* ── 地面扫光：贴地旋转扇形光带（不用半透明锥体，不会给全场加雾光） ── */
-  {
-    const m1=new THREE.MeshBasicMaterial({color:0xffd9a4,transparent:true,opacity:.15,
-      blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
-    const s1=new THREE.Mesh(new THREE.RingGeometry(1.4,5.70,30,1,0,1.05),m1);
-    s1.rotation.x=-Math.PI/2;s1.position.set(0,.115,0);
-    s1.renderOrder=2;s1.userData.noReflect=true;s1.userData.keep=true;
-    g.add(s1);circus.sweep=s1;circus.sweepMat=m1;
-    const m2=new THREE.MeshBasicMaterial({color:0x9fd8ff,transparent:true,opacity:.10,
-      blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
-    const s2=new THREE.Mesh(new THREE.RingGeometry(1.0,4.30,26,1,0,0.85),m2);
-    s2.rotation.x=-Math.PI/2;s2.position.set(0,.118,0);
-    s2.renderOrder=2;s2.userData.noReflect=true;s2.userData.keep=true;
-    g.add(s2);circus.sweep2=s2;circus.sweepMat2=m2;
-    /* 跟着走的柔光斑：像一盏追着表演者跑的顶灯 */
-    const pm=new THREE.MeshBasicMaterial({map:glowTex,color:0xffd7a0,transparent:true,opacity:.24,
-      blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
-    const pl=new THREE.Mesh(new THREE.PlaneGeometry(1,1),pm);
-    pl.rotation.x=-Math.PI/2;pl.scale.set(6.4,6.4,1);
-    pl.renderOrder=2;pl.userData.noReflect=true;pl.userData.keep=true;
-    g.add(pl);circus.pool=pl;
-  }
+  /* ── 地面扫光 / 追光斑：已按要求全部关掉 ──
+     原来这里有两道贴地旋转的扇形光带 + 一个追着表演者跑的柔光斑，
+     夜里看就是一团在帐篷里乱扫的怪光。现在全部不生成，
+     circus.sweep / sweep2 / pool 保持 null，updateCircus 里的动画代码自动跳过。 */
 
   /* ── 四个表演位（半径 3.9 圆周上，均面向场心） ── */
   function station(angDeg,rad){
@@ -12078,11 +12064,13 @@ const CIRCUS_ACTS=[
     for(const sx of [-1,1])for(const sz of [-1,1])add(st,BX(.06,.70,.06),inkM,sx*.57,.68,.26+sz*.29);
     /* 桌上的礼帽（会升起来） */
     const hatG=new THREE.Group();hatG.position.set(-.22,1.09,.24);st.add(hatG);
+    hatG.userData.keep=true;      // 会动：不能被外层合批烘进世界坐标
     add(hatG,new THREE.CylinderGeometry(.175,.165,.30,14),inkM,0,.15,0);
     add(hatG,new THREE.CylinderGeometry(.245,.245,.035,16),inkM,0,.018,0);
     add(hatG,new THREE.TorusGeometry(.178,.022,6,16),M(0x2a2d36,{roughness:.4}),0,.145,0);
     /* 帽子里变出来的小白兔 */
     const rabbit=new THREE.Group();rabbit.position.set(-.22,1.12,.24);st.add(rabbit);
+    rabbit.userData.keep=true;     // 会冒出来 + 会跟着升
     {
       const body=add(rabbit,new THREE.SphereGeometry(.13,14,10),creamM,0,.10,0);body.scale.set(.9,.8,.9);
       add(rabbit,new THREE.SphereGeometry(.095,14,10),creamM,0,.25,0);
@@ -12136,6 +12124,7 @@ const CIRCUS_ACTS=[
     const apples=[];
     for(let i=0;i<6;i++){
       const ap=new THREE.Group();
+      ap.userData.keep=true;       // 会绕着熊转：不能被合批烘死
       add(ap,new THREE.SphereGeometry(.125,14,10),appleM,0,0,0);
       add(ap,new THREE.CylinderGeometry(.014,.010,.075,5),stemM,0,.145,0);
       add(ap,new THREE.BoxGeometry(.10,.012,.045),leafM,.05,.165,0);
@@ -12181,6 +12170,7 @@ const CIRCUS_ACTS=[
   /* 空中吊环：从中央旗杆吊下来的一副秋千，熊用双脚勾住横杆倒挂在上面 */
   {
     const trap=new THREE.Group();trap.position.set(0,8.30,0);g.add(trap);
+    trap.userData.keep=true;   // 整副吊环会摆：绳子/横杆必须留在组内跟着转
     const RL=5.05;
     for(const s of [-1,1]){
       const r0=new THREE.Vector3(s*.44,0,0),r1=new THREE.Vector3(s*.44,-RL,0);
@@ -12220,6 +12210,7 @@ const CIRCUS_ACTS=[
     const bc=[0x3f8fd0,0xffd23f,0x4bbd6a];
     for(let i=0;i<3;i++){
       const b=new THREE.Group();
+      b.userData.keep=true;        // 会飞来飞去
       add(b,new THREE.SphereGeometry(.135,14,10),M(bc[i],{roughness:.45}),0,0,0);
       st.add(b);balls.push(b);
     }
@@ -13403,15 +13394,17 @@ function applyTime(h){
   const slot=timeSlotFor(h);
   state.timeKey=slot.k;
   const rainy=state.weather==='rain';
+  const snowy=state.weather==='snow';
   const sky   =rainy?slot.rainSky:slot.sky;
   const fogC  =rainy?slot.rainFog:slot.fog;
   const fogD  =rainy?slot.rainFogD:slot.fogD;
-  rWeather.textContent=rainy?slot.name+'雨':slot.weather;
-  if(seasonW)seasonW.textContent=rainy?slot.name+'雨':slot.weather;
+  const wxTxt=rainy?slot.name+'雨':(snowy?slot.weather:slot.name+'晴');
+  rWeather.textContent=wxTxt;
+  if(seasonW)seasonW.textContent=wxTxt;
   rTime.textContent=fmtHour(h);if(hourLbl)hourLbl.textContent=fmtHour(h);
   /* 纯净模式下常驻的时间牌：一眼看见现在几点、什么天气，也告诉用户还能切 */
   const cc=document.getElementById('cleanClock');
-  if(cc)cc.textContent=slot.name+' '+fmtHour(h)+(rainy?' 雨':' 雪');
+  if(cc)cc.textContent=slot.name+' '+fmtHour(h)+(rainy?' 雨':(snowy?' 雪':' 晴'));
   document.querySelectorAll('#seasons button').forEach(b=>b.classList.toggle('on',b.dataset.k===slot.k));
 
   const elev=Math.sin(((h-6)/12)*Math.PI);
@@ -13474,15 +13467,15 @@ function applyTime(h){
      3) 天空：每个时段配一套阴雨天的天色和更浓的雾
      4) 灯：雨天光被水汽散开，夜里灯晕压暗一截，不然整场发闷还刺眼 */
 function setWeather(w){
-  w=(w==='rain')?'rain':'snow';
-  const rainy=w==='rain';
+  w=(w==='rain')?'rain':(w==='none'?'none':'snow');
+  const rainy=w==='rain', snowy=w==='snow';
   state.weather=w;
   rainLevel=rainy?1:0;
-  if(snow)snow.visible=!rainy;
-  if(snowFar)snowFar.visible=!rainy;
+  if(snow)snow.visible=snowy;
+  if(snowFar)snowFar.visible=snowy;
   if(rain)rain.visible=rainy;
   if(rainRipples)rainRipples.visible=rainy;
-  ground.material.color.setHex(rainy?0xa7b1bc:0xd0ddeb);
+  ground.material.color.setHex(rainy?0xa7b1bc:(snowy?0xd0ddeb:0xc7d4e4));
   ground.material.roughness=rainy?.38:.88;
   ground.material.metalness=rainy?.14:.03;
   ground.material.envMapIntensity=rainy?1.55:.85;
@@ -13491,12 +13484,13 @@ function setWeather(w){
   /* 湿度：雪天 12%（几乎干），雨天 92%（整片湿透）；uMarkAmt 是积水变暗量 */
   wetRegistry.forEach(r=>{
     const u=r.m.userData.u;
-    u.uWetAmt.value=r.base*(rainy?.92:.12);
+    u.uWetAmt.value=r.base*(rainy?.92:(snowy?.12:0));
     u.uMarkAmt.value=rainy?.50:0;
   });
   lampPools.forEach(p=>{p.material.opacity=rainy?.24:.30;});
-  const b=document.getElementById('t-rain');
-  if(b)b.classList.toggle('on',rainy);
+  const bs=document.getElementById('t-snow'),br=document.getElementById('t-rain');
+  if(bs)bs.classList.toggle('on',snowy);
+  if(br)br.classList.toggle('on',rainy);
   sfx.setRain(rainy?1:0);
   renderer.toneMappingExposure=(state.quality?(IS_TOUCH_DEV?1.14:1.12):1.06)*(rainy?1.10:1);
   applyTime(state.hour);      // 天空/雾/灯光随天气一起换
@@ -13558,18 +13552,22 @@ applyQualityMode(state.quality);
 document.getElementById('t-lights').onclick=function(){
   state.lights=!state.lights;this.classList.toggle('on',state.lights);
 };
-document.getElementById('t-rotate').onclick=function(){
-  controls.autoRotate=!controls.autoRotate;this.classList.toggle('on',controls.autoRotate);
-};
 document.getElementById('t-stars').onclick=function(){
   state.stars=!state.stars;this.classList.toggle('on',state.stars);
 };
-/* 雪 / 雨 切换：一次换掉粒子、地面、天空雾和灯光 */
+/* 雪 / 雨 各自一个独立开关：
+   点「下雪」→ 开飞雪（雨自动关）；再点一下 → 关掉飞雪。
+   点「下雨」→ 开下雨（雪自动关）；再点一下 → 关掉下雨。
+   两个都关 = 无降水（天还阴着，但天上不掉东西）。 */
+document.getElementById('t-snow').onclick=function(){
+  const on=state.weather!=='snow';
+  setWeather(on?'snow':'none');
+  sfx.blip(on?660:520,.10,.06);
+};
 document.getElementById('t-rain').onclick=function(){
-  const rainy=state.weather!=='rain';
-  setWeather(rainy?'rain':'snow');
-  this.classList.toggle('on',rainy);
-  sfx.blip(rainy?300:660,.10,.06);
+  const on=state.weather!=='rain';
+  setWeather(on?'rain':'none');
+  sfx.blip(on?300:520,.10,.06);
 };
 document.getElementById('t-fp').onclick=function(){
   if(fp.on)exitWalk();else enterWalk();
@@ -13633,10 +13631,6 @@ function syncFpBtn(){
   b.addEventListener('pointerdown',e=>{e.preventDefault();jump();});
   b.addEventListener('click',e=>{e.preventDefault();});
 })();
-document.getElementById('t-reset').onclick=()=>{
-  flyTo({pos:[HOME.pos.x,HOME.pos.y,HOME.pos.z],tgt:[HOME.tgt.x,HOME.tgt.y,HOME.tgt.z]});
-  sfx.blip(520,.1,.06);
-};
 document.getElementById('t-sound').onclick=function(){
   const on=!this.classList.contains('on');
   this.classList.toggle('on',on);
@@ -13760,7 +13754,6 @@ function fpFloorAt(x,z,curY){
     // 左侧圣诞教堂 (-49,36) 敞开大门中央红毯通道允许走进观礼，两侧墙与圣坛保留碰撞
     if(x>-50.0&&x<-48.0&&z>=22.6&&z<=39.8)return{y:.68};
     if(x>-55.2&&x<-42.8&&z>23.5&&z<40.5)return{ok:0};
-    if(x>48.4&&x<62.6&&z>23.5&&z<40.0)return{ok:0};
     return{y:groundY(x,z)};       // 室外随便走（含外环小火车站台）
   }
   return{ok:0};
@@ -13872,7 +13865,9 @@ function fpUpdate(dt){
     const fx=-Math.sin(fp.yaw),fz=-Math.cos(fp.yaw);
     fpStep(fx*d,fz*d);
   }
-  const headBob=(fpSpd>0.5&&fp.jumpY<=0.01)?Math.sin(t*fpSpd*2.3)*.032*Math.min(1,fpSpd/4):0;
+  /* 走路不再带头部晃动：原来 ±3.2cm 的 headBob 在第一人称里就是持续的上下抖，
+     跑起来频率还到 2.3Hz，看着像画面自己在抖。相机只跟位置和朝向，不加任何额外位移。 */
+  const headBob=0;
   /* 第三人称时相机由 MP.update 接管（它把相机放在角色背后），
      这里只更新角色坐标，不写 camera —— 否则两者每帧互相覆盖。
      判断口径统一走 MP.thirdLive()：只有「第三人称真的在接管」时才让出相机，
@@ -13931,6 +13926,7 @@ cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.toFixed(2),z:+cam
   /* 调试用：直接设雨量，验反射通道的跳过与隔帧逻辑 */
   rain:()=>+rainLevel.toFixed(3),
   setRain:(v)=>{setWeather(v>=.5?'rain':'snow');return +rainLevel.toFixed(3);},
+  precip:(w)=>{setWeather(w);return state.weather;},
   weather:()=>state.weather,
   /* 调试：点灯池开关（A/B 看夜景观感有没有被牺牲） */
   mergeLog:()=>({log:_autoMerge.log||[],phase:_autoMerge.phase}),
@@ -13953,6 +13949,8 @@ cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.toFixed(2),z:+cam
   snow:(on)=>{if(snow)snow.visible=on;if(snowFar)snowFar.visible=on;return on;},
   /* 调试：拿到场景本体（探针用来逐对象体检、查是谁在挡镜头） */
   scene:()=>scene,
+  /* 调试：查询某个世界坐标能不能站人（空气墙体检用） */
+  floorAt:(x,z)=>{const r=fpFloorAt(x,z,0);return{ok:r.ok===0?0:1,y:r.y};},
   /* 调试：开关阴影、单独隐藏某个装置 */
   shadows:(on)=>{renderer.shadowMap.enabled=on;scene.traverse(o=>{if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.needsUpdate=true);else o.material.needsUpdate=true;}});return on;},
   hideRide:(i)=>{if(amusement.dyn[i])amusement.dyn[i].visible=false;return i;},
@@ -13978,7 +13976,8 @@ cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.toFixed(2),z:+cam
   pianoPlay:()=>pianoPlay(),
   /* 调试：马戏团状态（当前节目 / 各表演件位置 / 扫光角） */
   circus:()=>({x:circus.x,z:circus.z,act:circus.act,actCn:CIRCUS_ACTS[circus.act].cn,
-    sweepY:+circus.sweep.rotation.y.toFixed(3),
+    sweepY:circus.sweep?+circus.sweep.rotation.y.toFixed(3):null,
+    spotOn:!!circus.light,
     hatY:+circus.magic.hat.position.y.toFixed(3),
     rabbit:circus.magic.rabbit.visible,
     apple0:[+circus.jug.apples[0].position.x.toFixed(2),+circus.jug.apples[0].position.y.toFixed(2)],
@@ -15126,7 +15125,7 @@ function updateAerialHaze(dt,t){
         });
         MP.syncPeersUI();
         /* 登录成功后露出「个人」按钮，但个人信息默认不展开 */
-        if (MP._panel) { MP._panel.p.style.display = ''; MP._panel.p.classList.remove('open'); }
+        if (MP._panel) { MP._panel.p.style.display = ''; MP._panel.p.classList.remove('open'); document.body.classList.remove('mp-open'); }
         MP.startThirdPersonBody();
         /* 单机模式下已经建过本地角色的话，把头顶名牌换成账号名 */
         if (MP.selfTag) {
@@ -16129,8 +16128,9 @@ function updateAerialHaze(dt,t){
     /* 未登录时整块藏起来 */
     p.style.display = 'none';
     /* 点「个人」展开 / 再点收起 */
+    const setPanelOpen=on=>{p.classList.toggle('open',on);document.body.classList.toggle('mp-open',on);};
     meBtn.onclick = () => {
-      p.classList.toggle('open');
+      setPanelOpen(!p.classList.contains('open'));
       if (p.classList.contains('open')) nameI.focus();
     };
     p.querySelector('#mp-save').onclick = () => {
