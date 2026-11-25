@@ -932,7 +932,7 @@
 <div id="photo-hud"><div id="ph-frame"><s></s><s></s><s></s><s></s><span id="ph-dot"></span></div><div id="ph-bar"><span id="ph-state">等客人站好…</span><span id="ph-key">空格 拍照 · E 收摊</span></div></div>
 <button id="ph-shoot" data-label="拍照">拍照</button>
 <div id="photo-flash"></div>
-<div id="train-hud"><span id="train-msg">圣诞观光小火车运行中</span><button id="train-btn">上车</button></div>
+<div id="train-hud"><span id="train-msg">走近设施才会上车</span><button id="train-btn">上车</button></div>
 <div id="hand-hud"><span id="hand-name"></span><span id="hand-btns"><button id="hand-yes">同意</button><button id="hand-no">拒绝</button></span><button id="hand-act"></button></div>
 <div id="gift-modal" aria-hidden="true">
   <div id="gift-card">
@@ -13736,7 +13736,7 @@ const PANELS={
       ['圣诞树','13 米巨型圣诞树缠满彩灯，顶上金星星，树下堆着礼物；园中另有 18 棵小雪松'],
       ['小吃一条街','爆米花 / 棉花糖 / 热巧克力 / 烤香肠 / 圣诞糖果 / 热红酒，六摊连排挂灯串'],
       ['人','十几只维尼小熊在排队、围观圣诞树、吃小吃、在园子里溜达'],
-      ['雪币经济','每个设施都收门票钱：摩天轮 25 / 云霄飞车 40 / 直升机 60 / 小火车 10；站到发光上车点才让上'],
+      ['雪币经济','每个设施都收门票钱：摩天轮 25 / 云霄飞车 40 / 直升机 60 / 热气球 50；站到发光上车点才让上'],
       ['打工挣钱','售票处卖票一张 +6；摄影摊等小熊站好、对准了按空格拍照 +14~25；礼物包装台包一份礼物 +12']
     ]}
 };
@@ -13902,7 +13902,8 @@ function triggerPhys(hit){
     return true;
   }
   if(type==='train'||type==='station'){
-    toggleRideTrain(type==='station'?ref:null);
+    _recMsg('观光小火车今天只跑不载客，去游乐园坐摩天轮和云霄飞车吧',2400);
+    sfx.blip(420,.12,.07);
     return true;
   }
   if(type==='wheel'){
@@ -13924,7 +13925,7 @@ function triggerPhys(hit){
   return false;
 }
 const tip=document.getElementById('tip');
-const PHYS_LABELS={npc:'维尼小熊（点我蹦一跳）',animal:'雪地萌宠（点我欢呼）',car:'行驶跑车（点击鸣笛弹跳）',snowman:'不倒翁雪人（推一下晃悠）',tree:'圣诞雪松（摇一摇落雪）',guestbook:'游乐园留言信箱（点击打开邮箱留言板）',giftbox:'圣诞盲盒礼物山（点击拆开盲盒！）',train:'圣诞露天观光小火车（点击上车绕图看风景）',station:'小火车观光站台（点击呼唤/上下车）',wheel:'敞篷观景摩天轮（点击升空俯瞰全城）',ride:'游乐设施（点击直接坐上去体验！）',launch:'圣诞高空弹射跳伞（点击弹射上天 · 降落伞可控降落！）',balloon:'大号热气球（点击登上吊篮 · W/↑ 上升 S/↓ 下降）'};
+const PHYS_LABELS={npc:'维尼小熊（点我蹦一跳）',animal:'雪地萌宠（点我欢呼）',car:'行驶跑车（点击鸣笛弹跳）',snowman:'不倒翁雪人（推一下晃悠）',tree:'圣诞雪松（摇一摇落雪）',guestbook:'游乐园留言信箱（点击打开邮箱留言板）',giftbox:'圣诞盲盒礼物山（点击拆开盲盒！）',train:'圣诞露天观光小火车（今天只跑不载客）',station:'小火车观光站台（今天不停车）',wheel:'敞篷观景摩天轮（点击升空俯瞰全城）',ride:'游乐设施（点击直接坐上去体验！）',launch:'圣诞高空弹射跳伞（点击弹射上天 · 降落伞可控降落！）',balloon:'大号热气球（点击登上吊篮 · W/↑ 上升 S/↓ 下降）'};
 let lastHover=0;
 renderer.domElement.addEventListener('pointermove',e=>{
   if(e.buttons)return;
@@ -14896,7 +14897,7 @@ function showFpHint(){
   const el=document.getElementById('fphint');
   el.textContent=(isTouch||isSmall)
     ? '左下摇杆走 · 右侧拖动转头 · 右下跳 · 右上切沙盘'
-    : 'WASD 走 · 按住左键或右键拖动转头 · 空格跳 · Q 退出 · 点击盲盒拆礼物 · 按 E 上下小火车';
+    : 'WASD 走 · 按住左键或右键拖动转头 · 空格跳 · Q 退出 · 点击盲盒拆礼物 · 走到光点按 E 上车';
   if(!state.clean)return;
   el.style.opacity='1';
   clearTimeout(showFpHint._t);
@@ -19362,25 +19363,14 @@ function hudShow(msg,btn,fn,riding){
 }
 function hudHide(){trainHud.classList.remove('show','bare');}
 
+/* 观光小火车改成纯景观：只在自己跑，不再上车/下车。
+   之前它既能点车厢上车、又能按 E 下车，还会抢底部提示条的按钮，
+   在打工（工位提示条常驻）的时候两边互相打架，触发出一堆莫名其妙的上车/下车。 */
 function toggleRideTrain(){
   if(trainSys.riding){
     trainSys.riding=false;
     if(window.MP)MP.popFirstPerson();
     applyDpr(HI_DPR);
-    const caboose=trainCars[trainCars.length-1];
-    const p=caboose.position;
-    const outX=p.x>=0?-3.2:3.2;
-    fp.x=Math.max(-66,Math.min(66,p.x+outX));
-    fp.z=Math.max(-32,Math.min(62,p.z));
-    fp.y=0;
-    fp.vx=fp.vz=0;
-    sfx.blip(520,.1,.06);
-  }else{
-    if(!fp.on)enterWalk();
-    trainSys.riding=true;
-    if(window.MP)MP.pushFirstPerson();
-    applyDpr(LO_DPR);
-    sfx.blip(880,.12,.08);
   }
 }
 const wheelSys={riding:false,cab:null,kind:null,car:null,label:'',bump:null};
@@ -20105,7 +20095,6 @@ addEventListener('keydown',e=>{
       else{econPhotoStop();return;}
     }
     if(wheelSys.riding){toggleRideWheel(null);return;}
-    if(trainSys.riding){toggleRideTrain();return;}
     /* 设施必须站到固定的上车光点才让上；打工位在光点里按 E 开工 */
     if(econInteract())return;
     if(fp.on&&Math.hypot(fp.x-pianoPlaza.px,fp.z-pianoPlaza.pz)<4.8){pianoPlay();return;}
@@ -20192,24 +20181,9 @@ function updateTrain(dt){
     pf.mat.opacity=.78*fadeIn*fadeOut;
   }
 
-  // 玩家乘车视角跟随（锁定在最后一节加长车厢最后一排，面向正后方观景）
-  if(trainSys.riding&&fp.on){
-    const caboose=trainCars[trainCars.length-1];
-    if(!caboose.userData._camS){caboose.userData._camS=new THREE.Vector3();caboose.userData._camL=new THREE.Vector3();}
-    const seat=caboose.userData._camS.set(0,1.56,-2.28).applyMatrix4(caboose.matrixWorld);
-    const lookBack=caboose.userData._camL.set(0,1.40,-16.0).applyMatrix4(caboose.matrixWorld);
-    fp.x=seat.x;fp.z=seat.z;fp.y=seat.y-FP_EYE;
-    camera.position.copy(seat);
-    camera.up.set(0,1,0);
-    camera.lookAt(lookBack);
-    hudShow('','下车 (E)',()=>toggleRideTrain(),true);
-  }else if(fp.on){
-    /* 上车改走固定光点：站到候车点等车，进站了才让上（票价 10 雪币）。
-       这里不要 hudHide() —— 提示条现在是全局共用的，
-       每帧清一次会把经济系统的上车/上岗提示清得只剩一帧。 */
-  }else{
-    hudHide();
-  }
+  /* 小火车不再载人，这里没有乘车视角分支。
+     注意：不要 hudHide() —— 提示条是全局共用的，
+     每帧清一次会把经济系统的上车/上岗提示清得只剩一帧。 */
 }
 
 /* ══ Saltline 级真实法线贴图（NormalMap）+ 粗糙度贴图 + 材质对比度调优 ══ */
@@ -20683,7 +20657,6 @@ const ECON_RIDES=[
   {id:'launch',  name:'圣诞高空弹射跳伞',price:30,x:33.8,z:52.2,color:0x8ad8ff},
   {id:'heli',    name:'园区观光直升机',  price:60,x:45.4,z:50.5,color:0xffd08a},
   {id:'balloon', name:'大号热气球',      price:50,x:-49.0,z:51.0,color:0xff9fb8},
-  {id:'train',   name:'皇家冬夜加长特快',price:10,x:66.0,z:34.0,color:0x8affc8},
 ];
 /* 打工位：bx/bz = 摊位位置；gx/gz = 玩家站的工位光点（摊位正前方） */
 const ECON_JOBS=[
@@ -21011,10 +20984,6 @@ function econNearestJob(){
 function econBoard(id){
   const R=econRideById(id);
   if(!R)return false;
-  if(id==='train'){
-    const near=trainCars.some(c=>Math.hypot(fp.x-c.position.x,fp.z-c.position.z)<13);
-    if(!near){_recMsg('小火车还没到站，在光点上等一会儿',2400);sfx.blip(300,.14,.08);return false;}
-  }
   if(ECON.coin<R.price){
     _recMsg('雪币不够：'+R.name+' 票价 '+R.price+' 雪币，还差 '+(R.price-ECON.coin)+' 枚',2800);
     sfx.blip(300,.16,.09);return false;
@@ -21290,9 +21259,7 @@ function econUpdate(dt){
     fn=()=>econJobDo(job.id);
   }else if(pad){
     key='pad:'+pad.id;
-    msg=pad.id==='train'
-      ?'皇家冬夜加长特快 · 票价 10 雪币 · 在光点上等车，小火车进站后按 E 上车'
-      :pad.name+' · 票价 '+pad.price+' 雪币 · '+(TOUCH?'点按钮上车':'按 E 上车');
+    msg=pad.name+' · 票价 '+pad.price+' 雪币 · '+(TOUCH?'点按钮上车':'按 E 上车');
     btn='上车 ('+pad.price+')';
     fn=()=>econBoard(pad.id);
   }
