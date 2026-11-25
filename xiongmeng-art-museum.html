@@ -545,10 +545,14 @@
   #train-hud{
     position:fixed;bottom:74px;left:50%;transform:translateX(-50%);z-index:28;
     display:none;align-items:center;gap:10px;padding:7px 14px;border-radius:20px;
-    background:rgba(16,26,40,.86);border:1px solid rgba(244,197,106,.55);
+    background:rgba(16,26,40,.9);border:1px solid rgba(244,197,106,.6);
     backdrop-filter:blur(6px);color:#fff3d1;font-size:12px;font-family:var(--han);
-    box-shadow:0 8px 24px rgba(0,0,0,.45);
+    box-shadow:0 8px 24px rgba(0,0,0,.5);
+    max-width:min(88vw,520px);animation:trainhudIn .16s ease-out;
   }
+  @keyframes trainhudIn{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+  #train-msg{line-height:1.35}
+  #train-hud button{white-space:nowrap;flex:none}
   #train-hud.show{display:flex}
 
   /* ---------- 雪币：收进右上「个人」面板里 ---------- */
@@ -569,7 +573,7 @@
   #mp-coin.float::before{background:var(--accent);box-shadow:0 0 8px rgba(244,197,106,.9)}
   body.wallet-float #rail{top:52px}
   /* 手机端：交互提示条上的按钮做大，拇指点得中 */
-  body.touch #train-hud{padding:9px 12px;bottom:122px}
+  body.touch #train-hud{padding:10px 13px;bottom:122px;font-size:12.5px;line-height:1.35}
   body.touch #train-hud button{padding:11px 18px;font-size:13px;border-radius:16px}
   /* 手机端：摄影摊的快门按钮（手机上没有空格键） */
   #ph-shoot{
@@ -20186,8 +20190,9 @@ function updateTrain(dt){
     camera.lookAt(lookBack);
     hudShow('','下车 (E)',()=>toggleRideTrain(),true);
   }else if(fp.on){
-    /* 上车改走固定光点：站到候车点等车，进站了才让上（票价 10 雪币） */
-    if(!econAtPad('train'))hudHide();
+    /* 上车改走固定光点：站到候车点等车，进站了才让上（票价 10 雪币）。
+       这里不要 hudHide() —— 提示条现在是全局共用的，
+       每帧清一次会把经济系统的上车/上岗提示清得只剩一帧。 */
   }else{
     hudHide();
   }
@@ -20962,22 +20967,29 @@ function econAtPad(id){
   if(!R)return false;
   return Math.hypot(fp.x-R.x,fp.z-R.z)<ECON_PAD_R+1.1;
 }
+/* 进出范围加滞回：站在光点边缘时提示不会一闪一闪 */
+const ECON_HYST=2.0;
+let econLastPadId=null,econLastJobId=null;
 function econNearestPad(){
-  if(!fp.on)return null;
+  if(!fp.on){econLastPadId=null;return null;}
   let best=null,bd=1e9;
   for(const R of ECON_RIDES){
     const d=Math.hypot(fp.x-R.x,fp.z-R.z);
-    if(d<ECON_PAD_R&&d<bd){bd=d;best=R;}
+    const lim=(econLastPadId===R.id)?ECON_PAD_R+ECON_HYST:ECON_PAD_R;
+    if(d<lim&&d<bd){bd=d;best=R;}
   }
+  econLastPadId=best?best.id:null;
   return best;
 }
 function econNearestJob(){
-  if(!fp.on)return null;
+  if(!fp.on){econLastJobId=null;return null;}
   let best=null,bd=1e9;
   for(const J of ECON_JOBS){
     const d=Math.hypot(fp.x-J.gx,fp.z-J.gz);
-    if(d<ECON_JOB_R&&d<bd){bd=d;best=J;}
+    const lim=(econLastJobId===J.id)?ECON_JOB_R+ECON_HYST:ECON_JOB_R;
+    if(d<lim&&d<bd){bd=d;best=J;}
   }
+  econLastJobId=best?best.id:null;
   return best;
 }
 
@@ -21276,7 +21288,15 @@ function econUpdate(dt){
    只有「提示条上还是我自己那条」时才收走，别把别人的提示抹掉。 */
 function econSetPrompt(key,msg,btn,fn){
   if(key===econLastPrompt){
-    if(fn&&key)trainBtnEl.onclick=fn;
+    /* 提示条是全局共用的，小火车 / 溜冰场每帧会调 hudHide()，
+       所以这里必须每帧把提示重新挂上，否则它只闪一帧就没了。 */
+    if(key){
+      if(trainMsgEl.textContent!==msg)trainMsgEl.textContent=msg;
+      if(trainBtnEl.textContent!==btn)trainBtnEl.textContent=btn;
+      trainHud.classList.remove('bare');   /* 上车/上岗提示要带说明文字 */
+      trainHud.classList.add('show');
+      if(fn)trainBtnEl.onclick=fn;
+    }
     return;
   }
   const prevMsg=econLastMsg;
