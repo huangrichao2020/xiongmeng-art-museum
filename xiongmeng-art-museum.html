@@ -83,7 +83,7 @@
 
   /* ---------- 左上：品牌 + 实时读数 ---------- */
   #rail{
-    position:fixed;left:12px;top:52px;z-index:29;
+    position:fixed;left:12px;top:14px;z-index:29;
     display:flex;flex-direction:column;align-items:flex-start;gap:8px;
     transition:transform .3s cubic-bezier(.2,.8,.3,1);
   }
@@ -551,17 +551,36 @@
   }
   #train-hud.show{display:flex}
 
-  /* ---------- 左上角：雪币钱包（经济系统常驻，纯净模式也看得见） ---------- */
-  #wallet{
-    position:fixed;left:12px;top:14px;z-index:29;display:flex;align-items:center;gap:7px;
-    padding:6px 12px;font-family:var(--mono);font-size:12px;color:var(--ink);letter-spacing:.03em;
+  /* ---------- 雪币：收进右上「个人」面板里 ---------- */
+  .mp-coin{
+    display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:11px;flex:none;
+    background:linear-gradient(180deg,#ffe6a8,#f4c56a);color:#5a3d12;
+    font-family:var(--mono);font-size:11px;font-weight:800;letter-spacing:.02em;
+    box-shadow:0 2px 0 rgba(150,105,30,.35);
   }
-  #wallet .w-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none;
-    box-shadow:0 0 10px rgba(244,197,106,.85)}
-  #wallet b{font-size:15px;color:var(--accent);font-weight:600;min-width:20px;text-align:right}
-  #wallet span{font-family:var(--han);font-size:11px;color:var(--muted)}
-  #wallet em{font-style:normal;font-family:var(--han);font-size:10px;color:var(--muted);
-    padding-left:9px;border-left:1px solid var(--line)}
+  .mp-coin::before{content:'';width:7px;height:7px;border-radius:50%;background:#fff3d0;flex:none;
+    box-shadow:0 0 0 2px rgba(255,255,255,.45)}
+  /* 还没登录（个人面板没出现）时，单独挂在左上角，不跟 ≡ 圆钮打架 */
+  #mp-coin.float{
+    position:fixed;left:12px;top:14px;z-index:29;padding:5px 11px;font-size:12px;
+    background:rgba(9,16,24,.84);border:1px solid var(--line);color:var(--accent);
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  }
+  #mp-coin.float::before{background:var(--accent);box-shadow:0 0 8px rgba(244,197,106,.9)}
+  body.wallet-float #rail{top:52px}
+  /* 手机端：交互提示条上的按钮做大，拇指点得中 */
+  body.touch #train-hud{padding:9px 12px;bottom:122px}
+  body.touch #train-hud button{padding:11px 18px;font-size:13px;border-radius:16px}
+  /* 手机端：摄影摊的快门按钮（手机上没有空格键） */
+  #ph-shoot{
+    position:fixed;right:max(18px,env(safe-area-inset-right));bottom:200px;z-index:28;
+    display:none;width:78px;height:78px;border-radius:50%;
+    background:rgba(244,197,106,.92);border:2px solid rgba(255,255,255,.75);
+    color:#241704;font-family:var(--han);font-size:14px;font-weight:800;letter-spacing:.06em;
+    box-shadow:0 6px 20px rgba(0,0,0,.5);touch-action:none;cursor:pointer;
+  }
+  #ph-shoot.on{display:block}
+  #ph-shoot:active{transform:scale(.94)}
   /* ---------- 摄影取景框 ---------- */
   #photo-hud{position:fixed;inset:0;z-index:27;display:none;pointer-events:none}
   #photo-hud.show{display:block}
@@ -906,8 +925,8 @@
     <button class="fpv-btn exit" id="fpv-exit-btn">✕ 退出 (F)</button>
   </div>
 </div>
-<div id="wallet" class="panel"><i class="w-dot"></i><b id="w-coin">60</b><span>雪币</span><em id="w-sub">打工 0</em></div>
 <div id="photo-hud"><div id="ph-frame"><s></s><s></s><s></s><s></s><span id="ph-dot"></span></div><div id="ph-bar"><span id="ph-state">等客人站好…</span><span id="ph-key">空格 拍照 · E 收摊</span></div></div>
+<button id="ph-shoot" data-label="拍照">拍照</button>
 <div id="photo-flash"></div>
 <div id="train-hud"><span id="train-msg">圣诞观光小火车运行中</span><button id="train-btn">上车</button></div>
 <div id="hand-hud"><span id="hand-name"></span><span id="hand-btns"><button id="hand-yes">同意</button><button id="hand-no">拒绝</button></span><button id="hand-act"></button></div>
@@ -14927,10 +14946,23 @@ function joyApply(x,y){
   stickEl.style.transform='translate('+dx+'px,'+dy+'px)';
 }
 function joyReset(){joy.active=false;joy.dx=joy.dy=joy.mag=0;stickEl.style.transform='translate(0,0)';}
+/* 动态摇杆：左半屏按住时，把摇杆挪到手指底下；松手归位 */
+function joyShowAt(x,y){
+  const r=joyEl.getBoundingClientRect().width/2;
+  joy.active=true;joy.cx=x;joy.cy=y;joy.src='screen';
+  joyEl.style.left=(x-r)+'px';
+  joyEl.style.top=(y-r)+'px';
+  joyEl.style.right='auto';joyEl.style.bottom='auto';
+  joyApply(x,y);
+}
+function joyHide(){
+  joyReset();joy.src='';
+  joyEl.style.left='';joyEl.style.top='';joyEl.style.right='';joyEl.style.bottom='';
+}
 joyEl.addEventListener('pointerdown',e=>{
   e.preventDefault();
   const r=joyEl.getBoundingClientRect();
-  joy.active=true;joy.cx=r.x+r.width/2;joy.cy=r.y+r.height/2;
+  joy.active=true;joy.src='pad';joy.cx=r.x+r.width/2;joy.cy=r.y+r.height/2;
   joyApply(e.clientX,e.clientY);
   // 指针已释放时 setPointerCapture 会抛，包一层别把手势打断
   try{joyEl.setPointerCapture&&joyEl.setPointerCapture(e.pointerId);}catch(err){}
@@ -14981,9 +15013,13 @@ const TOUCH_LOOK=.0078, TOUCH_ORBIT=.0062;
 
 renderer.domElement.addEventListener('pointerdown',e=>{
   if(e.pointerType==='mouse')return;   // 鼠标交给 document 的 mousemove
-  // 触屏沙盒：相机旋转由 fp.yaw/pitch 接管，挡住 OrbitControls 的 pointerdown，
-  // 否则两者同时转 → 视角乱跳。缩放仍交给 controls。
-  lookPts.set(e.pointerId,{x:e.clientX,y:e.clientY,resync:false});
+  /* 手机：左半屏 = 移动区（手指按在哪，虚拟摇杆就出现在哪）；
+     右半屏 = 转视角。
+     原来整屏单指都是转头，手机上根本没法走路 —— 左下角那颗固定摇杆
+     又小又靠边，很多人根本不知道有它。左半屏动态摇杆才符合手机习惯。 */
+  const isMove=fp.on&&e.clientX<innerWidth*0.5;
+  lookPts.set(e.pointerId,{x:e.clientX,y:e.clientY,resync:false,kind:isMove?'move':'look'});
+  if(isMove)joyShowAt(e.clientX,e.clientY);
   if(lookPts.size===2){pinchBaseY=lookMidY();
     const ps=Array.from(lookPts.values());
     pinchBaseD=Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y);}
@@ -14996,6 +15032,12 @@ renderer.domElement.addEventListener('pointermove',e=>{
   if(p.resync){p.x=e.clientX;p.y=e.clientY;p.resync=false;return;}
   const dx=e.clientX-p.x,dy=e.clientY-p.y;
   p.x=e.clientX;p.y=e.clientY;
+  if(p.kind==='move'){
+    /* 移动区：位移直接喂给虚拟摇杆 */
+    p.x=e.clientX;p.y=e.clientY;
+    joyApply(e.clientX,e.clientY);
+    return;
+  }
   if(lookPts.size===1){
     const _bd=wheelSys.bump;
     if(_bd&&wheelSys.riding&&wheelSys.kind==='bumper'){
@@ -15032,6 +15074,8 @@ renderer.domElement.addEventListener('pointermove',e=>{
 },{passive:true});
 function lookEnd(e){
   if(!lookPts.has(e.pointerId))return;
+  const _p=lookPts.get(e.pointerId);
+  if(_p&&_p.kind==='move')joyHide();
   lookPts.delete(e.pointerId);
   if(lookPts.size<2)pinchBaseY=null;
   lookPts.forEach(p=>{p.resync=true;});   // 剩下的手指先同步坐标再继续，避免跳一下
@@ -16959,6 +17003,7 @@ function updateAerialHaze(dt,t){
       <button id="mp-me-btn" title="个人信息">
         <span class="mp-avatar" id="mp-me-av">?</span>
         <span>个人</span>
+        <span class="mp-coin" id="mp-coin">0</span>
         <span class="mp-cnt" id="mp-cnt"></span>
       </button>
       <div class="mp-body">
@@ -16968,6 +17013,8 @@ function updateAerialHaze(dt,t){
         </div>
         <div class="mp-field"><b>账号</b><span id="mp-acc-t">-</span></div>
         <div class="mp-field"><b>ID</b><span id="mp-id-t">-</span></div>
+        <div class="mp-field"><b>雪币</b><span id="mp-coin-t">0</span></div>
+        <div class="mp-field"><b>打工</b><span id="mp-earn-t">0</span></div>
         <div class="mp-peers" id="mp-peers"></div>
         <div class="mp-edit">
           <input id="mp-name" type="text" maxlength="16" placeholder="换个名字">
@@ -20630,14 +20677,38 @@ const ECON_JOB_R=3.30;          // 工位触发半径
 const ECON_PHOTO_SPOT=[19.8,25.2];  // 摄影位：客人站的地方
 
 /* ── 钱包 UI ───────────────────────────────────────────── */
-const econCoinEl=document.getElementById('w-coin');
-const econSubEl=document.getElementById('w-sub');
+const econCoinEl=document.getElementById('mp-coin');
+const econCoinTxtEl=document.getElementById('mp-coin-t');
+const econEarnEl=document.getElementById('mp-earn-t');
+const phShootBtn=document.getElementById('ph-shoot');
+const phKeyEl=document.getElementById('ph-key');
+if(phShootBtn)phShootBtn.onclick=()=>econPhotoShoot();
 const photoHudEl=document.getElementById('photo-hud');
 const phStateEl=document.getElementById('ph-state');
 const phFlashEl=document.getElementById('photo-flash');
 function econPaint(){
   if(econCoinEl)econCoinEl.textContent=String(ECON.coin);
-  if(econSubEl)econSubEl.textContent='打工 +'+ECON.earned;
+  if(econCoinTxtEl)econCoinTxtEl.textContent=String(ECON.coin)+' 枚';
+  if(econEarnEl)econEarnEl.textContent='+'+ECON.earned+' 雪币';
+  econMountCoin();
+}
+/* 雪币挂哪：个人面板出现了就塞进「个人」按钮当角标；
+   还没登录（面板隐藏）就单独浮在左上角，跟 ≡ 圆钮错开。 */
+function econMountCoin(){
+  const el=document.getElementById('mp-coin');
+  if(!el)return;
+  const panel=document.getElementById('mp-panel');
+  const btn=document.getElementById('mp-me-btn');
+  const shown=!!(panel&&panel.style.display!=='none');
+  if(shown&&btn){
+    if(el.parentElement!==btn)btn.appendChild(el);
+    el.classList.remove('float');
+    document.body.classList.remove('wallet-float');
+  }else{
+    if(el.parentElement!==document.body)document.body.appendChild(el);
+    el.classList.add('float');
+    document.body.classList.add('wallet-float');
+  }
 }
 function econPay(n){ECON.coin-=n;ECON.spent+=n;econPaint();}
 
@@ -20965,18 +21036,29 @@ function econFreeNpc(n){
   n._oldPath=null;n.job=null;n.wait=R(.2,1.4);
 }
 
-/* ── 打工 ①：售票处卖票 ────────────────────────────────── */
-function econSellTicket(){
-  if(ECON.jobCd>0)return;
-  const J=ECON_JOBS[0];
-  if(ECON.ticketBuyer){_recMsg('客人正在赶来，稍等一下',1800);return;}
-  const n=econPickNpc(J.bx,J.bz,7,30);
-  if(!n){_recMsg('附近没有小熊来买票，过一会儿再来',2400);return;}
-  econSendNpc(n,J.gx,J.gz+.4);
-  n.job={type:'ticket',x:J.gx,z:J.gz+.4,t:0};
-  ECON.ticketBuyer=n;
-  _recMsg('客人朝售票处走来了…',1800);
+/* ── 上岗：站到工位按 E 开始干活，客人自己会过来 ────────── */
+const ECON_SHIFT={id:null,t:0,next:0};
+function econShiftId(){
+  if(photoSys.on)return 'photo';
+  return ECON_SHIFT.id;
+}
+function econJobStart(id){
+  const J=ECON_JOBS.find(j=>j.id===id);
+  if(!J)return;
+  if(id==='photo'){econPhotoStart();return;}
+  ECON_SHIFT.id=id;ECON_SHIFT.t=0;ECON_SHIFT.next=.6;
+  econLastPrompt='';
+  _recMsg(J.name+' · 开始上岗，客人会自己过来找你',3000);
   sfx.blip(760,.10,.07);
+}
+function econJobStop(){
+  if(photoSys.on){econPhotoStop();econLastPrompt='';return;}
+  if(!ECON_SHIFT.id)return;
+  ECON_SHIFT.id=null;
+  if(ECON.ticketBuyer){econFreeNpc(ECON.ticketBuyer);ECON.ticketBuyer=null;}
+  econLastPrompt='';
+  _recMsg('已下班',1600);
+  hudHide();
 }
 
 /* ── 打工 ②：摄影摊 ───────────────────────────────────── */
@@ -20986,6 +21068,8 @@ function econPhotoStart(){
   if(!fp.on)enterWalk();
   photoSys.on=true;photoSys.npc=null;photoSys.cool=0;photoSys.wait=0;photoSys.aimed=false;
   if(photoHudEl)photoHudEl.classList.add('show');
+  if(phShootBtn)phShootBtn.classList.add('on');
+  if(phKeyEl)phKeyEl.textContent=IS_TOUCH_DEV?'点右下角快门拍照':'空格 拍照 · E 收摊';
   if(phStateEl)phStateEl.textContent='等客人走过来…';
   _recMsg('摄影摊开张：等小熊站到位置上，把视线对准他，按 空格 拍照',3600);
   sfx.blip(880,.12,.07);
@@ -20995,6 +21079,7 @@ function econPhotoStop(){
   if(photoSys.npc)econFreeNpc(photoSys.npc);
   photoSys.on=false;photoSys.npc=null;photoSys.aimed=false;
   if(photoHudEl)photoHudEl.classList.remove('show');
+  if(phShootBtn)phShootBtn.classList.remove('on');
   hudHide();
 }
 function econPhotoShoot(){
@@ -21055,6 +21140,8 @@ function econBuildWrapBox(){
 let econLastPrompt='',econLastMsg='';
 function econUpdate(dt){
   ECON.jobCd=Math.max(0,ECON.jobCd-dt);
+  /* 「个人」面板是联机模块后建的，雪币角标要定期重新挂一次 */
+  if(((ECON._tick=(ECON._tick|0)+1)%30)===0)econPaint();
   /* 飘字 */
   for(let i=econFloats.length-1;i>=0;i--){
     const f=econFloats[i];f.life+=dt;
@@ -21081,6 +21168,29 @@ function econUpdate(dt){
     p.ring.material.opacity=(p.isJob?.46:.30)+.13*Math.sin(t*2.3+p.x)*(night?1:.42);
     p.beam.material.opacity=(.055+.025*Math.sin(t*1.6+p.z))*(night?1:.4);
     if(p.pool)p.pool.material.opacity=(.05+.02*Math.sin(t*2.0+p.x))*k;
+  }
+  /* 上岗中：客人自己过来 */
+  const _shift=econShiftId();
+  if(_shift&&fp.on){
+    const J=ECON_JOBS.find(j=>j.id===_shift);
+    if(J&&Math.hypot(fp.x-J.gx,fp.z-J.gz)>9){
+      econJobStop();
+    }else if(J){
+      ECON_SHIFT.t+=dt;
+      if(_shift==='ticket'&&!ECON.ticketBuyer&&ECON_SHIFT.t>ECON_SHIFT.next){
+        const n=econPickNpc(J.bx,J.bz,7,30);
+        if(n){
+          econSendNpc(n,J.gx,J.gz+.4);
+          n.job={type:'ticket',x:J.gx,z:J.gz+.4,t:0};
+          ECON.ticketBuyer=n;
+        }
+        ECON_SHIFT.next=ECON_SHIFT.t+R(3.0,5.4);
+      }else if(_shift==='wrap'&&ECON_SHIFT.t>ECON_SHIFT.next){
+        econGain(12,'包好一份圣诞礼物');
+        if(econWrapBox.g){econWrapBox.on=true;econWrapBox.t=0;}
+        ECON_SHIFT.next=ECON_SHIFT.t+R(2.4,4.0);
+      }
+    }
   }
   /* 买票的客人走到窗口就成交 */
   if(ECON.ticketBuyer){
@@ -21136,17 +21246,27 @@ function econUpdate(dt){
   /* 提示：工位优先，其次上车光点 */
   const job=econNearestJob();
   const pad=econNearestPad();
+  const shift=econShiftId();
+  const TOUCH=IS_TOUCH_DEV;
   let key='',msg='',btn='',fn=null;
-  if(job){
+  if(shift){
+    const J=ECON_JOBS.find(j=>j.id===shift);
+    key='shift:'+shift;
+    msg=J.name+' · 上岗中'+(shift==='photo'
+      ?(TOUCH?' · 客人站好了就点右下角快门':' · 客人站好了就按 空格 拍照')
+      :' · 客人正在赶来');
+    btn=TOUCH?'下班':'下班 (E)';
+    fn=()=>econJobStop();
+  }else if(job){
     key='job:'+job.id;
-    msg=job.name+' · '+job.tip+'（'+job.pay+' 雪币）';
-    btn='开工 (E)';
+    msg=job.name+' · '+job.tip+'（'+job.pay+' 雪币）'+(TOUCH?' · 点按钮上岗':' · 按 E 上岗');
+    btn=TOUCH?'上岗':'上岗 (E)';
     fn=()=>econJobDo(job.id);
   }else if(pad){
     key='pad:'+pad.id;
     msg=pad.id==='train'
       ?'皇家冬夜加长特快 · 票价 10 雪币 · 在光点上等车，小火车进站后按 E 上车'
-      :pad.name+' · 票价 '+pad.price+' 雪币 · 按 E 上车';
+      :pad.name+' · 票价 '+pad.price+' 雪币 · '+(TOUCH?'点按钮上车':'按 E 上车');
     btn='上车 ('+pad.price+')';
     fn=()=>econBoard(pad.id);
   }
@@ -21164,11 +21284,7 @@ function econSetPrompt(key,msg,btn,fn){
   if(key){hudShow(msg,btn,fn);}
   else if(trainMsgEl.textContent===prevMsg){hudHide();}
 }
-function econJobDo(id){
-  if(id==='ticket')econSellTicket();
-  else if(id==='photo')econPhotoStart();
-  else if(id==='wrap')econWrapGift();
-}
+function econJobDo(id){econJobStart(id);}
 
 /* ── 经济系统：点设施时的引导（没站到光点就告诉你去哪儿）── */
 function econClickRide(kind){
@@ -21192,6 +21308,14 @@ function econClickRide(kind){
 /* ── 经济系统：E 键统一入口（上车点 / 工位）── */
 function econInteract(){
   if(!fp.on)return false;
+  const shift=econShiftId();
+  if(shift){
+    /* 站在别的工位旁边 → 直接换班；否则按 E 下班 */
+    const jb=econNearestJob();
+    if(jb&&jb.id!==shift){econJobStop();econJobStart(jb.id);return true;}
+    econJobStop();
+    return true;
+  }
   const job=econNearestJob();
   if(job){econJobDo(job.id);return true;}
   const pad=econNearestPad();
