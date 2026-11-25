@@ -20089,10 +20089,11 @@ addEventListener('keydown',e=>{
     if(heliSys.riding){heliSys.fast=true;return;}
     if(balloonSys.riding){stopBalloonRide();return;}
     if(photoSys.on){
-      /* 走到别的工位就直接去那边干活；站在摄影摊前按 E 才是收摊 */
+      /* 走到别的工位就直接去那边干活；站在摄影摊前按 E 才是收摊。
+         下班要满一分钟，不满会被拒。 */
       const _j=econNearestJob();
-      if(_j&&_j.id!=='photo'){econPhotoStop();}
-      else{econPhotoStop();return;}
+      if(_j&&_j.id!=='photo'){if(!econJobStop())return;}
+      else{econJobStop();return;}
     }
     if(wheelSys.riding){toggleRideWheel(null);return;}
     /* 设施必须站到固定的上车光点才让上；打工位在光点里按 E 开工 */
@@ -21033,27 +21034,46 @@ function econFreeNpc(n){
 
 /* ── 上岗：站到工位按 E 开始干活，客人自己会过来 ────────── */
 const ECON_SHIFT={id:null,t:0,next:0};
+/* 最短在岗时长：一分钟。不满一分钟不让下岗 —— 免得点了两下就下班，
+   打工变成点一下按钮拿一次钱。 */
+const ECON_SHIFT_MIN=60;
+let econShiftStart=0;
 function econShiftId(){
   if(photoSys.on)return 'photo';
   return ECON_SHIFT.id;
 }
+function econShiftLeft(){return ECON_SHIFT_MIN-(performance.now()-econShiftStart)/1000;}
 function econJobStart(id){
   const J=ECON_JOBS.find(j=>j.id===id);
   if(!J)return;
   if(id==='photo'){econPhotoStart();return;}
   ECON_SHIFT.id=id;ECON_SHIFT.t=0;ECON_SHIFT.next=.6;
+  econShiftStart=performance.now();
   econLastPrompt='';
-  _recMsg(J.name+' · 开始上岗，客人会自己过来找你',3000);
+  _recMsg(J.name+' · 开始上岗，客人会自己过来找你（站满 1 分钟才能下岗）',3400);
   sfx.blip(760,.10,.07);
 }
 function econJobStop(){
-  if(photoSys.on){econPhotoStop();econLastPrompt='';return;}
-  if(!ECON_SHIFT.id)return;
+  const shift=econShiftId();
+  if(!shift)return false;
+  const left=econShiftLeft();
+  if(left>0){
+    /* 没到时间不让下：提示别连着刷屏 */
+    const now=performance.now();
+    if(!ECON._stopCd||now-ECON._stopCd>1500){
+      ECON._stopCd=now;
+      _recMsg('还在上班，再站 '+Math.ceil(left)+' 秒才能下岗',2200);
+      sfx.blip(420,.12,.07);
+    }
+    return false;
+  }
+  if(photoSys.on){econPhotoStop();econLastPrompt='';return true;}
   ECON_SHIFT.id=null;
   if(ECON.ticketBuyer){econFreeNpc(ECON.ticketBuyer);ECON.ticketBuyer=null;}
   econLastPrompt='';
   _recMsg('已下班',1600);
   hudHide();
+  return true;
 }
 
 /* ── 打工 ②：摄影摊 ───────────────────────────────────── */
@@ -21062,6 +21082,7 @@ function econPhotoStart(){
   if(photoSys.on){econPhotoStop();return;}
   if(!fp.on)enterWalk();
   photoSys.on=true;photoSys.npc=null;photoSys.cool=0;photoSys.wait=0;photoSys.aimed=false;
+  econShiftStart=performance.now();
   if(photoHudEl)photoHudEl.classList.add('show');
   if(phShootBtn)phShootBtn.classList.add('on');
   if(phKeyEl)phKeyEl.textContent=IS_TOUCH_DEV?'点右下角快门拍照':'空格 拍照 · E 收摊';
@@ -21246,11 +21267,12 @@ function econUpdate(dt){
   let key='',msg='',btn='',fn=null;
   if(shift){
     const J=ECON_JOBS.find(j=>j.id===shift);
+    const left=Math.max(0,Math.ceil(econShiftLeft()));
     key='shift:'+shift;
     msg=J.name+' · 上岗中'+(shift==='photo'
       ?(TOUCH?' · 客人站好了就点右下角快门':' · 客人站好了就按 空格 拍照')
-      :' · 客人正在赶来');
-    btn=TOUCH?'下班':'下班 (E)';
+      :' · 客人正在赶来')+(left>0?' · 还差 '+left+' 秒才能下岗':' · 可以下岗了');
+    btn=left>0?'上班中':(TOUCH?'下班':'下班 (E)');
     fn=()=>econJobStop();
   }else if(job){
     key='job:'+job.id;
