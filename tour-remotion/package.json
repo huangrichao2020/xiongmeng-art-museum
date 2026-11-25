@@ -1,0 +1,17 @@
+{
+  "name": "xm-tour-remotion",
+  "version": "1.0.0",
+  "private": true,
+  "description": "熊萌艺术馆 · 「穿越记忆」宣传片 · Remotion 编排",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render XMTour out/xm-tour.mp4 --codec=h264 --crf=20 --pixel-format=yuv420p --concurrency=4",
+    "still": "remotion still XMTour out/poster.png --frame=60"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.547",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "remotion": "^4.0.547"
+  }
+}

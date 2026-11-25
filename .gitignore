@@ -15,3 +15,8 @@ assets2d/A_*.png
 
 # XM Studio 本地依赖（playwright-core 14MB，装一次即可）
 tools/xm-studio/node_modules/
+
+# Remotion 宣传片工程（依赖和中间产物不入库）
+tour-remotion/node_modules/
+tour-remotion/public/*.mp4
+tour-remotion/public/.concat-list.txt

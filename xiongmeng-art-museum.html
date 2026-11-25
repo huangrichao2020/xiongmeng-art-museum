@@ -20259,6 +20259,11 @@ function updateBumperDrive(dt){
 
 function updateWheelRide(dt){
   if(wheelSys.riding&&fp.on){
+    /* 外部相机接管钩子（录宣传片用）：
+       项目自己的乘坐视角会每帧把相机拉回「座位正前方 8 米」，
+       录宣传片时要自己控位置和俯仰（俯瞰城市、不死盯地面），
+       所以给外部一个完全接管的入口。返回 true = 相机已被接管，项目不再动它。 */
+    if(window.__XM_CAM_HOOK&&window.__XM_CAM_HOOK(wheelSys))return;
     const wp=new THREE.Vector3();
     if(wheelSys.kind==='wheel'&&wheelSys.cab){
       wheelSys.cab.getWorldPosition(wp);
@@ -21558,6 +21563,45 @@ window.ECON=ECON;window.ECON_RIDES=ECON_RIDES;window.ECON_JOBS=ECON_JOBS;
 window.__fp=fp;
 window.photoSys=photoSys;window.econBoard=econBoard;window.econInteract=econInteract;
 window.econNearestPad=econNearestPad;window.econNearestJob=econNearestJob;
+window.XM_TOUR={
+  /* 外部导览拍摄接口：这些对象都在模块作用域里，页面外拿不到，
+     这里开一个只读 + 少量控制的出口，供录宣传片时驱动相机 / 时间 / 设施。
+     线上玩家完全用不到，不影响任何玩法。 */
+  THREE,camera,controls,renderer,scene,sfx,amusement,wheelSys,trainSys,fp,director,state,intro,
+  setHour:(h)=>{const el=document.getElementById('hour');if(el){el.value=String(h);el.dispatchEvent(new Event('input',{bubbles:true}));}},
+  dpr:(v)=>{try{applyDpr(v);}catch(e){}},
+  quality:(on)=>{try{applyQualityMode(!!on);}catch(e){}},
+  /* 交出相机控制权（导演机位会每帧把相机拉回自己的位置，外部轨迹必须先关掉它） */
+  stopDirector(){director.active=false;director.shot=null;director.init=false;
+    try{if(intro){intro.active=false;intro.t=intro.dur;}}catch(e){}
+    try{if(typeof camTween!=='undefined')camTween=null;}catch(e){}
+    try{if(fp)fp.on=false;}catch(e){}
+  },
+  /* 第一视角乘摩天轮 / 云霄飞车：进入载人状态后相机由乘坐逻辑接管 */
+  rideWheel(mode){try{
+    /* 录制专用：默认登最低的舱，要从地面爬 30 秒才到顶。
+       这里改登当前最高的舱，一进去就是 30m 高空俯瞰，支架也落在脚下。
+       mode='ascend'：登西半圈那只 —— 轮子 z 角在减小，西半圈是上升段，
+       一路升到顶，全程俯瞰城市，是宣传片最想要的那条上升轨迹。 */
+    if(amusement.cabs&&amusement.cabs.length){
+      const wp=new THREE.Vector3();let best=amusement.cabs[0];
+      if(mode==='ascend'){
+        let minX=1e9;
+        for(const c of amusement.cabs){c.getWorldPosition(wp);if(wp.x<minX){minX=wp.x;best=c;}}
+      }else{
+        let maxY=-1e9;
+        for(const c of amusement.cabs){c.getWorldPosition(wp);if(wp.y>maxY){maxY=wp.y;best=c;}}
+      }
+      toggleRideWheel(best);
+    } else toggleRideWheel();
+    return{ok:true};
+  }catch(e){return{ok:false,error:String(e)};}},
+  rideCoaster(){try{toggleRideFacility({kind:'coaster',label:'云霄飞车'});return{ok:true};}catch(e){return{ok:false,error:String(e)};}},
+  stopRide(){try{stopFacilityRide();return{ok:true};}catch(e){return{ok:false,error:String(e)};}},
+  riding:()=>({kind:wheelSys.kind,riding:wheelSys.riding}),
+  /* 让角色站定（避免外部录制时人自己走） */
+  freezePlayer(){fp.locked=true;fp.vx=0;fp.vz=0;}
+};
 
 /* 全部建完 → 撤 boot 遮罩（一次成型，不给用户看半成品场景） */
 requestAnimationFrame(()=>{

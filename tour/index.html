@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>熊萌艺术馆 · 穿越记忆</title>
+<!--CHAPTERS--><script>window.__CHAPTERS=[{"name":"开场 · 艺术馆正门","time":0},{"name":"玻璃幕墙 · 暖金灯带","time":9.87},{"name":"八角冰雕喷泉","time":18.63},{"name":"圣诞市集","time":30.47},{"name":"皇家星耀巨树","time":38.37},{"name":"摩天轮 · 巨轮升起","time":46.2},{"name":"摩天轮 · 第一视角","time":50.03},{"name":"云霄飞车 · 第一视角","time":63.93},{"name":"国家体育场「鸟巢」","time":76.9},{"name":"哥特大教堂","time":85.87},{"name":"全景收尾","time":94.6}];</script><script>window.__CHAPTERS=[{"name":"开场 · 艺术馆正门","time":0},{"name":"玻璃幕墙 · 暖金灯带","time":9.87},{"name":"八角冰雕喷泉","time":18.63},{"name":"圣诞市集","time":30.47},{"name":"皇家星耀巨树","time":38.37},{"name":"摩天轮 · 巨轮升起","time":46.2},{"name":"摩天轮 · 第一视角","time":50.03},{"name":"云霄飞车 · 第一视角","time":63.93},{"name":"国家体育场「鸟巢」","time":76.9},{"name":"哥特大教堂","time":85.87},{"name":"全景收尾","time":94.6}];</script>
+<style>
+:root{
+  --bg:#070b12;
+  --card:#111927;
+  --line:#22304a;
+  --fg:#eaf0fa;
+  --dim:#93a3bd;
+  --accent:#ffd089;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--fg)}
+body{
+  font:15px/1.65 "PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  padding:0 0 40px;
+}
+.wrap{max-width:900px;margin:0 auto;padding:0 14px}
+
+/* 顶部 */
+header{padding:22px 0 14px}
+h1{margin:0;font-size:21px;font-weight:700;letter-spacing:.5px}
+.sub{margin:5px 0 0;color:var(--dim);font-size:13px}
+
+/* 播放器 */
+.stage{
+  position:relative;width:100%;background:#000;border-radius:14px;overflow:hidden;
+  box-shadow:0 10px 40px rgba(0,0,0,.55);
+}
+video{width:100%;display:block;background:#000}
+.sticky{position:sticky;top:0;z-index:20;background:var(--bg);padding-top:8px}
+
+/* 控制条 */
+.ctrl{
+  display:flex;align-items:center;gap:10px;padding:10px 2px 0;
+}
+.btn{
+  flex:0 0 auto;width:44px;height:44px;border-radius:50%;
+  border:1px solid var(--line);background:var(--card);color:var(--fg);
+  font-size:17px;display:flex;align-items:center;justify-content:center;cursor:pointer;
+}
+.btn:active{background:#1b2740}
+.seek{flex:1;height:34px;position:relative;display:flex;align-items:center;cursor:pointer;touch-action:none}
+.track{position:relative;width:100%;height:6px;background:#1c2740;border-radius:3px;overflow:hidden}
+.fill{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:3px}
+.knob{
+  position:absolute;top:50%;width:15px;height:15px;border-radius:50%;background:#fff;
+  transform:translate(-50%,-50%);left:0;box-shadow:0 2px 8px rgba(0,0,0,.5);
+}
+.time{font-variant-numeric:tabular-nums;font-size:13px;color:var(--dim);flex:0 0 auto;min-width:92px;text-align:right}
+
+/* 章节 */
+h2{margin:26px 0 10px;font-size:15px;color:var(--dim);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{
+  padding:8px 13px;border-radius:999px;border:1px solid var(--line);
+  background:var(--card);color:var(--fg);font-size:13px;cursor:pointer;
+}
+.chip.on{border-color:var(--accent);color:var(--accent)}
+
+/* 说明 */
+.note{
+  margin-top:22px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;
+  background:var(--card);color:var(--dim);font-size:13.5px;
+}
+.note b{color:var(--fg)}
+.dl{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.dl a{
+  padding:9px 14px;border:1px solid var(--line);border-radius:10px;
+  background:#162034;color:var(--fg);text-decoration:none;font-size:13.5px;
+}
+.dl a:active{background:#1e2b44}
+footer{margin-top:26px;color:#63718a;font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="sticky">
+    <header>
+      <h1>熊萌艺术馆 · 穿越记忆</h1>
+      <p class="sub">圣诞冰雪特展 · 夜场 · 第一视角宣传片</p>
+    </header>
+    <div class="stage">
+      <video id="v" playsinline controls preload="metadata" poster="./poster.jpg"></video>
+    </div>
+    <div class="ctrl">
+      <button class="btn" id="play" aria-label="播放/暂停">▶</button>
+      <div class="seek" id="seek"><div class="track"><div class="fill" id="fill"></div><div class="knob" id="knob"></div></div></div>
+      <div class="time" id="tm">00:00 / 00:00</div>
+    </div>
+  </div>
+
+  <h2>章节</h2>
+  <div class="chips" id="chips"></div>
+
+  <div class="note">
+    <b>配音说明</b>：片子本身没有人声配音，只铺了背景音乐和动效音效。你要加旁白的话，直接在剪映里导入下面这份 SRT 字幕，然后自己配音压上去就行 —— 建议人声音量压到 <b>-12dB</b> 左右，背景音乐再往下压 6dB，别互相盖。
+    <div class="dl">
+      <a href="./xm-tour.srt" download>下载字幕 SRT</a>
+      <a href="./xm-tour.txt" download>下载纯文字稿</a>
+      <a href="./xm-tour.mp4" download>下载视频 MP4</a>
+    </div>
+  </div>
+
+  <footer>熊萌艺术馆 · 圣诞冰雪特展</footer>
+</div>
+
+<script>
+/* 章节表由 build_site.js 注入 */
+const CHAPTERS = window.__CHAPTERS || [];
+const v = document.getElementById('v');
+const fill = document.getElementById('fill');
+const knob = document.getElementById('knob');
+const tm = document.getElementById('tm');
+const playBtn = document.getElementById('play');
+const seek = document.getElementById('seek');
+const chipsBox = document.getElementById('chips');
+
+function fmt(t){
+  if(!isFinite(t)) t=0;
+  const m=Math.floor(t/60), s=Math.floor(t%60);
+  return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+function upd(){
+  const d=v.duration||0;
+  const p=d? v.currentTime/d : 0;
+  fill.style.width=(p*100)+'%';
+  knob.style.left=(p*100)+'%';
+  tm.textContent=fmt(v.currentTime)+' / '+fmt(d);
+  /* 高亮当前章节 */
+  let idx=-1;
+  for(let i=0;i<CHAPTERS.length;i++){ if(v.currentTime>=CHAPTERS[i].time) idx=i; }
+  chipsBox.querySelectorAll('.chip').forEach((c,i)=>c.classList.toggle('on',i===idx));
+}
+v.addEventListener('timeupdate',upd);
+v.addEventListener('loadedmetadata',upd);
+v.addEventListener('play',()=>playBtn.textContent='❚❚');
+v.addEventListener('pause',()=>playBtn.textContent='▶');
+playBtn.onclick=()=>{ v.paused? v.play(): v.pause(); };
+
+/* 拖动进度：触屏 + 鼠标统一走 pointer 事件 */
+let dragging=false;
+function seekTo(ev){
+  const r=seek.getBoundingClientRect();
+  const x=(ev.clientX??0)-r.left;
+  let p=Math.max(0,Math.min(1,x/r.width));
+  if(v.duration) v.currentTime=p*v.duration;
+}
+seek.addEventListener('pointerdown',e=>{dragging=true;seek.setPointerCapture(e.pointerId);seekTo(e);});
+seek.addEventListener('pointermove',e=>{if(dragging)seekTo(e);});
+seek.addEventListener('pointerup',e=>{dragging=false;});
+seek.addEventListener('pointercancel',()=>{dragging=false;});
+
+/* 章节 chips */
+CHAPTERS.forEach(c=>{
+  const b=document.createElement('button');
+  b.className='chip';
+  b.textContent=c.name;
+  b.onclick=()=>{ v.currentTime=c.time; v.play(); };
+  chipsBox.appendChild(b);
+});
+upd();
+</script>
+</body>
+</html>
