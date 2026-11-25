@@ -14940,14 +14940,22 @@ function exitWalk(){
    再额外挂一套 touch 会让 touchmove 和 pointermove 轮流写同一个值，摇杆会自己抖回中间。 */
 const joy={active:false,cx:0,cy:0,dx:0,dy:0,mag:0};
 const joyEl=document.getElementById('joystick'),stickEl=document.getElementById('stick');
+/* 摇杆手感：
+   行程 26px（内圈直径就是 62，正好卡在虚线圈里）—— 原来 33px 偏钝；
+   输出走平方根曲线：手指推 8px 就给到一半速度，推到底才满舵。
+   之前是线性输出，推 8px 只有 0.24 速度，人几乎不动，就感觉"要用力滑"。 */
+const JOY_R=26;
 function joyApply(x,y){
-  /* 有效行程比外圈小得多：手指推一点点就能到满舵（原来要推 40px） */
-  const R=joyEl.getBoundingClientRect().width/2-34;
+  const R=JOY_R;
   let dx=x-joy.cx,dy=y-joy.cy;
   const len=Math.hypot(dx,dy);
   if(len>R){dx=dx/len*R;dy=dy/len*R;}
-  joy.dx=dx/R;joy.dy=dy/R;joy.mag=Math.min(1,len/R);
-  stickEl.style.transform='translate('+dx+'px,'+dy+'px)';
+  const raw=Math.min(1,len/R);
+  if(raw<.06){joy.dx=joy.dy=joy.mag=0;stickEl.style.transform='translate(0,0)';return;}
+  const k=Math.sqrt(raw)/raw;      // 曲线系数：小位移放大
+  joy.dx=dx/R*k;joy.dy=dy/R*k;
+  joy.mag=Math.min(1,Math.sqrt(raw));
+  stickEl.style.transform='translate('+(dx*k)+'px,'+(dy*k)+'px)';
 }
 function joyReset(){joy.active=false;joy.dx=joy.dy=joy.mag=0;stickEl.style.transform='translate(0,0)';}
 /* 动态摇杆：左半屏按住时，把摇杆挪到手指底下；松手归位 */
@@ -14978,7 +14986,13 @@ joyEl.addEventListener('pointermove',e=>{
 });
 joyEl.addEventListener('pointerup',joyReset);
 joyEl.addEventListener('pointercancel',joyReset);
-joyEl.addEventListener('pointerleave',joyReset);
+/* 以前还挂 pointerleave → joyReset：手指只要滑出摇杆圆圈就被清零，
+   正在推的时候突然停住，用户只能重新按住，越推越烦。
+   现在滑出圆圈照样能继续推（下面还有 window 级兜底），松手才停。 */
+/* 兜底：capture 丢失时（iOS 某些情况）滑出元素也要跟手 */
+addEventListener('pointermove',e=>{
+  if(joy.active&&joy.src==='pad')joyApply(e.clientX,e.clientY);
+},{passive:true});
 
 /* 触屏手势：每根手指按 pointerId 单独记账
    —— 摇杆那根手指按在 #joystick 上，不进画面的手势表，
