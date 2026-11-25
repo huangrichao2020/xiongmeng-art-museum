@@ -891,6 +891,7 @@
 
 <script type="module">
 import * as THREE from 'three';
+window.__xmT={start:performance.now()};
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -913,9 +914,25 @@ const HK='"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif';
 
 const sharedStyle={uWindTime:{value:0}};
 const matCache=new Map();
+/* 材质缓存的 key 不能直接 JSON.stringify(o)：
+   o 里经常带贴图，而 three 的 Texture 有 toJSON()，
+   序列化它会把 canvas 编码成 PNG data URL —— 实测一次 80ms，
+   而且 M() 每调用一次就要重来一遍。
+   贴图改用 uuid 入 key，其余字段照旧。 */
+function matKey(o){
+  const parts=[];
+  for(const k in o){
+    const v=o[k];
+    if(v&&v.isTexture)parts.push(k+'=T:'+v.uuid);
+    else if(v&&typeof v==='object')parts.push(k+'=O:'+JSON.stringify(v));
+    else parts.push(k+'='+v);
+  }
+  parts.sort();
+  return parts.join(',');
+}
 function M(color,o={}){
   if(color===undefined||color===null)color=0xffffff;
-  const k=color+'|'+JSON.stringify(o);
+  const k=color+'|'+matKey(o);
   if(matCache.has(k))return matCache.get(k);
   const m=new THREE.MeshStandardMaterial(Object.assign({color,flatShading:false,roughness:.76,metalness:.06,envMapIntensity:.85},o));
   matCache.set(k,m);return m;
@@ -965,7 +982,33 @@ function signPanel(parent,w,h,tex,x,y,z,em){
 /* ── 静态合批：把一片装饰里成百上千个小零件按材质合并成少数几个 mesh ──
    新增摊位/店铺/围栏后几何体涨到 7000+，draw call 直接压死帧；
    同一材质合并成一个 mesh，视觉完全不变，调用量能降一个量级。 */
-function mergeGeos(list){
+function mergeGeos(list,indexed){
+  /* 全部带索引就直接拼索引（顶点数不变）。
+     原来一律 toNonIndexed 展开，顶点数直接翻倍 —— 合批一次要复制几百 MB
+     顶点数据，开场磨 6 秒多就是这个原因。 */
+  if(indexed){
+    let total=0,ic=0;
+    for(const g of list){total+=g.attributes.position.count;ic+=g.index.count;}
+    const pos=new Float32Array(total*3),nor=new Float32Array(total*3),uv=new Float32Array(total*2);
+    const idx=new Uint32Array(ic);
+    let o=0,io=0;
+    for(const g of list){
+      const p=g.attributes.position;
+      pos.set(p.array,o*3);
+      if(g.attributes.normal)nor.set(g.attributes.normal.array,o*3);
+      if(g.attributes.uv)uv.set(g.attributes.uv.array,o*2);
+      const gi=g.index.array;
+      for(let i=0;i<gi.length;i++)idx[io+i]=gi[i]+o;
+      io+=gi.length;o+=p.count;
+    }
+    const out=new THREE.BufferGeometry();
+    out.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    out.setAttribute('normal',new THREE.BufferAttribute(nor,3));
+    out.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+    out.setIndex(new THREE.BufferAttribute(idx,1));
+    out.computeBoundingSphere();
+    return out;
+  }
   let total=0;
   for(const g of list)total+=g.attributes.position.count;
   const pos=new Float32Array(total*3),nor=new Float32Array(total*3),uv=new Float32Array(total*2);
@@ -996,24 +1039,38 @@ function mergeStatic(root,skip){
       if(ch.userData&&ch.userData.keep)continue;   // 标记 keep 的整棵子树不参与合批
       if(ch.isMesh){
         if(Array.isArray(ch.material))continue;       // 多材质网格没法合成一个，保留原样
-        let g=ch.geometry.clone();
-        if(g.index)g=g.toNonIndexed();
-        g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv,ch.matrixWorld));
         const key=ch.material.uuid+'|'+(ch.castShadow?1:0)+'|'+ch.renderOrder;
-        if(!buckets.has(key))buckets.set(key,{mat:ch.material,cast:ch.castShadow,ro:ch.renderOrder,list:[]});
-        buckets.get(key).list.push(g);
+        if(!buckets.has(key))buckets.set(key,{mat:ch.material,cast:ch.castShadow,ro:ch.renderOrder,list:[],idx:0,n:0});
+        const b=buckets.get(key);
+        b.list.push(ch);
+        if(ch.geometry.index)b.idx++;
+        b.n++;
         victims.push(ch);
       }else walk(ch);
     }
   };
   walk(root);
   for(const v of victims){ if(v.parent)v.parent.remove(v); v.geometry.dispose(); }
+  const tmp=new THREE.Matrix4();
   for(const b of buckets.values()){
-    const mesh=new THREE.Mesh(mergeGeos(b.list),b.mat);
+    /* 一个桶里全是有索引的走"拼索引"（省一半顶点数据），
+       混着非索引的才统一展开（宁可多一倍，也不能画错三角形） */
+    const allIdx=b.idx===b.n;
+    const prepped=[];
+    for(const ch of b.list){
+      const g0=ch.geometry;
+      let g;
+      if(allIdx)g=g0.clone();
+      else if(g0.index)g=g0.toNonIndexed();
+      else g=g0.clone();
+      g.applyMatrix4(tmp.multiplyMatrices(inv,ch.matrixWorld));
+      prepped.push(g);
+    }
+    const mesh=new THREE.Mesh(mergeGeos(prepped,allIdx),b.mat);
     mesh.castShadow=b.cast;mesh.receiveShadow=true;mesh.renderOrder=b.ro;
     mesh.userData.tag=root.userData.tag;
     root.add(mesh);
-    for(const g of b.list)g.dispose();
+    for(const g of prepped)g.dispose();
   }
 }
 
@@ -1041,7 +1098,9 @@ function _mergeSnap(){
 function _autoMergeTick(){
   if(_autoMerge.phase===0){ _autoMerge.snap=_mergeSnap(); _autoMerge.phase=1; _autoMerge.t0=performance.now(); return; }
   if(_autoMerge.phase===1){
-    if(performance.now()-_autoMerge.t0<1600)return;
+    /* 检测窗口：原来 1600ms 白等（动画都是连续动的，1 秒内矩阵必变）。
+       窗口越长，开场那段"没合批、帧率最差"的空档就越长 —— 用户体感就是卡。 */
+    if(performance.now()-_autoMerge.t0<900)return;
     _autoMerge.phase=2;
     const now=_mergeSnap();
     const byId=new Map();
@@ -1058,8 +1117,19 @@ function _autoMergeTick(){
   if(_autoMerge.phase===2){
     const q=_autoMerge.queue;
     if(q&&q.length){
-      const g=q.shift();
-      try{ mergeStatic(g); }catch(e){}
+      /* 一帧只合一组是个坑：场景顶层有 178 组，合批本身只要 124ms，
+         但一帧一组 = 178 帧 = 6 秒多的连续卡顿（实测帧率全程 29~31，
+         迟迟上不去）。改成按时间预算合：一帧最多花 12ms，
+         178 组十帧之内合完，卡顿从 6 秒压到 0.3 秒。 */
+      const _t0=performance.now();
+      while(q.length && performance.now()-_t0<12){
+        const g=q.shift();
+        const _g0=performance.now();
+        try{ mergeStatic(g); }catch(e){}
+        (_autoMerge.log||(_autoMerge.log=[])).push({
+          tag:(g.userData&&g.userData.tag)||g.type||'?',kids:g.children.length,
+          ms:Math.round(performance.now()-_g0)});
+      }
       return;
     }
     _autoMerge.phase=3;
@@ -14081,6 +14151,7 @@ cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.toFixed(2),z:+cam
   setRain:(v)=>{setWeather(v>=.5?'rain':'snow');return +rainLevel.toFixed(3);},
   weather:()=>state.weather,
   /* 调试：点灯池开关（A/B 看夜景观感有没有被牺牲） */
+  mergeLog:()=>({log:_autoMerge.log||[],phase:_autoMerge.phase}),
   lp:(on)=>{
     if(on===false){
       LP.slots.forEach(s=>{s.visible=false;s.intensity=0;});
@@ -14671,7 +14742,7 @@ const outerCrowd=(()=>{
   const pEarGeo=(()=>{
     const g1=new THREE.SphereGeometry(.07,6,5);g1.translate(-.14,.15,0);
     const g2=new THREE.SphereGeometry(.07,6,5);g2.translate(.14,.15,0);
-    return mergeGeos([g1,g2]);
+    return mergeGeos([g1,g2],true);
   })();
   const pEars=new THREE.InstancedMesh(pEarGeo,M(0xdca86c,{roughness:.82}),PED_N);
   for(const im of [pBody,pHead,pEars]){
@@ -17941,13 +18012,14 @@ addEventListener('resize',()=>{
   }
 });
 
-/* 预热一次渲染，避免开场卡顿 */
+/* 预热一次渲染，避免开场卡顿。
+   注意：这里只做"预热"，boot 遮罩的撤除在模块末尾统一做（见文件尾部）——
+   场景是分两半建的，遮罩撤早了用户会先看到半成品。 */
+window.__xmT.preCompile=performance.now();
 renderer.compile(scene,camera);
+window.__xmT.postCompile=performance.now();
 renderer.render(scene,camera);
-requestAnimationFrame(()=>{
-  document.getElementById('boot').classList.add('gone');
-  setTimeout(()=>document.getElementById('boot').remove(),800);
-});
+window.__xmT.postRender=performance.now();
 /* ══ 游乐园邮箱式留言板（支持线上/本地跨域访问 + 增删改查 + 30字限制 + 可匿名） ══ */
 const GB_API=(location.hostname==='preview.ai10088.com')
   ? '/alex-garage/api/guestbook'
@@ -19320,7 +19392,10 @@ function updateTrain(dt){
     const x=c.getContext('2d'),img=x.createImageData(S,S),d=img.data;
     const rc=document.createElement('canvas');rc.width=S;rc.height=S;
     const rx=rc.getContext('2d'),rimg=rx.createImageData(S,S),rd=rimg.data;
-    const h=(ix,iy)=>{const n=Math.sin((((ix%S)+S)%S)*127.1+(((iy%S)+S)%S)*311.7)*43758.5453;return n-Math.floor(n);};
+    /* 整数哈希代替 sin 哈希：同样的噪声分布，但一张 256² 贴图快 2~3 倍
+       （原来 3 张贴图要 114ms，sin 是大头） */
+    const h=(ix,iy)=>{let n=(((ix%S)+S)%S)*374761393+(((iy%S)+S)%S)*668265263;
+      n=(n^(n>>>13))*1274126177;return ((n^(n>>>16))>>>0)/4294967296;};
     const vnoise=(px,py)=>{
       const ix=Math.floor(px),iy=Math.floor(py),fx=px-ix,fy=py-iy;
       const ux=fx*fx*(3-2*fx),uy=fy*fy*(3-2*fy);
@@ -19766,7 +19841,13 @@ const fwSys=(()=>{
 })();
 const updateFireworks=fwSys;
 
+/* 全部建完 → 撤 boot 遮罩（一次成型，不给用户看半成品场景） */
+requestAnimationFrame(()=>{
+  const bt=document.getElementById('boot');
+  if(bt){bt.classList.add('gone');setTimeout(()=>bt.remove(),800);}
+});
 animate();
+window.__xmT.end=performance.now();
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 }
