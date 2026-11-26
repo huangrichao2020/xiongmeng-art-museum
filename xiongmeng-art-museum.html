@@ -2431,15 +2431,21 @@ const LOOP=(()=>{
   return{xA,zS,zN,xW,xE,zSC,zNC,r,halfW,totalLen,sample,distToCenter};
 })();
 
-function makeLoopRibbon(halfW,y,uTile,segs=260,centerOff=0){
+/* 沿环路生成一条带状面。
+   s0/s1：只取环路上 s∈[s0,s1] 的一段（默认整圈）。
+   用它来做「连续人行道 / 连续路缘石」—— 顺着弯道走，不用一堆直角盒子去拼，
+   接缝对不上、拐角还会叠出一块。 */
+function makeLoopRibbon(halfW,y,uTile,segs=260,centerOff=0,s0=0,s1=null){
+  const sEnd=(s1==null)?LOOP.totalLen:s1;
+  const span=Math.max(.001,sEnd-s0);
   const pos=[],norm=[],uv=[],idx=[];
   for(let i=0;i<=segs;i++){
-    const s=(i/segs)*LOOP.totalLen;
+    const s=s0+span*(i/segs);
     const pIn=LOOP.sample(s,centerOff-halfW);
     const pOut=LOOP.sample(s,centerOff+halfW);
     pos.push(pIn.x,y,pIn.z, pOut.x,y,pOut.z);
     norm.push(0,1,0, 0,1,0);
-    uv.push(s/uTile,0, s/uTile,1);
+    uv.push((s-s0)/uTile,0, (s-s0)/uTile,1);
     if(i<segs){
       const a=i*2,b=a+1,c=a+2,d=a+3;
       idx.push(a,c,b, c,d,b);
@@ -2460,30 +2466,62 @@ road.receiveShadow=true;road.castShadow=false;road.userData.tag='street';scene.a
 const roadFar=road;
 planar.hideList.push(ground,road);
 
-/* 人行道与路缘在 x=-13.6（-16.0 ~ -11.2）留出 4.8m 停车场出入口通道 */
+/* ══ 环城大道路侧标准剖面（全线统一）══════════════════════════
+   路面：halfW=4.45 → 8.9m 宽
+   路缘石：内外各一圈，沿弯道连续（不是一圈断掉的方盒子）
+   人行道：外侧（店铺街一侧）从西南角一路连到东南角，不断口
+   店铺退线：人行道外缘再往里 0.35m 就是店铺正面
+            （北 z=-30.1 / 西 x=-63.1 / 东 x=63.1，三面同一套）
+   ── 为什么人行道走外侧 ──────────────────────────────────
+   环线外侧：北/西/东是同一条连续店铺街，路面两侧本来就该有一样的步道；
+   南侧外圈是圣诞游乐园、西南角是红毯大道前广场 —— 那两块地自己就是步行区，
+   硬铺一条标准步道反而把地块切碎。所以「店铺街走步道，广场走广场」。
+   ── 内侧为什么不铺 ────────────────────────────────────
+   内侧是艺术馆前广场、喷泉大花坛、巨树广场、停车场 —— 同样是地块，
+   只需要一条连续路缘石把车和人分开就够了。 */
+const WALK_OUT_OFF=5.90;   // 外侧人行道中心偏移
+const curbRingM=M(0xcfd8e2,{roughness:.80,side:THREE.DoubleSide});
+const walkM=M(0xe9eff5,{roughness:.90,metalness:.04,map:concreteTex,flatShading:false});
+{
+  /* 外侧路缘石：整圈连续（南侧外圈是游乐园，但路缘照走，游乐园自己围边） */
+  const outCurb=new THREE.Mesh(makeLoopRibbon(.22,.16,16,260,4.68),curbRingM);
+  outCurb.receiveShadow=true;scene.add(outCurb);
+  /* 内侧路缘石：整圈连续，在 x=-16.0 ~ -11.2 的停车场出入口断开（留 4.8m 通道） */
+  for(const [cs0,cs1] of [[0,55.2],[60,LOOP.totalLen]]){
+    const inCurb=new THREE.Mesh(
+      makeLoopRibbon(.22,.16,16,Math.max(16,Math.round((cs1-cs0)/1.05)),-4.68,cs0,cs1),curbRingM);
+    inCurb.receiveShadow=true;scene.add(inCurb);
+  }
+  /* 外侧人行道：西段 → 西北角 → 北段 → 东北角 → 东段，连成一条 151m 不断的步道 */
+  const outWalk=new THREE.Mesh(makeLoopRibbon(.95,.12,7,145,WALK_OUT_OFF,103.7,255.1),walkM);
+  outWalk.receiveShadow=true;outWalk.castShadow=false;outWalk.userData.tag='street';scene.add(outWalk);
+}
+
+/* 南段内侧人行道：只保留艺术馆正门以东那一段（正门台阶前是广场，不铺步道）；
+   西侧 x=-43.5 ~ -16.0 那一段是市集步行街 + 喷泉花坛 + 停车场的地盘，铺步道反而压摊位。 */
 const sideM=M(0xffffff,{roughness:.62,metalness:.15,map:concreteTex,flatShading:false});
 const curbM=M(0x555f69,{roughness:.7});
-for(const [sx,sw] of [[-29.75,27.5],[16.15,54.7]]){
-  const sPart=add(scene,new THREE.BoxGeometry(sw,.26,3.6),sideM,sx,.13,10.0);
+{
+  const sPart=add(scene,new THREE.BoxGeometry(54.7,.12,2.8),sideM,16.15,.06,8.8);
   sPart.receiveShadow=true;sPart.userData.tag='street';
-  const cPart=add(scene,new THREE.BoxGeometry(sw,.3,.34),curbM,sx,.15,11.85);
-  cPart.castShadow=false;
 }
 /* 停车场驶出环路的专用沥青坡道 + 车道指引箭头 + 道闸立柱 */
 {
-  const drv=add(scene,new THREE.PlaneGeometry(4.8,4.6),roadMat,-13.6,.014,9.8);
+  /* 坡道原来 y=0.014，和路面 ribbon 完全同高 → z-fighting，夜里看是一团乱麻。
+     现在抬高 5mm 并且只铺到路内沿（z=10.6）为止，不往车道里盖。 */
+  const drv=add(scene,new THREE.PlaneGeometry(4.8,3.1),roadMat,-13.6,.019,9.05);
   drv.rotation.x=-Math.PI/2;drv.receiveShadow=true;drv.userData.tag='street';
   const dPaint=M(0xe6ecf2,{roughness:.5,side:THREE.DoubleSide});
   for(const s of [-2.22,2.22]){
-    const ln=add(scene,new THREE.PlaneGeometry(.14,4.3),dPaint,-13.6+s,.022,9.8);
+    const ln=add(scene,new THREE.PlaneGeometry(.14,2.8),dPaint,-13.6+s,.024,9.05);
     ln.rotation.x=-Math.PI/2;
   }
-  const stopL=add(scene,new THREE.PlaneGeometry(4.2,.20),dPaint,-13.6,.023,11.25);
+  const stopL=add(scene,new THREE.PlaneGeometry(4.2,.20),dPaint,-13.6,.025,10.42);
   stopL.rotation.x=-Math.PI/2;
   // 地面黄色出口箭头（^ 指向南侧大马路）
   const arrM=M(0xf7c645,{roughness:.45,side:THREE.DoubleSide});
-  const stem=add(scene,new THREE.PlaneGeometry(.24,1.3),arrM,-13.6,.024,9.4);stem.rotation.x=-Math.PI/2;
-  const tip=add(scene,new THREE.ConeGeometry(.42,.68,3),arrM,-13.6,.024,10.22);
+  const stem=add(scene,new THREE.PlaneGeometry(.24,1.3),arrM,-13.6,.026,8.9);stem.rotation.x=-Math.PI/2;
+  const tip=add(scene,new THREE.ConeGeometry(.42,.68,3),arrM,-13.6,.026,9.72);
   tip.rotation.x=Math.PI/2;tip.scale.set(1,1,.04);
   // 入口防撞柱与抬起状态的道闸杆
   const postM=M(0xebb22d,{roughness:.4,metalness:.3,flatShading:false});
@@ -2555,9 +2593,7 @@ const paintMat=M(0xd9dee2,{roughness:.55,metalness:.0,side:THREE.DoubleSide});
   const edgeIn=new THREE.Mesh(makeLoopRibbon(.075,.025,20,260,-4.16),paintMat);
   const edgeOut=new THREE.Mesh(makeLoopRibbon(.075,.025,20,260,4.16),paintMat);
   scene.add(edgeIn,edgeOut);
-  // 外环积雪路缘石圈
-  const outCurb=new THREE.Mesh(makeLoopRibbon(.22,.10,16,260,4.68),M(0xcfd8e2,{roughness:.8,side:THREE.DoubleSide}));
-  outCurb.receiveShadow=true;scene.add(outCurb);
+  // 外环积雪路缘石圈已移到「路侧标准剖面」那节统一生成（内外两圈同材质同高度）
   // 斑马线：沿前门南段车流方向的长条
   const zebra=new THREE.InstancedMesh(BX(3.2,.016,.52),paintMat,10);
   for(let i=0;i<10;i++){m.makeTranslation(16.2,.027,10.9+i*.82);zebra.setMatrixAt(i,m);}
@@ -6123,18 +6159,30 @@ const lampPools=[];
   const lampConeMat=new THREE.MeshBasicMaterial({
     color:0xffd79a,vertexColors:true,transparent:true,opacity:.26,
     blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false});
-  for(const x of lx){
-    const g=new THREE.Group();g.position.set(x,0,11.45);street.add(g);
+  /* 路灯杆立在人行道靠马路的一侧，灯头探出去照在马路上 ——
+     原来整排灯杆立在 z=11.45，那是马路内沿（10.55）里面的路面，
+     5 根灯杆整整齐齐插在车道上。现在南段这排挪到人行道带（7.4 ~ 10.2）上。 */
+  const baseM=M(0x1e242a,{roughness:.75});
+  const headM=M(0x333b43,{roughness:.45,metalness:.65});
+  const haloM=new THREE.MeshBasicMaterial({
+    map:glowTex,color:0xffd79a,transparent:true,opacity:.32,blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
+  const bulbM=new THREE.MeshBasicMaterial({color:0xffdfa8});
+  const baseGeo=new THREE.CylinderGeometry(.16,.22,.36,14);
+  const headGeo=BX(.42,.15,.72);
+  const capGeo=BX(.46,.09,.76);
+  const bulbGeo=BX(.30,.11,.52);
+  const haloGeo=new THREE.PlaneGeometry(3.6,3.6);
+  const mkLamp=(px,pz,rotY,withPointLight)=>{
+    const g=new THREE.Group();g.position.set(px,0,pz);g.rotation.y=rotY;street.add(g);
     add(g,poleGeo,poleM,0,0,0);
-    add(g,new THREE.CylinderGeometry(.16,.22,.36,14),M(0x1e242a,{roughness:.75}),0,.2,0);
-    add(g,BX(.42,.15,.72),M(0x333b43,{roughness:.45,metalness:.65}),0,5.93,1.38);
-    add(g,BX(.46,.09,.76),snowCapM,0,6.04,1.38);
+    add(g,baseGeo,baseM,0,.2,0);
+    add(g,headGeo,headM,0,5.93,1.38);
+    add(g,capGeo,snowCapM,0,6.04,1.38);
     // 路灯柱挂圣诞花环 + 立体厚壁柔光灯罩（替代原先 2D 薄片，彻底消除掠射角亚像素与深度冲突闪烁）
     const lWr=buildWreath(.26);lWr.position.set(0,3.8,.12);g.add(lWr);
-    const bulb=new THREE.Mesh(BX(.30,.11,.52),new THREE.MeshBasicMaterial({color:0xffdfa8}));
+    const bulb=new THREE.Mesh(bulbGeo,bulbM);
     bulb.position.set(0,5.79,1.38);g.add(bulb);
-    const halo=new THREE.Mesh(new THREE.PlaneGeometry(3.6,3.6),new THREE.MeshBasicMaterial({
-      map:glowTex,color:0xffd79a,transparent:true,opacity:.32,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+    const halo=new THREE.Mesh(haloGeo,haloM);
     halo.rotation.x=-Math.PI/2;halo.position.set(0,.05,1.40);g.add(halo);
     halo.userData.noReflect=true;
     lampPools.push(halo);
@@ -6146,10 +6194,22 @@ const lampPools=[];
     const cone=new THREE.Mesh(lampConeGeo,lampConeMat);
     cone.position.set(0,2.9,1.40);cone.castShadow=false;cone.raycast=()=>{};
     g.add(cone);
-    if(x===-19.5||x===9.5){
+    if(withPointLight){
       const pl=new THREE.PointLight(0xffd9a4,68,34,1.65);
-      pl.position.set(x,5.8,12.85);scene.add(pl);shopLights.push({l:pl,base:68,street:true});
+      pl.position.set(px+1.38*Math.sin(rotY),5.8,pz+1.38*Math.cos(rotY));
+      scene.add(pl);shopLights.push({l:pl,base:68,street:true});
     }
+  };
+  /* 南段内侧 5 盏（正门广场一侧） */
+  for(const x of lx)mkLamp(x,9.9,0,(x===-19.5||x===9.5));
+  /* 外侧人行道一整串：西段 → 西北角 → 北段 → 东北角 → 东段，
+     间距 13m（跟路面光晕同一节奏），灯杆贴着马路那一侧站，
+     离店铺正面还有 2m 以上，绝不会插进房子或雨棚。
+     全部用自发光灯罩 + 加色地面光晕，不新增点光源（点光源是每像素成本）。 */
+  for(let s=110;s<=250;s+=13){
+    const p=LOOP.sample(s,5.25);
+    const rotY=Math.atan2(-p.nx,-p.nz);   // 灯头一律朝马路方向
+    mkLamp(p.x,p.z,rotY,false);
   }
   /* ── 沿环城马路补一整串路面灯光晕 ──
      微缩景观的夜景，街道必须有连续、有节奏的光：
@@ -6188,7 +6248,10 @@ const lampPools=[];
   });
   const plateM=M(0xc8352c,{roughness:.45,metalness:.3});
   const poleM=M(0x9aa4ad,{roughness:.4,metalness:.8});
-  for(const [sx,sz,ry] of [[9.6,10.6,0],[9.6,19.5,Math.PI]]){
+  /* 限速牌：原来 10.6 那个正好站在马路内沿（10.55）上，另一个 19.5 骑在外沿路缘上，
+     现在都挪到路缘外：内侧的站人行道带（z=9.9），外侧的站路缘外（z=19.95）。
+     x 挪到 12.6，避开 x=9.5 那根路灯。 */
+  for(const [sx,sz,ry] of [[12.6,9.9,0],[12.6,19.95,Math.PI]]){
     const g=new THREE.Group();g.position.set(sx,0,sz);g.rotation.y=ry;street.add(g);
     add(g,new THREE.CylinderGeometry(.055,.06,2.35,10),poleM,0,1.175,0);
     const body=add(g,new THREE.CylinderGeometry(.54,.54,.04,24),plateM,0,2.85,0);
@@ -7650,12 +7713,16 @@ const skylineMats=[];
      全部横穿游乐园 —— 地面是 y=0.01 的薄板，马路路面在 0.02、路缘 0.055，
      于是马路直接压在游乐园地面上，看着就是「地面多了很多马路」。
      现在把这一段彻底断开（每条拆成南北两截），并把游乐园地面板抬高盖住路缘。 */
-  addStreetSeg(0,-18,8.4,68,Math.PI/2);       // z  -52..16
+  /* 原来这里有两段「x=0 主轴」写成了 rot=π/2 —— rot=π/2 是把长度转到世界 X 方向，
+     于是「南北向主轴」实际生成了两条东西向马路，中心都落在 z=-18，
+     横着压在北段环城马路（z=-25.45 ~ -16.55）上，连人行道、路缘都糊在马路上 ——
+     用户箭头指的那片白就是它。现在这两段整块删掉：环城马路是美术馆片区的边界，
+     外城马路不许穿进环里。外城 x=0 主轴保留 z∈[-192,-44] 那一段
+     （见下面 addStreetSeg(0,-118,...)），越过环城马路就不再往南延伸。 */
   addStreetSeg(0,101,8.4,82,Math.PI/2);       // z   60..142
   addStreetSeg(-80,0,8.4,376,0);
   addStreetSeg(80,0,8.4,376,0);
   addStreetSeg(0,-210,8.0,124,Math.PI/2);     // z -272..-148
-  addStreetSeg(0,-18,8.0,68,Math.PI/2);       // z  -52..16
   addStreetSeg(0,82,8.0,44,Math.PI/2);        // z   60..104
   addStreetSeg(0,-230,8.0,164,Math.PI/2);     // z -312..-148
   addStreetSeg(0,181,8.0,242,Math.PI/2);      // z   60..302
@@ -8489,9 +8556,17 @@ const skylineMats=[];
     };
 
     // 石板广场 + 迎宾红毯大道 + 三级宽石阶（逐级铺红毯，严禁实心方块压住台阶产生 Z-fighting）
-    add(ch,makeScaledBox(20.5,.12,25.5,3.0,3.0),plazaM,0,.04,0).receiveShadow=true;
-    add(ch,makeScaledBox(5.2,.10,10.5,2.5,2.5),plazaM,0,.05,11.75).receiveShadow=true;
-    add(ch,BX(2.4,.03,6.2),carpetM,0,.115,13.9).receiveShadow=true;
+    /* 这三块是教堂的迎宾前广场 + 红毯大道。原来红毯南端伸到 z=15，
+       而西南角的环城马路外沿就在 z≈18 一线 —— 红毯直接铺在马路上，
+       车从红毯上碾过去。现在整块收进路沿以内：
+         主广场  局部 z -13.75..11.75  → 世界 z 20.25..45.75
+         前广场  局部 z  3.5..12.7    → 世界 z 19.3..28.5
+         红毯    局部 z  9.0..12.8    → 世界 z 19.2..23.0
+       前广场抬高到 y=.065（顶面 .115），跟主广场顶面 .10 错开，
+       避免两块共面 z-fighting。 */
+    add(ch,makeScaledBox(20.5,.12,25.5,3.0,3.0),plazaM,0,.04,-1.0).receiveShadow=true;
+    add(ch,makeScaledBox(5.2,.10,9.2,2.5,2.5),plazaM,0,.065,8.1).receiveShadow=true;
+    add(ch,BX(2.4,.03,3.8),carpetM,0,.125,10.9).receiveShadow=true;
     for(let s=0;s<3;s++){
       add(ch,BX(11.6-s*.7,.18,2.4-s*.4),gothicTrimM,0,.18+s*.18,9.8-s*.4);
       add(ch,BX(2.4,.025,2.4-s*.4),carpetM,0,.285+s*.18,9.8-s*.4);
@@ -9067,9 +9142,11 @@ const skylineMats=[];
   });
   // 将教堂静态建筑、雪堆与小熊人合批（保留 PointLight 光源，大幅削减 Draw Call）
   mergeStatic(lmGroup);
-  // 环路外侧：洁净覆雪人行道（移除杂乱大发光圈孤立树，保持视野通透大气）
-  const farWalk=add(scene,BX(92,.14,2.2),M(0xd9e4ee,{roughness:.78,metalness:.06,flatShading:false}),0,.07,-23.8);
-  farWalk.castShadow=false;
+  /* 原来这里有一块 92m×2.2m 的「覆雪人行道」白板（z=-23.8），
+     整条压在北段环城马路的外半幅上 —— 用户截图里那根红箭头指的就是它：
+     马路被一整块白板盖掉，车道线、路缘、路面全看不见了。
+     现在环路外侧统一由「路侧标准剖面」那节的连续人行道带负责
+     （沿弯道贴着路缘走，和西段、东段连成一条），这块白板整块拆掉。 */
 }
 }
 
@@ -11121,16 +11198,20 @@ function stallString(parent,a,b,n,sag,y){
       a[0]+(b[0]-a[0])*u, y-Math.sin(u*Math.PI)*sag, a[1]+(b[1]-a[1])*u);
   }
 }
-/* ── 九个摊位：西侧一列（面东）+ 北侧一排（面南）+ 西南拐角 ──
+/* ── 摊位：西侧一列（面东）+ 北侧一排（面南）─────────────────
    11-26：西列北段三个摊位（热狗 / 糖果手杖 / 姜饼甜点）整块拆掉。
    原因：那三个摊位正好堵在喷泉花坛的西侧与西北角，从市集拐角往花坛看，
    视线被一排深棕木棚全挡死，喷泉永远只能看见一条缝，停车场那边更是
-   完全看不见。现在西列只留南段三个（热红酒 / 烤栗子 / 棉花糖），
-   花坛西北方向整个打开，从市集一眼能看穿到雪松林和停车场。 */
+   完全看不见。现在西列只留南段三个（热红酒 / 烤栗子 / 棉花糖）。
+   11-26 环路整改：西列三个摊位整体北移 4.5m（12.9/9.6/6.3 → 8.4/5.1/1.8）。
+   原因：摊位沿 z 排开、半宽 1.5m，最南那摊原来占 z 11.4 ~ 14.4，
+   而南段环城马路内沿在 z=10.55 —— 这摊整整齐齐骑在马路上，
+   连它那块地面暖光池都糊在路面中间。现在整列退到马路内沿以北，
+   南边留出 1.6m 的街口空地，市集步行街的南端收在这里。 */
 const STALLS=[
-  {x:-35.5,z:12.9,rot:Math.PI/2,cn:'热红酒',en:'MULLED WINE',goods:'wine',h:2.35,light:1,hang:[0x7a2f26,0xd8a13c,0x2f6b5a,0xd23b32],fab:2,accent:'#7a2f26'},
-  {x:-35.5,z: 9.6,rot:Math.PI/2,cn:'烤栗子',en:'CHESTNUTS',goods:'nuts',h:2.60,light:0,hang:[0x8a5a2c,0xc4713c,0x7a2f26,0xd8a13c],fab:12,accent:'#c4813c'},
-  {x:-35.5,z: 6.3,rot:Math.PI/2,cn:'棉花糖',en:'COTTON CANDY',goods:'cotton',h:2.30,light:0,hang:[0xffc2d8,0xd07a9a,0xf2f0e6,0xffc2d8],fab:14,accent:'#d07a9a'},
+  {x:-35.5,z: 8.4,rot:Math.PI/2,cn:'热红酒',en:'MULLED WINE',goods:'wine',h:2.35,light:1,hang:[0x7a2f26,0xd8a13c,0x2f6b5a,0xd23b32],fab:2,accent:'#7a2f26'},
+  {x:-35.5,z: 5.1,rot:Math.PI/2,cn:'烤栗子',en:'CHESTNUTS',goods:'nuts',h:2.60,light:0,hang:[0x8a5a2c,0xc4713c,0x7a2f26,0xd8a13c],fab:12,accent:'#c4813c'},
+  {x:-35.5,z: 1.8,rot:Math.PI/2,cn:'棉花糖',en:'COTTON CANDY',goods:'cotton',h:2.30,light:0,hang:[0xffc2d8,0xd07a9a,0xf2f0e6,0xffc2d8],fab:14,accent:'#d07a9a'},
   {x:-30.6,z:-12.4,rot:0,cn:'姜饼屋',en:'GINGERBREAD HOUSE',goods:'house',h:2.35,light:1,hang:[0xc4813c,0xf2f7fc,0xd8a13c,0xf2f7fc],fab:5,accent:'#c4813c'},
   {x:-27.2,z:-12.4,rot:0,cn:'圣诞礼物',en:'XM GIFTS',goods:'gift',h:2.50,light:0,hang:[0xd23b32,0x2f8f6b,0x3f6ba8,0xe0a33c],fab:8,accent:'#2f8f6b'},
   {x:-23.8,z:-12.4,rot:0,cn:'雪地咖啡',en:'SNOW CAFE',goods:'wine',h:2.30,light:0,hang:[0xb87333,0xd23b32,0x7a4a2c,0xd8a13c],fab:1,accent:'#7a4a2c'}
@@ -11151,23 +11232,25 @@ for(const st of STALLS){
 }
 /* 市集入口牌坊已删除：两根 4.2m 黑柱横跨通道只挡视线不挡人，整座牌坊连招牌一起去掉，
    通道恢复成敞开的雪道（原碰撞圆 [-19.4,-12.4,1.5] 一并清除） */
-/* 市集步行街：摊位与花坛之间铺一条宽雪道（已移除两侧矮灯柱保持路面整洁） */
+/* 市集步行街：摊位与花坛之间铺一条宽雪道（已移除两侧矮灯柱保持路面整洁）
+   南端收到 z=10.0 —— 再往南就压到南段环城马路（内沿 z=10.55）了 */
 {
   const paveM=M(0xe6ecf1,{roughness:.92});
-  add(market,BX(3.9,.06,27.0),paveM,-32.6,.04,.8).castShadow=false;
+  add(market,BX(3.9,.06,22.7),paveM,-32.6,.04,-1.35).castShadow=false;
   add(market,BX(11.6,.06,3.9),paveM,-27.0,.04,-9.9).castShadow=false;
   add(market,BX(4.6,.06,4.6),paveM,-32.9,.04,-10.6).castShadow=false;
 }
 /* 市集全部是静态的：合批，把上千个小零件压成十几个 mesh */
 mergeStatic(market);
-/* 逛市集的熊：沿摊位前人行道来回走，各自带着单品 */
-addNpc([[-30.3,0,9.4],[-30.3,0,5.2],[-30.3,0,1],[-30.3,0,-5],[-30.3,0,-7.6]],0xd8a13c,0xfbe2cf,.55,false,{scale:.95,acc:'coffee'});
+/* 逛市集的熊：沿摊位前人行道来回走，各自带着单品
+   （西列摊位北移后，路线南端跟着收到 z≈8 以内，别走到马路上） */
+addNpc([[-30.3,0,8.0],[-30.3,0,5.2],[-30.3,0,1],[-30.3,0,-5],[-30.3,0,-7.6]],0xd8a13c,0xfbe2cf,.55,false,{scale:.95,acc:'coffee'});
 addNpc([[-28.6,0,-8.3],[-25.4,0,-8.3],[-22.2,0,-8.3],[-20.5,0,-8.3]],0xb23f2c,0xfbe2cf,.45,false,{scale:.9,acc:'camera'});
-addNpc([[-33.7,0,12.2],[-33.7,0,9.4],[-33.7,0,6.6]],0x3f6ba8,0xfbe2cf,.5,false,{scale:1,acc:'headphone'});
-addNpc([[-31.8,0,13.0],[-31.8,0,8],[-31.8,0,2],[-31.8,0,-7.4]],0x7f8f76,0xfbe2cf,.62,false,{scale:.92,acc:'backpack'});
+addNpc([[-33.7,0,7.8],[-33.7,0,5.0],[-33.7,0,2.2]],0x3f6ba8,0xfbe2cf,.5,false,{scale:1,acc:'headphone'});
+addNpc([[-31.8,0,8.4],[-31.8,0,4.4],[-31.8,0,.4],[-31.8,0,-7.4]],0x7f8f76,0xfbe2cf,.62,false,{scale:.92,acc:'backpack'});
 /* 原本站桩的市集摊前游客，全部改成沿市集漫步路线 */
-addNpc([[-33.4,0,12.6],[-31.4,0,11.4],[-31.4,0,8.2],[-33.4,0,12.6]],0xd8a13c,0xfbe2cf,.44,false,{scale:.92,acc:'cap'});
-addNpc([[-32.6,0,9.4],[-30.6,0,8.0],[-30.6,0,4.4],[-32.6,0,9.4]],0xb23f2c,0xfbe2cf,.46,false,{scale:.95,acc:'beret'});
+addNpc([[-33.4,0,8.0],[-31.4,0,6.8],[-31.4,0,4.4],[-33.4,0,8.0]],0xd8a13c,0xfbe2cf,.44,false,{scale:.92,acc:'cap'});
+addNpc([[-32.6,0,8.0],[-30.6,0,6.6],[-30.6,0,3.2],[-32.6,0,8.0]],0xb23f2c,0xfbe2cf,.46,false,{scale:.95,acc:'beret'});
 addNpc([[-33.2,0,6.0],[-30.8,0,3.6],[-30.8,0,.4],[-33.2,0,6.0]],0xe8c24a,0xfbe2cf,.42,false,{scale:.85,acc:'coffee'});
 addNpc([[-32.8,0,-6.6],[-30.2,0,-7.8],[-27.2,0,-7.8],[-32.8,0,-6.6]],0xd07a9a,0xfbe2cf,.45,false,{scale:.88,acc:'earmuff'});
 addNpc([[-31.2,0,-10.6],[-29.0,0,-10.6],[-26.8,0,-10.6],[-24.6,0,-10.6]],0xc99456,0xfbe2cf,.5,false,{scale:.93,acc:'santa'});
@@ -11202,7 +11285,7 @@ const SHOPS=[
 ];
 for(const sp of SHOPS){
   SK.shopHouse(shopRow,sp);
-  OUTDOOR_OBS.push([sp.x,sp.z,2.5]);
+  OUTDOOR_OBS.push([sp.x,sp.z,2.0]);   // 店深 3.6（半深 1.8），碰撞圆收到 2.0，别顶到人行道上
 }
 /* ══ 艺术馆正门对面 · 圣诞游乐园（76m × 38m） ══
    大量复用现成构件：buildChristmasTree / buildSnowman / buildGiftBox / buildCandyCane /
@@ -12123,18 +12206,18 @@ const amusement={wheel:null,carousel:null,chairs:null,ship:null,zip:null,
   Q([[-2.0,0,50.5],[-2.0,0,50.5]],0xf0b268,.08,.87);
   Q([[24.5,0,53.0],[24.5,0,53.0]],0x8f3a68,.08,.90);
   /* ── 左侧圣诞教堂广场 & 红毯步道：人来人往参礼拍照（贴合广场 y=0.11，避开台阶防穿模） ── */
-  Q([[-50.2,.11,16.2],[-50.2,.11,20.4],[-47.8,.11,20.4],[-47.8,.11,16.2],[-50.2,.11,16.2]],0xd23b32,.52,.92,'camera');
-  Q([[-48.0,.11,16.2],[-48.0,.11,20.2],[-50.0,.11,20.2],[-50.0,.11,16.2],[-48.0,.11,16.2]],0x2f8f6b,.48,.89,'coffee');
-  Q([[-54.5,0,19.0],[-49.0,.08,16.5],[-43.5,0,19.0],[-49.0,.08,16.5],[-54.5,0,19.0]],0x3f6ba8,.54,.91,'cap');
-  Q([[-56.0,.11,20.0],[-42.0,.11,20.0],[-42.0,.11,20.8],[-56.0,.11,20.8],[-56.0,.11,20.0]],0xe8c24a,.46,.90,'backpack');
-  Q([[-42.5,.11,20.5],[-55.5,.11,20.5],[-42.5,.11,20.5]],0x8f3a68,.49,.88,'headphone');
-  Q([[-52.2,.11,20.8],[-45.8,.11,20.8],[-45.8,.11,19.6],[-52.2,.11,19.6],[-52.2,.11,20.8]],0xc99456,.44,.87,'camera');
-  Q([[-44.8,.08,18.2],[-49.0,.11,20.4],[-53.2,.08,18.2],[-44.8,.08,18.2]],0xd07a9a,.47,.90,'coffee');
-  Q([[-53.5,.11,20.6],[-53.5,.11,20.6]],0xf0b268,.08,.91,'camera');
-  Q([[-44.5,.11,20.6],[-44.5,.11,20.6]],0x2f8f6b,.08,.89,'coffee');
-  Q([[-51.0,.11,20.6],[-51.0,.11,20.6]],0xd23b32,.08,.92,'cap');
-  Q([[-47.0,.11,20.6],[-47.0,.11,20.6]],0x3f6ba8,.08,.88,'camera');
-  Q([[-57.2,.11,25.5],[-57.2,.11,38.5],[-57.2,.11,25.5]],0x7f8f76,.46,.90,'backpack');
+  Q([[-47.0,.11,16.2],[-47.0,.11,20.4],[-44.6,.11,20.4],[-44.6,.11,16.2],[-47.0,.11,16.2]],0xd23b32,.52,.92,'camera');
+  Q([[-44.8,.11,16.2],[-44.8,.11,20.2],[-46.8,.11,20.2],[-46.8,.11,16.2],[-44.8,.11,16.2]],0x2f8f6b,.48,.89,'coffee');
+  Q([[-51.3,0,19.0],[-45.8,.08,16.5],[-40.3,0,19.0],[-45.8,.08,16.5],[-51.3,0,19.0]],0x3f6ba8,.54,.91,'cap');
+  Q([[-52.8,.11,20.0],[-38.8,.11,20.0],[-38.8,.11,20.8],[-52.8,.11,20.8],[-52.8,.11,20.0]],0xe8c24a,.46,.90,'backpack');
+  Q([[-39.3,.11,20.5],[-52.3,.11,20.5],[-39.3,.11,20.5]],0x8f3a68,.49,.88,'headphone');
+  Q([[-49.0,.11,20.8],[-42.6,.11,20.8],[-42.6,.11,19.6],[-49.0,.11,19.6],[-49.0,.11,20.8]],0xc99456,.44,.87,'camera');
+  Q([[-41.6,.08,18.2],[-45.8,.11,20.4],[-50.0,.08,18.2],[-41.6,.08,18.2]],0xd07a9a,.47,.90,'coffee');
+  Q([[-50.3,.11,20.6],[-50.3,.11,20.6]],0xf0b268,.08,.91,'camera');
+  Q([[-41.3,.11,20.6],[-41.3,.11,20.6]],0x2f8f6b,.08,.89,'coffee');
+  Q([[-47.8,.11,20.6],[-47.8,.11,20.6]],0xd23b32,.08,.92,'cap');
+  Q([[-43.8,.11,20.6],[-43.8,.11,20.6]],0x3f6ba8,.08,.88,'camera');
+  Q([[-54.0,.11,25.5],[-54.0,.11,38.5],[-54.0,.11,25.5]],0x7f8f76,.46,.90,'backpack');
   Q([[-40.8,.11,24.5],[-40.8,.11,37.5],[-40.8,.11,24.5]],0xe8c24a,.48,.91,'headphone');
   Q([[-52.0,0,18.2],[-35.0,0,18.2],[-52.0,0,18.2]],0xd23b32,.56,.90,'coffee');
 }
@@ -14827,6 +14910,26 @@ function fpStep(dx,dz){
 }
 /* 调试接口：window.diorama.fp 可读取/设置第一人称位置 */
 window.diorama={
+/* 区域物件清单：把指定矩形范围内的 mesh 列出来（合批后的真实状态）。
+   排查「什么东西压在路上」用 —— 合批后包围盒会变大，但仍然能定位到具体物件。 */
+dump:(x0,z0,x1,z1)=>{
+  const b=new THREE.Box3(),out=[];
+  scene.updateMatrixWorld(true);
+  scene.traverse(o=>{
+    if(!o.isMesh||!o.geometry)return;
+    if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();
+    b.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld);
+    if(b.max.x<x0||b.min.x>x1||b.max.z<z0||b.min.z>z1)return;
+    const m=Array.isArray(o.material)?o.material[0]:o.material;
+    let q=o,chain=[];
+    for(let i=0;i<5&&q;i++){chain.push(q.name||q.type);q=q.parent;}
+    out.push({c:(m&&m.color)?'#'+m.color.getHexString():'',map:!!(m&&m.map),
+      geo:o.geometry.type,chain:chain.join('<'),
+      mn:[+b.min.x.toFixed(2),+b.min.y.toFixed(2),+b.min.z.toFixed(2)],
+      mx:[+b.max.x.toFixed(2),+b.max.y.toFixed(2),+b.max.z.toFixed(2)]});
+  });
+  return out;
+},
 /* 材质体检：列出「没有任何贴图的大面积 MeshStandardMaterial」，
    按地面投影面积排序 —— 用来把还在裸奔的纯色块揪出来。
    微缩景观最忌讳大面积纯色：没有贴图的表面上所有光照都落在同一块颜色上，
