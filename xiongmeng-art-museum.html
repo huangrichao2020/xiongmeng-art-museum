@@ -2500,7 +2500,6 @@ const walkM=M(0xe9eff5,{roughness:.90,metalness:.04,map:concreteTex,flatShading:
 /* 南段内侧人行道：只保留艺术馆正门以东那一段（正门台阶前是广场，不铺步道）；
    西侧 x=-43.5 ~ -16.0 那一段是市集步行街 + 喷泉花坛 + 停车场的地盘，铺步道反而压摊位。 */
 const sideM=M(0xffffff,{roughness:.62,metalness:.15,map:concreteTex,flatShading:false});
-const curbM=M(0x555f69,{roughness:.7});
 {
   const sPart=add(scene,new THREE.BoxGeometry(54.7,.12,2.8),sideM,16.15,.06,8.8);
   sPart.receiveShadow=true;sPart.userData.tag='street';
