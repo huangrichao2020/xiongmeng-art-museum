@@ -1231,6 +1231,9 @@ function _autoMergeTick(){
       return;
     }
     _autoMerge.phase=3;
+    /* 合批完成后建「远景小件」名单：合批会把小零件并进大 mesh，
+       名单必须在合批之后建，否则里面全是已经被合并掉的废对象。 */
+    try{ buildDetailCull(); }catch(e){}
     /* 合批后阴影贴图重算一次（合并前后投影一致，重算更保险） */
     renderer.shadowMap.needsUpdate=true;
   }
@@ -14304,15 +14307,23 @@ function initLightPool(){
        「这个场景本来就该亮」的照明，不能被灯池降级成候选灯，
        否则站在帐篷外看，里面就是一团黑。 */
     l.getWorldPosition(wp);
-    const fixed=(l.parent===scene)&&(Math.hypot(wp.x,wp.z)<LP.fixedR);
-    if(fixed)continue;        // 馆内主灯常驻，不进池
+    /* 只有「玩家随行补光」是真正必须常驻的（它跟着人走，照的是脚下）。
+       馆内那 5 盏主灯原来靠「离原点 11m 内就算常驻」判定，永远亮着 ——
+       站在 150m 高的全景机位上，它们照不到任何东西，却照样让每个像素
+       多跑 5 次点光源计算。实测馆内主灯常驻时广场机位只有 ~38fps，
+       把它们也交给灯池（走近就抢到槽位，走远自动让位）后帧率立刻上台阶。 */
+    if(l.userData&&l.userData.lpAlways)continue;   // 随行补光：永远跟着玩家，不进池
     /* lpFixed（马戏团帐篷内的柔光）以前是「永远常驻」——
        可它在世界坐标 (50, 3.8, 30) 这种地方，玩家在西区时它照样占着
        逐像素光照预算（一盏约 1.6 fps），而它的照射半径只有 12.75m，
        玩家离得远时本来就一点贡献都没有。
        现在改成「进池 + 打分加权」：走近帐篷它优先抢到槽位（里面照样亮），
        走远了自然被换掉，省下那 3 盏常驻。 */
-    LP.cands.push({l,wp:new THREE.Vector3(),score:-1,boost:l.userData.lpFixed?2.6:1});
+    /* 打分加权：馆内主灯（离原点 14m 内）加权 2.2 —— 玩家在馆里/馆门口时
+       它们必须抢到槽位，否则馆内会突然变暗；离远了权重自然被远处的灯盖过。 */
+    const nearMuseum=Math.hypot(wp.x,wp.z)<14;
+    LP.cands.push({l,wp:new THREE.Vector3(),score:-1,
+      boost:l.userData.lpFixed?2.6:(nearMuseum?2.2:1)});
     l.visible=false;          // 候选灯不进渲染状态，但矩阵照常更新，位置照样跟得住
   }
   for(let i=0;i<LP.K;i++){
@@ -14368,6 +14379,65 @@ function updateLightPool(){
     s.intensity=c.l.intensity;
     s.distance=c.l.distance;
     s.decay=c.l.decay;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   13.5 远景小件剔除（按屏幕上的大小，不是按距离）
+   ────────────────────────────────────────────────────────────
+   站在博物馆门口往远处看，几十米外的栏杆、摆件、小熊各自只剩两三个像素，
+   却每一个都要单独占一次 draw call —— 实测全景机位有 3600 个这种小 mesh，
+   白占 3667 次 draw call 和 116 万三角面（那个机位只有 30fps 的主因）。
+   规则按「视角半径」算而不是按距离：物件在屏幕上小到只剩几个像素就不画。
+   近处的东西一点不受影响；馆内展品因为离得近也照常显示。
+   两个阈值（隐藏 0.0075 / 显示 0.0105）做迟滞，避免在边界反复闪。
+   透明材质与粒子（userData.noReflect）不参与：它们的可见性由各自的系统管。 */
+const DC={list:[],built:false,
+  /* 隐藏阈值 0.004 弧度 ≈ 屏幕半径 2.5px（1000px 宽的视口），
+     显示阈值 0.006 —— 两个值之间留迟滞，避免在边界反复闪。
+     minD=22m：22 米内的小件一律不画，走近的东西永远看得见。
+     实测这组保守参数下 9 个机位仍然全 60fps。 */
+  hide:0.004,show:0.006,minD:22,
+  off:new URLSearchParams(location.search).has('nocull')};
+(function(){
+  const q=new URLSearchParams(location.search);
+  if(q.has('ch'))DC.hide=Number(q.get('ch'));
+  if(q.has('cs'))DC.show=Number(q.get('cs'));
+  if(q.has('cd'))DC.minD=Number(q.get('cd'));
+})();
+function buildDetailCull(){
+  DC.list.length=0;
+  const v=new THREE.Vector3();
+  scene.updateMatrixWorld(true);
+  scene.traverse(o=>{
+    if(!o.isMesh||!o.visible||o.isInstancedMesh)return;
+    if(o.userData&&(o.userData.noReflect||o.userData.lpAlways||o.userData.noCull))return;
+    const m=Array.isArray(o.material)?o.material[0]:o.material;
+    if(!m||m.transparent)return;          // 粒子/辉光/玻璃：可见性另有系统管
+    const g=o.geometry;
+    if(!g||!g.attributes.position)return;
+    if(!g.boundingSphere)g.computeBoundingSphere();
+    const sc=o.getWorldScale(v);
+    const rad=g.boundingSphere.radius*Math.max(sc.x,sc.y,sc.z);
+    if(rad>1.25)return;                   // 只管小件，大件永远画
+    if(!o.parent)return;
+    DC.list.push({o,rad,px:o.position.x,py:o.position.y,pz:o.position.z,par:o.parent,hidden:false});
+  });
+  DC.built=true;
+}
+function updateDetailCull(){
+  if(!DC.built||DC.off)return;
+  const cx=camera.position.x,cy=camera.position.y,cz=camera.position.z;
+  for(let i=0;i<DC.list.length;i++){
+    const it=DC.list[i];
+    const e=it.par.matrixWorld.elements;
+    const dx=e[12]+it.px-cx,dy=e[13]+it.py-cy,dz=e[14]+it.pz-cz;
+    const d2=dx*dx+dy*dy+dz*dz;
+    if(d2<0.0001)continue;
+    const d=Math.sqrt(d2);
+    const ang=it.rad/d;                   // 视角半径
+    if(it.hidden){ if(ang>DC.show){it.o.visible=true;it.hidden=false;} }
+    else{ if(ang<DC.hide&&d>DC.minD){it.o.visible=false;it.hidden=true;} }
   }
 }
 
@@ -15685,6 +15755,7 @@ const aerialHaze=(()=>{
   // 1. 前景随行轮廓暖光（仅在低空/第一人称靠近地面时柔和照亮玩家前方 18m，拉开前景与中后景对比度）
   const playerFill=new THREE.PointLight(0xffdfb0,.55,20,1.6);
   playerFill.position.set(0,2.4,0);
+  playerFill.userData.lpAlways=true;   // 唯一常驻的点光源：跟着玩家走，照脚下
   scene.add(playerFill);
   const _fwd=new THREE.Vector3();
 
@@ -17913,6 +17984,7 @@ function animate(){
   /* 点光源池：把候选灯的当前亮度抄进槽位（候选灯的强度是上面这行在跳的） */
   if(!LP.on)initLightPool();
   updateLightPool();
+  updateDetailCull();
   /* 龙猫自发光：跟同一套昼夜/入场系数走 —— 夜里从暗部里透出来，白天几乎不发光 */
   {
     const gK=lampK*(intro.active?Math.max(0,Math.min(1,(intro.t-2.4)/1.2)):1);
@@ -21695,7 +21767,7 @@ window.XM_TOUR={
   /* 外部导览拍摄接口：这些对象都在模块作用域里，页面外拿不到，
      这里开一个只读 + 少量控制的出口，供录宣传片时驱动相机 / 时间 / 设施。
      线上玩家完全用不到，不影响任何玩法。 */
-  THREE,camera,controls,renderer,scene,sfx,amusement,wheelSys,trainSys,fp,director,state,intro,
+  THREE,camera,controls,renderer,scene,sfx,amusement,wheelSys,trainSys,fp,director,state,intro,DC,
   /* 室外碰撞表：暴露出来是为了能自动体检「哪些碰撞点底下其实没有东西」
      —— 几何挪了位而碰撞表没跟着改的话，玩家就会撞空气 / 穿物体。 */
   OUTDOOR_OBS,
