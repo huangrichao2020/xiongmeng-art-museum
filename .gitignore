@@ -23,3 +23,6 @@ tour-remotion/public/.concat-list.txt
 
 # 交付对比截图（不入库）
 shots/
+
+# Remotion 拼接中间产物
+tour-remotion/.alltmp/
