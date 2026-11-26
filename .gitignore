@@ -20,3 +20,6 @@ tools/xm-studio/node_modules/
 tour-remotion/node_modules/
 tour-remotion/public/*.mp4
 tour-remotion/public/.concat-list.txt
+
+# 交付对比截图（不入库）
+shots/
