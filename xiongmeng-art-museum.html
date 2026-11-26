@@ -6081,7 +6081,11 @@ const street=new THREE.Group();street.userData.tag='street';scene.add(street);
        · 现在：间距拉开（-24 挪到 -29.5，和下一棵隔 11.7m）、整排降一档
          （树高 7m → 5.4m、冠幅收 12%），人眼 1.6m 站着能从树冠下沿看穿过去，
          树还保留街道气氛，但不再把视线堵死。 */
-const treeX=[-29.5,-17.8,-6,5.5,14.5,21.5,32.5,39.5];
+/* 西端这棵原来放在 -29.5（从 -24 挪过来的，为了拉开马路视线），
+   结果整棵长进了公交站候车亭里：树池压在长椅和玻璃隔板上、树干穿顶棚、树冠从顶棚里钻出来。
+   现在挪到 -26.5 —— 离候车亭东沿（-27.9）留 0.9m，避开树池和长椅；
+   同时站在马路上看喷泉时树心在视轴以西 13°，八角喷泉整个轮廓还在画面里，不被切掉。 */
+const treeX=[-26.5,-17.8,-6,5.5,14.5,21.5,32.5,39.5];
 {
   const TZ=9.35;
   const bark=M(0x4a3525,{roughness:.92,flatShading:false});
@@ -10423,8 +10427,12 @@ function addNpc(path,color,skin,speed,indoor,opts={}){
 const OUTDOOR_OBS=(()=>{
   const list=[];
   // 1. 街道树坑 + 路灯杆 + 垃圾桶 + 消防栓 + 隔离柱 + 长椅 + 交通牌/灯 + 门前迎宾摆件
-  for(const tx of [-24,-17.8,-6,5.5,14.5,21.5,32.5,39.5])list.push([tx,9.35,.92]);
-  for(const lx of [-19.5,-10.5,9.5,18.0,36.0])list.push([lx,11.45,.68]);
+  /* 树坑：必须跟着 treeX 走。原来这里写的是 -24，而树早就挪到 -29.5 了，
+     结果那棵树没有碰撞（玩家直接穿过去），反倒原地留了一堵看不见的墙。 */
+  for(const tx of treeX)list.push([tx,9.35,.92]);
+  /* 路灯杆：南段这 5 盏已经挪到人行道 z=9.9，碰撞还停在老位置 z=11.45（马路上），
+     差 1.55m —— 玩家撞的是空路，实际灯杆反而能穿。 */
+  for(const lx of [-19.5,-10.5,9.5,18.0,36.0])list.push([lx,9.9,.68]);
   for(const bx of [-8.4,4.5])list.push([bx,9.5,.55]);
   list.push([-7.2,9.3,.45],[9.6,10.6,.48],[-10.75,11.2,.48],[19.6,10.7,.58],[3.25,8.75,.72],[-10.9,9.55,.95]);
   // 门前迎宾雪人只剩西侧一只（东侧那只已删），碰撞同步只留西侧
@@ -14272,21 +14280,39 @@ renderer.domElement.addEventListener('pointerup',e=>{
 
    为什么不是把灯删掉：删了就真的黑了；槽位是"谁离你近谁负责亮"，
    走位的时候画面照样有光，只是不再同时点亮二十多个光源。 */
-const LP={on:false,slots:[],cands:[],K:8,cd:0,cur:[],
-  probe:new THREE.Vector3(),dir:new THREE.Vector3()};
+const LP={on:false,slots:[],cands:[],K:IS_TOUCH_DEV?5:6,cd:0,cur:[],
+  probe:new THREE.Vector3(),dir:new THREE.Vector3(),
+  /* 常驻灯的判定半径（世界坐标，绕艺术馆原点）。
+     11m 刚好把馆内那 3 盏主灯圈进来（馆内主灯、入口暖光条、中厅补光），
+     馆外的（天台主光、南段路灯、喷泉花园、游乐园、摩天轮）全部交给灯池按距离轮换。
+     天台那两盏是「从街上远看艺术馆屋顶发暖光」的关键，但它们在 12~13m 外，
+     玩家在馆子附近时本来就会被灯池按距离选中（半径 17m，够亮）。 */
+  fixedR:11};
 function initLightPool(){
   if(LP.on)return;
   const all=[];
+  scene.updateMatrixWorld(true);
   scene.traverse(o=>{ if(o.isPointLight) all.push(o); });
+  const wp=new THREE.Vector3();
   for(const l of all){
-    /* 馆内主灯和玩家身前的随行补光常驻（玩家大部分时间就在馆里），
-       判定：直接挂在场景根下、且就在馆子附近。
+    /* 常驻判定必须用**世界坐标**。
+       原来写的是 l.position（局部坐标）：挂在远处某个组里的灯，
+       局部坐标往往是 (0,0,0)，于是游乐园那 3 盏、喷泉花园那盏、摩天轮那盏
+       全被判成「馆内常驻」，不管玩家走到哪都常亮着 —— 白占逐像素光照预算
+       （实测每多一盏常驻灯，广场机位掉约 1.6 fps）。
        另外 userData.lpFixed 的灯也常驻 —— 马戏团帐篷内的柔光属于
        「这个场景本来就该亮」的照明，不能被灯池降级成候选灯，
        否则站在帐篷外看，里面就是一团黑。 */
-    const fixed=(l.parent===scene)&&(Math.hypot(l.position.x,l.position.z)<20);
-    if(fixed||l.userData.lpFixed)continue;
-    LP.cands.push({l,wp:new THREE.Vector3(),score:-1});
+    l.getWorldPosition(wp);
+    const fixed=(l.parent===scene)&&(Math.hypot(wp.x,wp.z)<LP.fixedR);
+    if(fixed)continue;        // 馆内主灯常驻，不进池
+    /* lpFixed（马戏团帐篷内的柔光）以前是「永远常驻」——
+       可它在世界坐标 (50, 3.8, 30) 这种地方，玩家在西区时它照样占着
+       逐像素光照预算（一盏约 1.6 fps），而它的照射半径只有 12.75m，
+       玩家离得远时本来就一点贡献都没有。
+       现在改成「进池 + 打分加权」：走近帐篷它优先抢到槽位（里面照样亮），
+       走远了自然被换掉，省下那 3 盏常驻。 */
+    LP.cands.push({l,wp:new THREE.Vector3(),score:-1,boost:l.userData.lpFixed?2.6:1});
     l.visible=false;          // 候选灯不进渲染状态，但矩阵照常更新，位置照样跟得住
   }
   for(let i=0;i<LP.K;i++){
@@ -14314,7 +14340,7 @@ function updateLightPool(){
       let sc=0;
       if(d<dist){
         const q=1-Math.pow(d/dist,4);
-        sc=c.l.intensity/(d*d+1)*q*q;    // 和 three 的物理衰减同口径
+        sc=c.l.intensity/(d*d+1)*q*q*(c.boost||1);    // 和 three 的物理衰减同口径
       }
       c.score=sc;
     }
@@ -21670,6 +21696,9 @@ window.XM_TOUR={
      这里开一个只读 + 少量控制的出口，供录宣传片时驱动相机 / 时间 / 设施。
      线上玩家完全用不到，不影响任何玩法。 */
   THREE,camera,controls,renderer,scene,sfx,amusement,wheelSys,trainSys,fp,director,state,intro,
+  /* 室外碰撞表：暴露出来是为了能自动体检「哪些碰撞点底下其实没有东西」
+     —— 几何挪了位而碰撞表没跟着改的话，玩家就会撞空气 / 穿物体。 */
+  OUTDOOR_OBS,
   setHour:(h)=>{const el=document.getElementById('hour');if(el){el.value=String(h);el.dispatchEvent(new Event('input',{bubbles:true}));}},
   dpr:(v)=>{try{applyDpr(v);}catch(e){}},
   quality:(on)=>{try{applyQualityMode(!!on);}catch(e){}},
