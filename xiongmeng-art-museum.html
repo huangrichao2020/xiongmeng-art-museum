@@ -333,6 +333,9 @@
     position:fixed;left:50%;bottom:70px;transform:translateX(-50%);z-index:26;
     display:none;padding:8px 16px;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;
     color:#cfe3f2;background:rgba(7,12,19,.72);border:1px solid var(--line);border-radius:2px;
+    /* 纯提示，绝不能吃触摸：clean 模式下它 opacity:0 但仍然挡在
+       摇杆右侧那块画布上，按下去像"没反应"。 */
+    pointer-events:none;
   }
   body.fp #fphint{display:block}
   body.fp:not(.clean) #fphint{opacity:1}
@@ -573,7 +576,7 @@
   #mp-coin.float::before{background:var(--accent);box-shadow:0 0 8px rgba(244,197,106,.9)}
   body.wallet-float #rail{top:52px}
   /* 手机端：交互提示条上的按钮做大，拇指点得中 */
-  body.touch #train-hud{padding:10px 13px;bottom:122px;font-size:12.5px;line-height:1.35}
+  body.touch #train-hud{padding:10px 13px;bottom:162px;font-size:12.5px;line-height:1.35}
   body.touch #train-hud button{padding:11px 18px;font-size:13px;border-radius:16px}
   /* 手机端：摄影摊的快门按钮（手机上没有空格键） */
   #ph-shoot{
@@ -706,7 +709,12 @@
     position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;
     background:radial-gradient(120% 90% at 50% 32%,rgba(40,60,100,.30) 0%,rgba(10,16,30,.62) 80%);
     backdrop-filter:blur(2px);transition:opacity .35s;
+    /* 登录卡只是浮在场景上的一张小卡片，不该把整个展厅的触摸都吃掉 ——
+       手机上"手指不落在按键时也没反应"，多半就是这块全屏遮罩挡的。
+       卡片本身照常可点。 */
+    pointer-events:none;
   }
+  #mp-login .mp-card{pointer-events:auto}
   #mp-login.hide{opacity:0;pointer-events:none}
   .mp-card{
     width:min(352px,calc(100vw - 32px));padding:26px 24px 22px;border-radius:26px;
@@ -15278,7 +15286,7 @@ cam:()=>({x:+camera.position.x.toFixed(2),y:+camera.position.y.toFixed(2),z:+cam
     }));
   },
   /* 调试：摇杆当前输出 + 跳楼机飞行状态 */
-  joy:()=>({dx:+joy.dx.toFixed(3),dy:+joy.dy.toFixed(3),mag:+joy.mag.toFixed(3),active:joy.active}),
+  joy:()=>({dx:+joy.dx.toFixed(3),dy:+joy.dy.toFixed(3),mag:+joy.mag.toFixed(3),active:joy.active,mode:joy.mode,src:joy.src}),
   launch:()=>({active:launchSys.active,stage:launchSys.stage,
     x:+launchSys.x.toFixed(2),y:+launchSys.y.toFixed(2),z:+launchSys.z.toFixed(2),
     vx:+launchSys.vx.toFixed(2),vy:+launchSys.vy.toFixed(2),vz:+launchSys.vz.toFixed(2)}),
@@ -15344,7 +15352,7 @@ function exitWalk(){
 /* ── 虚拟摇杆（左手移动）──
    统一只用 pointer 事件：触屏上浏览器本来就会派发 pointer 事件，
    再额外挂一套 touch 会让 touchmove 和 pointermove 轮流写同一个值，摇杆会自己抖回中间。 */
-const joy={active:false,cx:0,cy:0,ox:0,oy:0,dx:0,dy:0,mag:0,pid:null,src:''};
+const joy={active:false,cx:0,cy:0,ox:0,oy:0,dx:0,dy:0,mag:0,pid:null,src:'',mode:'drag'};
 const joyEl=document.getElementById('joystick'),stickEl=document.getElementById('stick');
 /* 摇杆手感（11-25 重做）：跟右边视角键一套逻辑 —— 位移驱动。
    按下哪儿哪儿就是原点，往哪滑就往哪走，滑多远走多快。
@@ -15353,8 +15361,11 @@ const joyEl=document.getElementById('joystick'),stickEl=document.getElementById(
      · 「滑出圈锁方向 / 滑到右半区清零」= 手一抖就断。
    现在只有一条规则：位移 = 方向 + 幅度（跟 TOUCH_LOOK 一样吃原始 dx/dy）。
    幅度走平方根曲线：推 8px 就有一半速度，推到 40px 满舵。 */
-const JOY_FULL=40;      // 满舵所需位移（px）
-const JOY_DEAD=2.5;     // 死区，忽略手抖
+const JOY_FULL=40;       // 位移模式：满舵所需位移（px）
+const JOY_DEAD=6;        // 死区，忽略手抖
+const JOY_PAD_DEAD=26;   // 方向键模式：离盘心多近算「按在盘正中间」
+const JOY_PAD_FULL=60;   // 方向键模式：满舵所需偏移（px）
+const JOY_LEGACY=/[?&]joy=drag/.test(location.search);   // 旧的纯位移语义（对照用）
 function joyApply(x,y){
   const dx=x-joy.ox, dy=y-joy.oy;
   const len=Math.hypot(dx,dy);
@@ -15363,42 +15374,57 @@ function joyApply(x,y){
     stickEl.style.transform='translate(0,0)';
     return;
   }
-  const mag=Math.min(1,Math.sqrt(len/JOY_FULL));   // 小位移放大，推一点就动
+  /* 方向键模式用线性曲线（小偏移也走得住，按下去就有反应）；
+     位移模式保留原来的平方根曲线（小位移放大，推一点就动）。 */
+  const mag=joy.mode==='pad'
+    ?Math.min(1,len/JOY_PAD_FULL)
+    :Math.min(1,Math.sqrt(len/JOY_FULL));
   joy.dx=dx/len*mag; joy.dy=dy/len*mag; joy.mag=mag;
   /* 内圈跟着手指走：视觉行程封顶 38px，正好卡在虚线圈里 */
   const vis=Math.min(38,len);
   stickEl.style.transform='translate('+(dx/len*vis)+'px,'+(dy/len*vis)+'px)';
 }
 function joyReset(){joy.active=false;joy.dx=joy.dy=joy.mag=0;stickEl.style.transform='translate(0,0)';}
-/* 摇杆浮起来：手指按在哪，整个摇杆就挪到哪，原点 = 手指落点。
-   左下角那颗固定摇杆只是「归位时的家」，按下去一样浮到手指底下 —— 一个入口，两种按法。 */
-function joyShowAt(x,y){
-  const r=joyEl.getBoundingClientRect().width/2;
-  joy.active=true;joy.cx=x;joy.cy=y;joy.ox=x;joy.oy=y;
-  joyEl.style.left=(x-r)+'px';
-  joyEl.style.top=(y-r)+'px';
-  joyEl.style.right='auto';joyEl.style.bottom='auto';
+/* 摇杆有两个角色，位置不能乱飘：
+   「家」  —— 手指没落在盘上时，它就是左下角那颗固定方向盘，用户知道往哪儿按；
+   「活动盘」—— 手指按在别处时，它浮到手指落点当跟手摇杆。 */
+function joyPadRect(){return joyEl.getBoundingClientRect();}
+function joyOnPad(x,y){
+  const r=joyPadRect();
+  if(!r.width)return false;
+  return Math.hypot(x-(r.left+r.width/2),y-(r.top+r.height/2))<=r.width/2;
+}
+/* 统一入口：手指按下 → 选语义 + 定摇杆落点。
+   ① 落在盘上、且不在正中间 → 方向键语义：按住就朝那边走（不用先滑）。
+   ② 正中间按着（先按住、滑了再走）或落在盘外 → 位移驱动。 */
+function joyBegin(x,y,pid,src){
+  const r=joyPadRect();
+  const hw=r.width/2, pcx=r.left+hw, pcy=r.top+r.height/2;
+  const d=Math.hypot(x-pcx,y-pcy);
+  joy.active=true;joy.src=src;joy.pid=pid;
+  joy.cx=x;joy.cy=y;
+  if(!JOY_LEGACY&&d<=hw&&d>JOY_PAD_DEAD){
+    joy.mode='pad';joy.ox=pcx;joy.oy=pcy;      // 方向键：按住即走
+  }else{
+    joy.mode='drag';joy.ox=x;joy.oy=y;
+    if(d>hw||JOY_LEGACY){                       // 落在盘外：整颗盘浮到手指落点
+      joyEl.style.left=(x-hw)+'px';
+      joyEl.style.top=(y-hw)+'px';
+      joyEl.style.right='auto';joyEl.style.bottom='auto';
+    }
+  }
   joyApply(x,y);
 }
+/* 只有摇杆自己那根手指能改方向 —— 右手在右半区转视角时 pointerId 不同，不能串 */
+function joyDrive(e){
+  if(joy.active&&e.pointerId===joy.pid)joyApply(e.clientX,e.clientY);
+}
 function joyHide(){
-  joyReset();joy.src='';
+  joyReset();joy.src='';joy.mode='drag';
   joyEl.style.left='';joyEl.style.top='';joyEl.style.right='';joyEl.style.bottom='';
 }
-joyEl.addEventListener('pointerdown',e=>{
-  e.preventDefault();
-  const r=joyEl.getBoundingClientRect();
-  joy.active=true;joy.src='pad';joy.pid=e.pointerId;
-  /* 按在圈的哪边都无所谓：原点就是手指本身，往哪滑往哪走 */
-  joy.cx=e.clientX;joy.cy=e.clientY;joy.ox=e.clientX;joy.oy=e.clientY;
-  joyEl.style.left=(e.clientX-r.width/2)+'px';
-  joyEl.style.top=(e.clientY-r.height/2)+'px';
-  joyEl.style.right='auto';joyEl.style.bottom='auto';
-  joyApply(e.clientX,e.clientY);
-  // 指针已释放时 setPointerCapture 会抛，包一层别把手势打断
-  try{joyEl.setPointerCapture&&joyEl.setPointerCapture(e.pointerId);}catch(err){}
-});
 joyEl.addEventListener('pointermove',e=>{
-  if(!joy.active)return;
+  if(!joy.active||e.pointerId!==joy.pid)return;
   e.preventDefault();
   joyApply(e.clientX,e.clientY);
 });
@@ -15408,18 +15434,32 @@ joyEl.addEventListener('pointercancel',joyHide);
    正在推的时候突然停住，用户只能重新按住，越推越烦。
    现在滑出圆圈照样能继续推（下面还有 window 级兜底），松手才停。 */
 /* 兜底：capture 丢失时（iOS 某些情况）滑出元素也要跟手。
-   必须盯住摇杆那根手指的 pointerId —— 右手在右半区转视角时
+   认准摇杆那根手指的 pointerId —— 右手在右半区转视角时
    pointerId 不同，不能让它改到人物的方向。 */
-addEventListener('pointermove',e=>{
-  if(joy.active&&joy.src==='pad'&&e.pointerId===joy.pid)joyApply(e.clientX,e.clientY);
-},{passive:true});
+addEventListener('pointermove',e=>{joyDrive(e);},{passive:true});
 /* 手指在圈外抬起（capture 丢了）也要把摇杆收回左下角 */
 addEventListener('pointerup',e=>{
-  if(joy.active&&joy.src==='pad'&&e.pointerId===joy.pid)joyHide();
+  if(joy.active&&e.pointerId===joy.pid)joyHide();
 });
 addEventListener('pointercancel',e=>{
-  if(joy.active&&joy.src==='pad'&&e.pointerId===joy.pid)joyHide();
+  if(joy.active&&e.pointerId===joy.pid)joyHide();
 });
+/* 起摇杆：左半屏（沉浸模式）任何位置按下都能起 ——
+   手指落在盘子以外也照样有反应，不再只有盘那一小块能用。
+   放在 window 捕获阶段：压在浮层/提示条上时也能操作，不会被挡。 */
+const JOY_BLOCK='button,#rail,#info,#dock,#panel,#gift-modal,#recpv,#fpv-osd,#photo-hud,#mp-login';
+addEventListener('pointerdown',e=>{
+  if(e.pointerType==='mouse')return;
+  const onPad=joyOnPad(e.clientX,e.clientY);
+  if(!fp.on){ if(!onPad)return; }                     // 沙盘：只有盘本身能操作
+  else{
+    if(e.clientX>=innerWidth*0.5)return;              // 右半屏＝转头
+    const t=e.target;
+    if(t&&t.closest&&t.closest(JOY_BLOCK))return;     // 按钮/面板不抢
+  }
+  if(joy.active&&joy.pid===e.pointerId)return;
+  joyBegin(e.clientX,e.clientY,e.pointerId,'win');
+},{capture:true});
 
 /* 触屏手势：每根手指按 pointerId 单独记账
    —— 摇杆那根手指按在 #joystick 上，不进画面的手势表，
@@ -15464,7 +15504,7 @@ renderer.domElement.addEventListener('pointerdown',e=>{
      又小又靠边，很多人根本不知道有它。左半屏动态摇杆才符合手机习惯。 */
   const isMove=fp.on&&e.clientX<innerWidth*0.5;
   lookPts.set(e.pointerId,{x:e.clientX,y:e.clientY,resync:false,kind:isMove?'move':'look'});
-  if(isMove)joyShowAt(e.clientX,e.clientY);
+  /* 起摇杆由 window 捕获阶段统一负责（joyBegin），这里只管视角手势表 */
   if(lookPts.size===2){pinchBaseY=lookMidY();
     const ps=Array.from(lookPts.values());
     pinchBaseD=Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y);}
@@ -15480,7 +15520,7 @@ renderer.domElement.addEventListener('pointermove',e=>{
   if(p.kind==='move'){
     /* 移动区：位移直接喂给虚拟摇杆 */
     p.x=e.clientX;p.y=e.clientY;
-    joyApply(e.clientX,e.clientY);
+    joyDrive(e);
     return;
   }
   if(lookPts.size===1){
