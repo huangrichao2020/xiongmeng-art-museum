@@ -21539,11 +21539,11 @@ function econJobStart(id){
   _recMsg(J.name+' · 开始上岗，客人会自己过来找你（站满 1 分钟才能下岗）',3400);
   sfx.blip(760,.10,.07);
 }
-function econJobStop(){
+function econJobStop(force){
   const shift=econShiftId();
   if(!shift)return false;
   const left=econShiftLeft();
-  if(left>0){
+  if(left>0&&!force){
     /* 没到时间不让下：提示别连着刷屏 */
     const now=performance.now();
     if(!ECON._stopCd||now-ECON._stopCd>1500){
@@ -21608,9 +21608,19 @@ function econPhotoShoot(){
     econFreeNpc(n);photoSys.npc=null;photoSys.wait=1.2;
     if(phStateEl)phStateEl.textContent='拍好一张，等下一位客人…';
   }else{
-    _recMsg('没对准，小熊笑着跑开了，再来一次',2200);
-    econFreeNpc(n);photoSys.npc=null;photoSys.wait=1.2;
-    if(phStateEl)phStateEl.textContent='没对准，等下一位客人…';
+    /* 没对准：别立刻把客人赶走 —— 玩家多半只是没转准，
+       给一次补拍机会（客人站着等你）；补不上才放人走。 */
+    const nj=n.job||(n.job={type:'photo',x:ECON_PHOTO_SPOT[0],z:ECON_PHOTO_SPOT[1],t:0});
+    nj.miss=(nj.miss||0)+1;
+    if(nj.miss>=2){
+      econFreeNpc(n);photoSys.npc=null;photoSys.wait=1.2;
+      _recMsg('没对准，小熊笑着跑开了，再来一次',2200);
+      if(phStateEl)phStateEl.textContent='没对准，等下一位客人…';
+    }else{
+      nj.t=0;
+      _recMsg('没对准，小熊还在等你 · 转过来再拍一次',2200);
+      if(phStateEl)phStateEl.textContent='没对准 · 客人还在，把视线移过去';
+    }
   }
 }
 
@@ -21618,6 +21628,9 @@ function econPhotoShoot(){
 let econLastPrompt='',econLastMsg='';
 function econUpdate(dt){
   ECON.jobCd=Math.max(0,ECON.jobCd-dt);
+  /* 快门冷却原来没人递减 —— 第一次按过之后 cool 永远是 0.8，
+     后面每次按快门都在第一行 return，表现为"拍不了第二张"。 */
+  photoSys.cool=Math.max(0,photoSys.cool-dt);
   /* 「个人」面板是联机模块后建的，雪币角标要定期重新挂一次 */
   if(((ECON._tick=(ECON._tick|0)+1)%30)===0)econPaint();
   /* 飘字 */
@@ -21644,7 +21657,7 @@ function econUpdate(dt){
   if(_shift&&fp.on){
     const J=ECON_JOBS.find(j=>j.id===_shift);
     if(J&&Math.hypot(fp.x-J.gx,fp.z-J.gz)>9){
-      econJobStop();
+      econJobStop(true);      // 离开工位＝中断，不吃"站满 1 分钟"
     }else if(J){
       ECON_SHIFT.t+=dt;
       if(_shift==='ticket'&&!ECON.ticketBuyer&&ECON_SHIFT.t>ECON_SHIFT.next){
@@ -21679,15 +21692,22 @@ function econUpdate(dt){
     if(photoSys.npc){
       const n=photoSys.npc;
       n.look=[fp.x,fp.z];
-      const dx=n.p.position.x-camera.position.x, dz=n.p.position.z-camera.position.z;
-      const dist=Math.hypot(dx,dz);
-      const cy=camera.rotation.y;
-      const dot=(dx*(-Math.sin(cy))+dz*(-Math.cos(cy)))/Math.max(.001,dist);
-      const ang=Math.acos(Math.min(1,Math.max(-1,dot)));
-      photoSys.aimed=(ang<.44&&dist<16);
-      if(phStateEl)phStateEl.textContent=photoSys.aimed
-        ?'对准了！按 空格 拍照（'+dist.toFixed(1)+'m）'
-        :'客人站好了 · 把视线移过去对准他';
+      /* 客人站着等太久了就放走，别让一个人占着摄影位不走 */
+      let gone=false;
+      if(n.job){n.job.t=(n.job.t||0)+dt;
+        if(n.job.t>22){econFreeNpc(n);photoSys.npc=null;photoSys.wait=1.2;gone=true;
+          if(phStateEl)phStateEl.textContent='客人等太久走了，等下一位…';}}
+      if(!gone){
+        const dx=n.p.position.x-camera.position.x, dz=n.p.position.z-camera.position.z;
+        const dist=Math.hypot(dx,dz);
+        const cy=camera.rotation.y;
+        const dot=(dx*(-Math.sin(cy))+dz*(-Math.cos(cy)))/Math.max(.001,dist);
+        const ang=Math.acos(Math.min(1,Math.max(-1,dot)));
+        photoSys.aimed=(ang<.44&&dist<16);
+        if(phStateEl)phStateEl.textContent=photoSys.aimed
+          ?'对准了！'+(IS_TOUCH_DEV?'点右下角快门':'按 空格 拍照')+'（'+dist.toFixed(1)+'m）'
+          :'客人站好了 · 把视线移过去对准他';
+      }
     }else{
       photoSys.wait-=dt;
       if(photoSys.wait<=0&&!ECON.ticketBuyer){
@@ -21704,8 +21724,21 @@ function econUpdate(dt){
         }
       }
     }
-    /* 走远了就收摊 */
+    /* 走远了就收摊（离开工位＝中断，不吃"站满 1 分钟"那一套） */
     if(Math.hypot(fp.x-ECON_JOBS[1].gx,fp.z-ECON_JOBS[1].gz)>9)econPhotoStop();
+    /* 在岗提示：上岗以后提示条必须换成「上岗中 / 下班」。
+       原来这里直接 return，提示条一直挂着上岗前的「上岗」按钮，
+       玩家看��还是"让我上岗"，再点一下就把自己的摊子关了。 */
+    if(photoSys.on){
+      const J=ECON_JOBS[1];
+      const left=Math.max(0,Math.ceil(econShiftLeft()));
+      const TOUCH=IS_TOUCH_DEV;
+      econSetPrompt('shift:photo',
+        J.name+' · 上岗中 · '+(TOUCH?'客人站好了就点右下角快门':'客人站好了就按 空格 拍照')+
+        (left>0?' · 还差 '+left+' 秒才能下岗':' · 可以下岗了'),
+        left>0?'上班中':(TOUCH?'下班':'下班 (E)'),
+        ()=>econJobStop());
+    }
     return;
   }
   if(wheelSys.riding||trainSys.riding||launchSys.active||heliSys.riding||balloonSys.riding)return;
@@ -21785,7 +21818,7 @@ function econInteract(){
   if(shift){
     /* 站在别的工位旁边 → 直接换班；否则按 E 下班 */
     const jb=econNearestJob();
-    if(jb&&jb.id!==shift){econJobStop();econJobStart(jb.id);return true;}
+    if(jb&&jb.id!==shift){econJobStop(true);econJobStart(jb.id);return true;}
     econJobStop();
     return true;
   }
