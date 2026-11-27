@@ -1,6 +1,7 @@
 .DS_Store
 *.bak-*
 .deploy/
+.deploy-jiangnan/
 .localtest/
 out/
 tmp/

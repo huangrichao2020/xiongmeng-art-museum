@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>江南百景图 · 古村</title>
+<link rel="icon" type="image/svg+xml" href="./favicon.svg">
+<style>
+  :root{
+    --seal:#a8342a; --seal-d:#7d241d; --gold:#c8a44a;
+    --paper:#f2ead9; --ink:#2b2620; --ink2:#6b6154; --line:rgba(120,100,72,.34);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0d1116;
+    font-family:"Songti SC","STSong","Noto Serif SC",serif;color:var(--ink)}
+  canvas{display:block;touch-action:none}
+  #app{position:fixed;inset:0}
+
+  /* ── 左侧面板 ── */
+  #panel{
+    position:fixed;left:18px;top:18px;z-index:30;width:288px;max-width:calc(100vw - 36px);
+    background:linear-gradient(180deg,rgba(244,238,224,.96),rgba(236,228,210,.94));
+    border:1px solid var(--line);border-radius:3px;
+    box-shadow:0 18px 44px rgba(0,0,0,.42),inset 0 0 0 1px rgba(255,255,255,.5);
+    padding:16px 18px 14px;user-select:none;
+  }
+  #panel .row-head{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+  /* 手机端折叠面板用的开关，桌面不需要 */
+  #btn-more{display:none}
+  .seal{
+    width:46px;height:46px;flex:none;border-radius:3px;background:var(--seal);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.35),0 3px 10px rgba(168,52,42,.35);
+    display:grid;place-items:center;color:#fff;font-size:20px;line-height:1;letter-spacing:.06em;
+    writing-mode:vertical-rl;text-orientation:upright;padding-top:3px;
+  }
+  .ttl{font-size:22px;letter-spacing:.14em;line-height:1.25}
+  .sub{font-size:10px;letter-spacing:.30em;color:var(--ink2);margin-top:3px}
+  #landmark{font-size:19px;letter-spacing:.10em;margin:6px 0 2px}
+  #landsub{font-size:11px;color:var(--ink2);letter-spacing:.16em;margin-bottom:12px}
+
+  .bigbtn{
+    width:100%;height:44px;border:none;border-radius:3px;cursor:pointer;
+    background:linear-gradient(180deg,#b23c30,#8d2820);color:#f7e7c4;
+    font-family:inherit;font-size:15px;letter-spacing:.30em;text-indent:.30em;
+    box-shadow:0 6px 16px rgba(141,40,32,.38),inset 0 1px 0 rgba(255,255,255,.22);
+  }
+  .bigbtn:active{transform:translateY(1px)}
+  .seedrow{display:flex;gap:7px;margin:9px 0 12px;align-items:center}
+  .seedrow input{
+    flex:1;min-width:0;height:30px;border:1px solid var(--line);background:rgba(255,255,255,.55);
+    border-radius:2px;padding:0 8px;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink);
+  }
+  .seedrow button{height:30px;padding:0 11px;border:1px solid var(--line);background:rgba(255,255,255,.6);
+    border-radius:2px;font-family:inherit;font-size:12px;letter-spacing:.1em;cursor:pointer;color:var(--ink)}
+
+  .modes{display:flex;gap:6px;margin-bottom:12px}
+  .modes button{
+    flex:1;height:32px;border:1px solid var(--line);background:rgba(255,255,255,.45);border-radius:2px;
+    font-family:inherit;font-size:13px;letter-spacing:.08em;cursor:pointer;color:var(--ink2);
+  }
+  .modes button.on{background:var(--seal);border-color:var(--seal);color:#f7e7c4}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px 4px;border-top:1px solid var(--line);
+    padding-top:11px}
+  .stats div{text-align:center}
+  .stats b{display:block;font-size:19px;font-weight:600;letter-spacing:.02em}
+  .stats span{font-size:10.5px;color:var(--ink2);letter-spacing:.14em}
+
+  #panel .foot{margin-top:11px;padding-top:9px;border-top:1px solid var(--line);
+    font-size:10.5px;color:var(--ink2);letter-spacing:.12em;display:flex;justify-content:space-between}
+
+  /* ── 右下小地图 ── */
+  #mini{
+    position:fixed;right:18px;bottom:18px;z-index:30;width:214px;
+    background:linear-gradient(180deg,rgba(244,238,224,.95),rgba(234,226,208,.93));
+    border:1px solid var(--line);border-radius:3px;padding:9px 9px 8px;
+    box-shadow:0 14px 34px rgba(0,0,0,.4);
+  }
+  #mini .mt{font-size:11px;letter-spacing:.24em;color:var(--ink2);margin-bottom:6px;display:flex;justify-content:space-between}
+  #mini canvas{width:196px;height:196px;display:block;background:#e8dfc9;border:1px solid var(--line)}
+  #mini .mf{margin-top:6px;font-size:10px;letter-spacing:.12em;color:var(--ink2);display:flex;justify-content:space-between}
+
+  /* ── 底部提示条 ── */
+  #hintbar{
+    position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:28;
+    padding:8px 18px;border-radius:2px;background:rgba(14,20,28,.74);
+    border:1px solid rgba(200,164,74,.32);color:#e8dcc2;font-size:12px;letter-spacing:.16em;
+    white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis;
+  }
+  #hintbar b{color:var(--gold);font-weight:600}
+
+  /* ── 沉浸模式的手机控件 ── */
+  #joystick{position:fixed;left:14px;bottom:20px;z-index:29;display:none;width:130px;height:130px;
+    border-radius:50%;border:1.5px solid rgba(160,210,240,.3);
+    background:radial-gradient(circle,rgba(12,22,32,.42) 40%,rgba(12,22,32,.16) 100%);
+    backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);touch-action:none}
+  #stick{position:absolute;left:50%;top:50%;width:60px;height:60px;margin:-30px 0 0 -30px;border-radius:50%;
+    background:rgba(190,225,245,.34);border:1.5px solid rgba(210,240,255,.55);pointer-events:none}
+  body.immersive #joystick{display:block}
+  /* 沉浸模式的一次性操作提示 */
+  #walk-tip{position:fixed;left:50%;top:16%;transform:translateX(-50%);z-index:29;display:none;
+    padding:8px 16px;border-radius:3px;background:rgba(14,24,34,.72);color:#d6ecf8;
+    font-size:12px;letter-spacing:.1em;pointer-events:none;white-space:nowrap}
+  #walk-tip.on{display:block}
+  #walkbar{position:fixed;right:16px;bottom:20px;z-index:29;display:none;gap:8px}
+  body.immersive #walkbar{display:flex}
+  /* 传送门按钮：默认藏起来，靠近法阵才出现（手机上没有 E 键） */
+  #wb-portal[hidden]{display:none}
+  /* 沉浸模式下把右下角让出来 —— 小地图和"沙盘/传送门"按钮在同一块，
+     不藏掉的话按钮会被小地图压住点不到 */
+  body.immersive #mini{display:none}
+  /* 沉浸模式下底部提示条会跟"沙盘/传送门"按钮叠在一起，藏掉 */
+  body.immersive #hintbar{display:none}
+  #wb-portal{border-color:rgba(200,164,74,.55);background:rgba(52,38,16,.62);color:#f0dca8;font-size:12px}
+  #walkbar button{width:64px;height:64px;border-radius:50%;border:1.5px solid rgba(160,210,240,.4);
+    background:rgba(14,24,34,.5);color:#d6ecf8;font-family:inherit;font-size:12px;letter-spacing:.1em;cursor:pointer}
+
+  #loading{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:#0d1116;
+    color:#e8dcc2;font-size:13px;letter-spacing:.3em;transition:opacity .5s}
+  #loading.gone{opacity:0;pointer-events:none}
+
+  @media (max-width:720px){
+    /* 手机优先：面板改成顶部一条 + 展开抽屉。
+       原来手机上面板常驻 272×560，把整个村子挡没了 —— 现在默认只占顶上一百来像素，
+       点"图景"才展开种子框、统计网格和新一幅图景。 */
+    #panel{
+      left:8px;top:8px;right:8px;width:auto;max-width:none;padding:8px 10px 9px;
+      display:grid;grid-template-columns:1fr auto;align-items:center;gap:5px 8px;
+    }
+    #panel .row-head{grid-column:1;margin:0;gap:8px}
+    .seal{width:30px;height:30px;font-size:14px;padding-top:2px}
+    .ttl{font-size:15px;letter-spacing:.06em}
+    .sub{display:none}
+    #landmark{grid-column:1;margin:0;font-size:14px;letter-spacing:.08em}
+    #landsub{display:none}
+    #btn-more{
+      grid-column:2;grid-row:1/3;display:block;height:30px;padding:0 12px;flex:none;
+      border:1px solid var(--line);background:rgba(255,255,255,.6);border-radius:2px;
+      font-family:inherit;font-size:12px;letter-spacing:.12em;color:var(--ink2);cursor:pointer;
+    }
+    #btn-more.on{background:var(--seal);border-color:var(--seal);color:#f7e7c4}
+    .modes{grid-column:1/3;margin:6px 0 0;gap:5px}
+    .modes button{height:31px;font-size:13px}
+    /* 抽屉里的东西默认收起来 */
+    .bigbtn,.seedrow,.stats,#panel .foot{display:none}
+    #panel.open .bigbtn{display:block;margin-top:8px;height:40px;font-size:14px}
+    #panel.open .seedrow{display:flex;margin:8px 0 0}
+    #panel.open .stats{display:grid;margin-top:8px;padding-top:8px;gap:6px 4px}
+    #panel.open #panel .foot{display:flex;margin-top:8px}
+    .stats b{font-size:16px}
+    /* 小地图再缩一档，别跟面板抢地方 */
+    #mini{right:8px;bottom:8px;width:112px;padding:5px}
+    #mini canvas{width:100px;height:100px}
+    #mini .mf{display:none}
+    #mini .mt{font-size:9px;letter-spacing:.14em;margin-bottom:4px}
+    #hintbar{font-size:10.5px;bottom:8px;padding:6px 12px}
+  }
+  @media (max-width:720px) and (orientation:landscape){
+    /* 横屏时面板退回左侧一条，但仍然保持折叠（别把折叠规则覆盖掉） */
+    #panel{right:auto;width:238px}
+    #mini{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="panel">
+  <div class="row-head">
+    <div class="seal">江南</div>
+    <div>
+      <div class="ttl">江南百景图</div>
+      <div class="sub">JIANGNAN · A VILLAGE ATLAS</div>
+    </div>
+    <button id="btn-more">图景</button>
+  </div>
+  <div id="landmark">竹海茶山</div>
+  <div id="landsub">一座古村 · 可俯瞰 · 可沉浸</div>
+  <button class="bigbtn" id="btn-new">新一幅图景</button>
+  <div class="seedrow">
+    <input id="seed" inputmode="numeric" placeholder="种子（留空随机）">
+    <button id="btn-seed">载入</button>
+  </div>
+  <div class="modes" id="modes">
+    <button data-mode="over">俯瞰</button>
+    <button data-mode="close">近观</button>
+    <button data-mode="orbit">环绕</button>
+    <button data-mode="walk">沉浸</button>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="foot"><span id="foot-l">生成新图景</span><span id="foot-r">匠人笔记</span></div>
+</div>
+
+<div id="mini">
+  <div class="mt"><span>村 域 图</span><span id="mini-scale">—</span></div>
+  <canvas id="minimap" width="392" height="392"></canvas>
+  <div class="mf"><span>▲ 北</span><span id="mini-pos">—</span></div>
+</div>
+
+<div id="hintbar">载入图景 · 清点完成 · <b>新一幅图景</b> 换一张 · <b>俯瞰/近观/环绕/沉浸</b> 切换 · 拖动旋转 · 滚轮缩放</div>
+
+<div id="joystick"><i id="stick"></i></div>
+<div id="walk-tip"></div>
+<div id="walkbar"><button id="wb-back">沙盘</button><button id="wb-portal" hidden>回艺术馆</button></div>
+
+<div id="loading">正在铺展图卷…</div>
+
+<script type="importmap">
+{"imports":{"three":"./three.module.js","three/addons/":"./addons/"}}
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

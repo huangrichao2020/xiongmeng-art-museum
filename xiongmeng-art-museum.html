@@ -18504,6 +18504,7 @@ function animate(){
   updateHelis(dt);
   updateFireworks(dt);
   econUpdate(dt);
+  if(JN_PORTAL.userData.update)JN_PORTAL.userData.update(t,dt);
   updateAerialHaze(dt,t);
   const ridingFast=fpvSys.active||(wheelSys.riding&&wheelSys.kind==='coaster')||trainSys.riding||heliSys.riding;
   if(!ridingFast||(_reflTick&1)===0)updateOuterCrowd(ridingFast?dt*2:dt,t);
@@ -21742,6 +21743,16 @@ function econUpdate(dt){
     return;
   }
   if(wheelSys.riding||trainSys.riding||launchSys.active||heliSys.riding||balloonSys.riding)return;
+  /* 传送门：站在江南古村门楼前，提示条切成"进村"。
+     优先级放在工位/上车点之后 —— 打工和上车是主站玩法，传送门是支线。 */
+  if(jnPortalNear()){
+    const TOUCH=IS_TOUCH_DEV;
+    econSetPrompt('portal:jn',
+      '江南古村 · 门楼里的水墨门还开着'+(TOUCH?' · 点按钮进村':' · 按 E 进村'),
+      TOUCH?'进村':'进村 (E)',
+      ()=>jnPortalGo());
+    return;
+  }
   /* 提示：工位优先，其次上车光点 */
   const job=econNearestJob();
   const pad=econNearestPad();
@@ -21814,6 +21825,8 @@ function econClickRide(kind){
 /* ── 经济系统：E 键统一入口（上车点 / 工位）── */
 function econInteract(){
   if(!fp.on)return false;
+  /* 江南古村传送门：在门楼前按 E 直接进村（优先级最高，站在门口就是要走） */
+  if(jnPortalNear()){jnPortalGo();return true;}
   const shift=econShiftId();
   if(shift){
     /* 站在别的工位旁边 → 直接换班；否则按 E 下班 */
@@ -21829,6 +21842,130 @@ function econInteract(){
   return false;
 }
 
+
+/* ════════════════════════════════════════════════════════════
+   江南古村 · 传送门（主站 → 古村地图）
+   放在艺术馆正门正南的空雪地上（x=-2, z=26，实测净空 7.7m，不压马路也不压游乐园）
+   ════════════════════════════════════════════════════════════ */
+const JN_GATE={x:-2,z:26,r:3.2,target:'https://preview.ai10088.com/jiangnan/'};
+const JN_PORTAL=new THREE.Group();JN_PORTAL.name='jn-portal';scene.add(JN_PORTAL);
+(function buildJnPortal(){
+  /* 门楼：两根石柱 + 一道黛瓦门楣 + 匾额（"江南古村"），
+     做成国风小门洞，别用纯色方块 —— 每根柱都有柱础、柱身收分、柱头斗块。 */
+  const stoneM=M(0xcfd6de,{roughness:.86,metalness:.04});
+  const stoneDarkM=M(0x9aa4ae,{roughness:.9,metalness:.03});
+  const tileM=M(0x2f3944,{roughness:.72,metalness:.12});
+  const woodM=M(0x6b4a33,{roughness:.78,metalness:.05});
+  const H=4.6, SPAN=5.0, PX=SPAN/2;
+  for(const s of[-1,1]){
+    const cx=s*PX;
+    /* 柱础 */
+    add(JN_PORTAL,BX(.92,.28,.92),stoneDarkM,cx,.14,0);
+    add(JN_PORTAL,BX(.78,.16,.78),stoneM,cx,.36,0);
+    /* 柱身：两段收分 */
+    add(JN_PORTAL,BX(.60,2.05,.60),stoneM,cx,1.46,0);
+    add(JN_PORTAL,BX(.52,1.05,.52),stoneM,cx,3.01,0);
+    /* 柱头斗块 */
+    add(JN_PORTAL,BX(.72,.26,.72),stoneDarkM,cx,3.66,0);
+    /* 瓦当小挑檐 */
+    add(JN_PORTAL,BX(.96,.13,.96),tileM,cx,3.86,0);
+  }
+  /* 门楣横梁（两根，中间抬高） */
+  add(JN_PORTAL,BX(SPAN+.9,.42,.62),woodM,0,4.06,0);
+  add(JN_PORTAL,BX(SPAN+1.5,.20,.86),tileM,0,4.36,0);
+  /* 门楣上小瓦垄：8 条 */
+  for(let i=0;i<8;i++){
+    const x=(i-3.5)*(SPAN+1.3)/8;
+    add(JN_PORTAL,BX(.16,.16,.92),tileM,x,4.50,0);
+  }
+  /* 匾额 */
+  {
+    const[c,ctx]=cv(512,128);
+    const g=ctx.createLinearGradient(0,0,0,128);
+    g.addColorStop(0,'#3a2417');g.addColorStop(1,'#241309');
+    ctx.fillStyle=g;ctx.fillRect(0,0,512,128);
+    ctx.strokeStyle='#e8c884';ctx.lineWidth=5;ctx.strokeRect(10,10,492,108);
+    ctx.fillStyle='#ffeab8';ctx.font='700 58px '+HK;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('江 南 古 村',256,62);
+    const tex=ctex(c);
+    const pm=new THREE.Mesh(new THREE.PlaneGeometry(2.6,.65),new THREE.MeshBasicMaterial({map:tex}));
+    pm.position.set(0,4.06,.33);JN_PORTAL.add(pm);
+    const pm2=pm.clone();pm2.position.z=-.33;pm2.rotation.y=Math.PI;JN_PORTAL.add(pm2);
+  }
+  /* 门内：发光的江南水墨门（半透明波纹 + 一圈刻纹） */
+  const gateMat=new THREE.MeshBasicMaterial({
+    color:0x8fd8e8,transparent:true,opacity:.34,side:THREE.DoubleSide,
+    blending:THREE.AdditiveBlending,depthWrite:false});
+  const gate=new THREE.Mesh(new THREE.PlaneGeometry(SPAN-.5,H-.5),gateMat);
+  gate.position.set(0,2.5,0);JN_PORTAL.add(gate);
+  /* 水墨纹路：同心圈 + 放射线，贴在门面上 */
+  {
+    const[c,ctx]=cv(512,512);
+    ctx.clearRect(0,0,512,512);
+    ctx.strokeStyle='rgba(190,240,255,.85)';ctx.lineWidth=2.5;
+    for(const r of[70,110,150,190]){ctx.beginPath();ctx.arc(256,256,r,0,Math.PI*2);ctx.stroke();}
+    ctx.lineWidth=1.6;ctx.strokeStyle='rgba(210,245,255,.6)';
+    for(let i=0;i<16;i++){const a=i*Math.PI/8;ctx.beginPath();
+      ctx.moveTo(256+Math.cos(a)*46,256+Math.sin(a)*46);
+      ctx.lineTo(256+Math.cos(a)*205,256+Math.sin(a)*205);ctx.stroke();}
+    /* 中央一个"古"字 */
+    ctx.fillStyle='rgba(230,250,255,.9)';ctx.font='700 96px '+HK;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('古',256,256);
+    const tex=ctex(c);
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(SPAN-.5,H-.5),new THREE.MeshBasicMaterial({
+      map:tex,transparent:true,opacity:.9,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
+    m.position.set(0,2.5,0);JN_PORTAL.add(m);
+    /* 慢慢转 + 呼吸 */
+    m.userData.update=(t)=>{m.rotation.z=t*.14;gateMat.opacity=.22+.14*Math.sin(t*1.7);};
+  }
+  /* 门柱上两盏红灯笼 */
+  for(const s of[-1,1]){
+    const lx=s*(PX+.05);
+    const lant=new THREE.Mesh(new THREE.SphereGeometry(.30,12,10),
+      new THREE.MeshStandardMaterial({color:0xd8322f,emissive:0xb02020,emissiveIntensity:.9,roughness:.6}));
+    lant.scale.set(1,1.18,1);lant.position.set(lx,3.62,.42);lant.castShadow=true;JN_PORTAL.add(lant);
+    add(JN_PORTAL,BX(.04,.34,.04),woodM,lx,3.96,.42);
+    add(JN_PORTAL,BX(.20,.05,.20),stoneDarkM,lx,3.30,.42);
+  }
+  /* 门前石板 + 雪堆（别让门悬空） */
+  add(JN_PORTAL,BX(SPAN+1.6,.10,3.4),stoneDarkM,0,.05,0);
+  add(JN_PORTAL,BX(SPAN+1.2,.06,2.2),stoneM,0,.13,0);
+  for(const s of[-1,1]){
+    const sn=new THREE.Mesh(new THREE.SphereGeometry(.62,14,10),M(0xf2f6fb,{roughness:.95}));
+    sn.scale.set(1,.36,.7);sn.position.set(s*(PX+1.0),.10,.9);sn.castShadow=true;sn.receiveShadow=true;JN_PORTAL.add(sn);
+  }
+  JN_PORTAL.position.set(JN_GATE.x,0,JN_GATE.z);
+  JN_PORTAL.rotation.y=Math.PI;   /* 正面朝南（面向从正门走过来的人） */
+  /* 门柱挡人，但门口留出通道（法阵要能走进去） */
+  OUTDOOR_OBS.push([JN_GATE.x-2.5,JN_GATE.z,0.85],[JN_GATE.x+2.5,JN_GATE.z,0.85]);
+  /* 门两侧各一盏暖光，夜里能看见 */
+  for(const s of[-1,1]){
+    const pl=new THREE.PointLight(0xffcf90,26,16,1.6);
+    pl.position.set(s*PX,3.4,.6);JN_PORTAL.add(pl);
+  }
+  /* 门口光池 */
+  const pool=new THREE.Mesh(new THREE.CircleGeometry(2.1,32),
+    new THREE.MeshBasicMaterial({color:0x6fd0e0,transparent:true,opacity:.22,blending:THREE.AdditiveBlending,depthWrite:false}));
+  pool.rotation.x=-Math.PI/2;pool.position.set(0,.03,0);JN_PORTAL.add(pool);
+})();
+
+/* 传送门触发：走到跟前，提示条出现"进入江南古村"，按 E / 点按钮跳转 */
+function jnPortalNear(){
+  if(!fp.on)return false;
+  return Math.hypot(fp.x-JN_GATE.x,fp.z-JN_GATE.z)<JN_GATE.r+1.4;
+}
+function jnPortalGo(){
+  const u=new URL(JN_GATE.target);
+  u.searchParams.set('from','alex-garage');
+  location.href=u.toString();
+}
+JN_PORTAL.userData.update=(t)=>{
+  /* 只遍历子节点 —— 遍历自己会无限递归 */
+  for(const o of JN_PORTAL.children){
+    if(o.userData&&o.userData.update)o.userData.update(t);
+    else o.children.forEach(c=>{if(c.userData&&c.userData.update)c.userData.update(t);});
+  }
+};
 
 econBuildAll();
 /* 调试出口：探针和联机面板要看钱包 / 上车点 / 打工状态 */
