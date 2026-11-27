@@ -4,6 +4,16 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { generateLayout, TYPE } from './core/layout.js';
 import { initMaterials, MAT } from './core/materials.js';
+import { initSky } from './core/sky.js';
+import { initEffects } from './core/effects.js';
+import { updateShared, sharedUniforms } from './core/patch.js';
+import { windState } from './core/effects.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 
 const qs = new URLSearchParams(location.search);
 const APP = document.getElementById('app');
@@ -20,10 +30,19 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 APP.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xcfdce6);
-scene.fog = new THREE.Fog(0xc6d4de, 190, 520);
+scene.fog = new THREE.Fog(0xc6d6e2, 90, 420);
 
-const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, .3, 1400);
+const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, .3, 3200);
+
+/* ── 画质档位 ──
+   用户主要用手机。GTAO（环境光遮蔽）是"廉价体块感"的头号杀手，
+   但在手机上很贵 —— 所以按设备分档：
+     高：GTAO + FXAA + 4096 阴影   （桌面）
+     中：FXAA + 4096 阴影 + 接地阴影贴片（手机默认）
+   可以在左上栏里手动切。 */
+const IS_TOUCH = matchMedia('(pointer:coarse)').matches;
+const quality = { level: IS_TOUCH ? 'mid' : 'high' };
+window.__jnQuality = quality;
 camera.position.set(0, 150, 120);
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -34,34 +53,100 @@ controls.maxDistance = 420;
 controls.maxPolarAngle = Math.PI * .495;
 controls.target.set(0, 0, 0);
 
-/* ── 光：晨光 + 天光 + 一盏补光 ── */
-const hemi = new THREE.HemisphereLight(0xcfe0ee, 0x6d7a4c, 1.05);
-scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff0d6, 2.15);
-sun.position.set(96, 128, 62);
-sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.near = 40;
-sun.shadow.camera.far = 420;
-const S = 120;
-sun.shadow.camera.left = -S; sun.shadow.camera.right = S;
-sun.shadow.camera.top = S; sun.shadow.camera.bottom = -S;
-sun.shadow.bias = -.0009;
-sun.shadow.normalBias = .035;
-scene.add(sun);
-const fill = new THREE.DirectionalLight(0xa8c4dd, .45);
-fill.position.set(-70, 60, -80);
-scene.add(fill);
+/* ── 后期链路：RenderPass → (GTAO) → OutputPass → FXAA ── */
+const composer = new EffectComposer(renderer);
+composer.setPixelRatio(Math.min(devicePixelRatio, 2));
+composer.setSize(innerWidth, innerHeight);
+const renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
+let gtaoPass = null;
+const outputPass = new OutputPass();
+composer.addPass(outputPass);
+const fxaaPass = new ShaderPass(FXAAShader);
+composer.addPass(fxaaPass);
+function syncFxaa() {
+  const pr = renderer.getPixelRatio();
+  fxaaPass.material.uniforms.resolution.value.set(1 / (innerWidth * pr), 1 / (innerHeight * pr));
+}
+syncFxaa();
+function applyQuality(level) {
+  quality.level = level;
+  const wantAO = level === 'high';
+  if (wantAO && !gtaoPass) {
+    gtaoPass = new GTAOPass(scene, camera, innerWidth, innerHeight);
+    gtaoPass.output = GTAOPass.OUTPUT.Default;
+    /* 采样半径必须和场景尺度匹配：原来 radius .85m / thickness 1.0m，
+       对 0.18m 厚的墙来说等于「把整面墙当薄片」，于是墙棱、山墙边、
+       屋脊边被判定成大深度差 → 纯黑楔形伪影（关掉 GTAO 就消失）。
+       半径收到 0.28m、厚度收到 0.45m，只留「贴着表面的接触阴影」，
+       这才是我们想要的 AO，而不是大面积脏黑。 */
+    gtaoPass.updateGtaoMaterial({
+      radius: .28, distanceExponent: 1.0, thickness: .45,
+      scale: 1.0, samples: 16, distanceFallOff: 1.0, screenSpaceRadius: false,
+    });
+    gtaoPass.blendIntensity = .62;
+    composer.insertPass(gtaoPass, 1);       /* 必须在 tone mapping 之前 */
+  } else if (!wantAO && gtaoPass) {
+    composer.removePass(gtaoPass);
+    gtaoPass.dispose?.();
+    gtaoPass = null;
+  }
+  /* 阴影精度：4096 贴图 + 收紧视锥（原来 2048 覆盖 ±120m，每 texel 11.7cm，屋檐全糊） */
+  const mapSize = level === 'high' ? 4096 : 2048;
+  const S = level === 'high' ? 110 : 96;
+  if (sky && sky.sun) {
+    sky.sun.shadow.mapSize.set(mapSize, mapSize);
+    const c = sky.sun.shadow.camera;
+    c.left = -S; c.right = S; c.top = S; c.bottom = -S;
+    c.updateProjectionMatrix();
+    if (sky.sun.shadow.map) { sky.sun.shadow.map.dispose(); sky.sun.shadow.map = null; }
+  }
+  syncFxaa();
+}
+
+/* ── 天色系统：真实大气散射天空 + 环境反射 + 时段联动 ──
+   原来这里是「一盏平行光 + 一盏半球光 + 一盏补光」，材质没有环境反射，
+   颜色全靠 albedo 硬画，所以瓦顶死黑、墙面灰绿 —— 塑料感的根源。
+   现在天空用 Preetham 大气散射模型，PMREM 烘成环境贴图给 scene.environment。 */
+const sky = initSky(renderer, scene);
+applyQuality(quality.level);   /* sky 建好之后才能设阴影参数 */
+scene.environmentIntensity = .34;   /* 环境光别压过太阳，不然没有明暗对比 */
+sky.onChange = (h, label) => {
+  const hh = Math.floor(h), mm = Math.floor((h - hh) * 60);
+  const clockEl = document.getElementById('jnClock');
+  if (clockEl) clockEl.innerHTML = `<b>${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}</b> ${label}`;
+  document.querySelectorAll('#jnHours button').forEach(b2 => {
+    b2.classList.toggle('on', Math.abs(parseFloat(b2.dataset.hour) - h) < .6);
+  });
+  syncRemotes();
+};
+
+/* 远景（裙边 + 远山）的颜色全部由当前雾色推出来 → 换时段自动协调 */
+function syncRemotes() {
+  try {
+    const r = world && world.getObjectByName('model-remotes');
+    if (r && r.userData.setSky) {
+      /* 夜色浓度：21 点最浓，晨昏居中，昼日为 0 */
+      const h = sky ? sky.hour : 12;
+      const night = h >= 17.5 || h <= 5.2
+        ? Math.min(1, (h >= 17.5 ? (h - 17.5) / 3.5 : (5.2 - h) / 3.5))
+        : 0;
+      r.userData.setSky(scene.fog.color, night);
+    }
+  } catch (e) { /* world 还没建好，忽略 */ }
+}
 
 /* ── 状态 ── */
-const MODEL_MODULES = ['terrain', 'water', 'roads', 'farmland', 'houses', 'trees', 'pagoda', 'paifang', 'props', 'people', 'portal'];
+const MODEL_MODULES = ['terrain', 'water', 'roads', 'farmland', 'houses', 'trees', 'pagoda', 'paifang', 'props', 'people', 'portal', 'remotes'];
 let layout = null;
 let world = new THREE.Group();
 scene.add(world);
 let portals = [];
+let effects = null;
 let mode = 'over';
 let walk = null;               // 沉浸模式状态
 const clock = new THREE.Clock();
+const _sunDir = new THREE.Vector3();
 
 /* ── 生成一座村 ── */
 async function buildVillage(seed) {
@@ -79,14 +164,15 @@ async function buildVillage(seed) {
       console.warn('[江南] 模型模块缺失或出错:', name, e && e.message);
     }
   }
-  /* 地形若有起伏，把太阳阴影范围重新对齐 */
-  scene.fog.color.set(0xc6d4de);
+  /* 环境动效（炊烟 / 萤火 / 落花）—— 重建村子时先摘掉旧的 */
+  if (effects) { scene.remove(effects); effects = null; }
+  effects = initEffects(scene, layout, world);
   paintStats();
-  paintMinimap();
-  document.getElementById('landmark').textContent = layout.landmark.name;
-  document.getElementById('landsub').textContent = layout.landmark.sub;
+  const nameEl = document.getElementById('railName');
+  if (nameEl) nameEl.innerHTML = layout.landmark.name + '<small>JIANGNAN VILLAGE</small>';
   document.getElementById('seed').value = layout.seed;
   const u = new URL(location.href); u.searchParams.set('seed', layout.seed); history.replaceState(null, '', u);
+  syncRemotes();
   applyMode(mode, true);
 }
 
@@ -98,7 +184,7 @@ const MODES = {
 };
 function applyMode(m, silent) {
   mode = m;
-  document.querySelectorAll('#modes button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  document.querySelectorAll('#viewbar button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
   if (m === 'walk') { enterWalk(); return; }
   exitWalk();
   controls.enabled = true;
@@ -251,90 +337,67 @@ function paintStats() {
   ];
   statEl.innerHTML = rows.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('');
 }
-document.querySelectorAll('#modes button').forEach(b => {
+document.querySelectorAll('#viewbar button').forEach(b => {
   b.onclick = () => applyMode(b.dataset.mode);
 });
-/* 手机端面板：默认只留顶部一条，点"图景"展开抽屉 */
-const panelEl = document.getElementById('panel');
-const moreBtn = document.getElementById('btn-more');
-function closePanel() {
-  if (!panelEl) return;
-  panelEl.classList.remove('open');
-  if (moreBtn) { moreBtn.classList.remove('on'); moreBtn.textContent = '图景'; }
+/* 左上窄边栏：默认收成 ≡ + 时辰牌，点开才有内容（照熊萌艺术馆的 rail 做法） */
+const railToggle = document.getElementById('railToggle');
+const railClock = document.getElementById('jnClock');
+if (railToggle) railToggle.onclick = () => document.body.classList.toggle('rail-min');
+if (railClock) railClock.onclick = () => document.body.classList.remove('rail-min');
+
+/* 时辰：滑杆连续调，四个预设按钮快速跳转 */
+const hourSlider = document.getElementById('jnHour');
+if (hourSlider) {
+  hourSlider.oninput = () => sky.setHour(parseFloat(hourSlider.value));
+  document.querySelectorAll('#jnHours button').forEach(b => {
+    b.onclick = () => {
+      const h = parseFloat(b.dataset.hour);
+      sky.setHour(h);
+      if (hourSlider) hourSlider.value = h;
+    };
+  });
 }
-if (moreBtn) moreBtn.onclick = () => {
-  const open = panelEl.classList.toggle('open');
-  moreBtn.classList.toggle('on', open);
-  moreBtn.textContent = open ? '收起' : '图景';
+
+/* 画质档位切换（手机默认流畅，桌面默认高） */
+const qBtn = document.getElementById('btn-q');
+function syncQBtn() {
+  if (!qBtn) return;
+  qBtn.textContent = '画质 ' + (quality.level === 'high' ? '高' : '流畅');
+  qBtn.classList.toggle('on', quality.level === 'high');
+}
+if (qBtn) qBtn.onclick = () => {
+  applyQuality(quality.level === 'high' ? 'mid' : 'high');
+  syncQBtn();
+  toast(quality.level === 'high' ? '高画质：环境光遮蔽 + 高精度阴影' : '流畅画质：更适合手机');
 };
+syncQBtn();
+
+/* 回默认机位 */
+const resetBtn = document.getElementById('btn-reset');
+if (resetBtn) resetBtn.onclick = () => applyMode(mode === 'walk' ? 'orbit' : mode);
+
+/* 村志：统计默认收起，点一下才显示 */
+const statsEl = document.getElementById('stats');
+const statsBtn = document.getElementById('btn-stats');
+if (statsBtn) statsBtn.onclick = () => {
+  const on = statsEl.style.display === 'none' || !statsEl.style.display;
+  statsEl.style.display = on ? '' : 'none';
+  statsBtn.classList.toggle('on', on);
+};
+
 document.getElementById('btn-new').onclick = () => {
   const seed = Math.floor(Math.random() * 1e9);
   buildVillage(seed);
   toast('新图景已生成');
-  closePanel();
 };
 document.getElementById('btn-seed').onclick = () => {
   const v = document.getElementById('seed').value.trim();
   const seed = /^\d+$/.test(v) ? parseInt(v, 10) : (v ? Array.from(v).reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7) : Math.floor(Math.random() * 1e9));
   buildVillage(seed);
   toast('图景已载入');
-  closePanel();
 };
 document.getElementById('wb-back').onclick = () => applyMode('orbit');
-
-/* 小地图 */
-const miniCv = document.getElementById('minimap');
-const mctx = miniCv.getContext('2d');
-function paintMinimap() {
-  const W = layout.W, H = layout.H, S = miniCv.width / W;
-  mctx.clearRect(0, 0, miniCv.width, miniCv.height);
-  mctx.fillStyle = '#ded3b6'; mctx.fillRect(0, 0, miniCv.width, miniCv.height);
-  const cellPx = c => c * S;
-  /* 田 */
-  mctx.fillStyle = '#b9c493';
-  for (const f of layout.fields) mctx.fillRect(cellPx(f.gx), cellPx(f.gz), cellPx(f.w), cellPx(f.h));
-  /* 树 */
-  mctx.fillStyle = 'rgba(70,110,60,.45)';
-  for (const t of layout.trees) mctx.fillRect(cellPx(t.x / layout.cell - .5) - 1, cellPx(t.z / layout.cell - .5) - 1, 2, 2);
-  /* 路 */
-  mctx.strokeStyle = '#c8b48c'; mctx.lineCap = 'round';
-  for (const r of layout.roads) {
-    mctx.lineWidth = Math.max(1.4, (r.kind === 'main' ? 3.4 : r.kind === 'stone' ? 2.2 : 1.4));
-    mctx.beginPath(); mctx.moveTo(r.x1 / layout.cell * S, r.z1 / layout.cell * S);
-    mctx.lineTo(r.x2 / layout.cell * S, r.z2 / layout.cell * S); mctx.stroke();
-  }
-  /* 河 */
-  mctx.strokeStyle = '#7fa9bd'; mctx.lineCap = 'butt';
-  for (const r of layout.rivers) {
-    mctx.lineWidth = Math.max(3, r.w / layout.cell * S);
-    mctx.beginPath(); mctx.moveTo(r.x1 / layout.cell * S, r.z1 / layout.cell * S);
-    mctx.lineTo(r.x2 / layout.cell * S, r.z2 / layout.cell * S); mctx.stroke();
-  }
-  /* 房 */
-  mctx.fillStyle = '#3a3227';
-  for (const h of layout.houses) mctx.fillRect(cellPx(h.gx), cellPx(h.gz), Math.max(2, h.w * S - .6), Math.max(2, h.d * S - .6));
-  /* 牌坊 / 塔 */
-  mctx.fillStyle = '#a8342a';
-  for (const p of layout.paifangs) { mctx.beginPath(); mctx.arc(cellPx(p.gx + .5), cellPx(p.gz + .5), 3, 0, 7); mctx.fill(); }
-  if (layout.tower) {
-    mctx.fillStyle = '#c8a44a';
-    mctx.beginPath(); mctx.arc(cellPx(layout.tower.gx + .5), cellPx(layout.tower.gz + .5), 4, 0, 7); mctx.fill();
-  }
-  /* 传送门 */
-  mctx.fillStyle = '#2ea78f';
-  for (const p of portals) { mctx.beginPath(); mctx.arc(p.x / layout.cell * S, p.z / layout.cell * S, 3.5, 0, 7); mctx.fill(); }
-  document.getElementById('mini-scale').textContent = layout.W * layout.cell + 'm 见方';
-}
-function paintMiniPos() {
-  const el = document.getElementById('mini-pos');
-  if (!layout) return;
-  const x = camera.position.x, z = camera.position.z;
-  const gx = (x - layout.originX) / layout.cell, gz = (z - layout.originZ) / layout.cell;
-  el.textContent = `${gx.toFixed(0)}, ${gz.toFixed(0)}`;
-  const S = miniCv.width / layout.W;
-  mctx.fillStyle = '#a8342a';
-  mctx.beginPath(); mctx.arc(gx * S, gz * S, 3.4, 0, 7); mctx.fill();
-}
 
 /* toast */
 let toastT = null;
@@ -381,14 +444,27 @@ function tick() {
       portalBtn.textContent = '回' + String(pn.label || '上一处').replace('熊萌', '');
     } else portalBtn.hidden = true;
   }
-  if (t - (paintMiniPos._t || 0) > .12) { paintMiniPos._t = t; paintMiniPos(); }
-  renderer.render(scene, camera);
+  sky.update(dt);
+  /* 共享 uniforms：全场一棵树的摆动方向、透光方向都从这里来 */
+  if (sky.sun) {
+    _sunDir.copy(sky.sun.position).normalize();
+    updateShared(t, windState(), _sunDir, camera);
+  }
+  if (effects) {
+    /* 17:30 之后算入夜 —— 窗灯要跟着亮 */
+    const night = sky.hour >= 17.5 || sky.hour <= 5.2;
+    effects.userData.update(t, dt, night);
+  }
+  composer.render();
 }
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+  syncFxaa();
+  if (gtaoPass) gtaoPass.setSize(innerWidth, innerHeight);
 });
 
 /* ── 启动 ── */
@@ -405,6 +481,8 @@ addEventListener('resize', () => {
   window.__jnWorld = world;
   window.__jnCam = camera;
   window.__jnControls = controls;
+  window.__jnSky = sky;
+  window.__jnSetHour = (h) => sky.setHour(h, true);
   window.__jnPortals = () => portals;
   window.__jnWalk = () => walk;
   window.__jnMode = (m) => applyMode(m);

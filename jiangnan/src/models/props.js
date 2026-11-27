@@ -32,6 +32,7 @@ import * as THREE from 'three';
 import { makeRng } from '../core/rng.js';
 import { MAT, initMaterials } from '../core/materials.js';
 import { mergeGeometries, nonIndexed } from '../core/geo.js';
+import { aoPatch, aoBatch } from '../core/ao.js';
 
 /* ── 常量 ────────────────────────────────────────────────── */
 const SEED_XOR = 0x3C0B;      // 本模块自己的随机种子异或常数
@@ -40,14 +41,16 @@ const AXLE_Y = 0.90;           // 筒车轴心高（轮辋浮在水面，竹筒�
 const BOAT_L = 3.55;           // 乌篷船长
 const BOAT_B = 1.10;           // 乌篷船宽
 
-/* 材质桶：key → MAT 里的底材 */
+/* 材质桶：key → MAT 里的底材
+   注意：木纹 / 石纹贴图本身就是"带颜色的图"，material.color 不能再压深，
+   否则颜色相乘，木头就成了一团黑漆。 */
 const BUCKETS = [
   { key: 'stone', base: 'stone' },     // 井圈石块、井台、灯杆石座
   { key: 'dark', base: 'stoneDark' },  // 井壁、井水、缸里的酱面
   { key: 'wood', base: 'wood' },       // 木架、木梁、船壳船帮
-  { key: 'glaze', base: 'woodDark' },  // 乌篷（压到近黑）
-  { key: 'jar', base: 'woodDark' },    // 酱缸陶身（深褐釉）
-  { key: 'bamboo', base: 'bark' },     // 竹竿、竹骨、竹笼
+  { key: 'glaze', base: 'thatch' },    // 乌篷（压到近黑，用平色不用木纹）
+  { key: 'jar', base: 'thatch' },      // 酱缸陶身（深褐釉）
+  { key: 'bamboo', base: 'thatch' },   // 竹竿、竹骨、竹笼（竹子是平色，不是木纹）
   { key: 'fiber', base: 'thatch' },    // 玉米、谷穗、麻绳
   { key: 'red', base: 'woodRed' },     // 辣椒串、流苏
   { key: 'paper', base: 'lantern' },   // 灯笼纸
@@ -135,17 +138,91 @@ function groundify(g, y = 0) {
   return g;
 }
 
-/* ── 顶点色（深浅变化） ───────────────────────────────────── */
+/* ── 接地阴影（AO 贴片）──────────────────────────────────────
+   场景"贴纸化"的最大原因就是硬边坐在地上、底下一点不变暗。
+   做法照 core/ao.js 的思路：铺一张径向渐变贴片，用 MultiplyBlending
+   跟地面相乘。ao.js 提供共享贴图 + 共享材质，这里只把若干张贴片
+   合成一个 mesh —— 全村几十件道具也只多 1 个 draw call。
+
+   贴片本身是「圆盘 + 顶点色」：顶点色带强度，径向衰减靠共享贴图。 */
+let _aoMat = null;
+function aoMaterial() {
+  if (_aoMat) return _aoMat;
+  const src = aoPatch(1, .5).material;          /* 借 ao.js 的共享径向贴图 */
+  _aoMat = new THREE.MeshBasicMaterial({
+    map: src.map, transparent: true, depthWrite: false,
+    blending: THREE.MultiplyBlending, vertexColors: true,
+    side: THREE.FrontSide, toneMapped: false,
+  });
+  _aoMat.name = 'mat-props-ao';
+  return _aoMat;
+}
+/* 一张椭圆接地阴影：rx/rz = 两个方向的半径，s = 强度，y = 离地高度 */
+function aoDisc(x, z, rx, rz, s, y = 0.02, rot = 0) {
+  const g = new THREE.CircleGeometry(1, 24);
+  g.rotateX(-Math.PI / 2);
+  /* 顶点色：中心按强度压暗，边缘回到白 */
+  const pos = g.attributes.position, n = pos.count;
+  const col = new Float32Array(n * 3);
+  const k = 1 - Math.max(0, Math.min(1, s));
+  for (let i = 0; i < n; i++) {
+    const d = Math.min(1, Math.hypot(pos.getX(i), pos.getZ(i)));
+    const v = 1 - k * Math.max(0, 1 - d * d);
+    col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = v;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.scale(rx, 1, rz);
+  if (rot) g.rotateY(rot);
+  g.translate(x, y, z);
+  return g;
+}
+
+/* ── 顶点色（深浅变化） ───────────────────────────────────────
+   三层叠加，缺一个都"塑料"：
+     ① 高度渐变 —— 底色暗、见光面亮（s0 → s1 随 y 走）
+     ② 法线项 —— 朝上的面吃天光更亮，朝下/朝里的面更暗
+     ③ 件间色差 —— 每根木料 / 每块石头自己一个色调（不随机数，用位置哈希）
+   顶点色是逐顶点算的，但色差是「逐件」的（同一件里不抖），
+   这样木头是"一根一根有色差"，不是"一片一片有噪点"。 */
+function hash3(x, y, z) {
+  const s = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453;
+  return s - Math.floor(s);
+}
 function tint(geo, rgb, rng, opt = {}) {
   const p = geo.attributes.position, n = p.count;
   const arr = new Float32Array(n * 3);
+  const nrm = geo.attributes.normal;
   const y0 = opt.y0 ?? 0, y1 = opt.y1 ?? 1;
-  const s0 = opt.s0 ?? .86, s1 = opt.s1 ?? 1.08, jit = opt.jit ?? .07;
+  const s0 = opt.s0 ?? .86, s1 = opt.s1 ?? 1.08;
+  const jit = opt.jit ?? .07;
+  const up = opt.up ?? .16;                 // 法线朝上的加成
+  const grain = opt.grain ?? 0;             // 木纹色带
+  /* 件间色差：以整件包围盒中心做哈希 —— 同一件里不抖 */
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox;
+  const cx = (bb.min.x + bb.max.x) * .5, cy = (bb.min.y + bb.max.y) * .5, cz = (bb.min.z + bb.max.z) * .5;
+  const tone = 1 + (hash3(cx * 3.1, cy * 2.7, cz * 3.3) - .5) * jit * 2;
+  /* 竖着的件走竖纹，横着的件走横纹 */
+  const bw = bb.max.x - bb.min.x, bh = bb.max.y - bb.min.y, bd = bb.max.z - bb.min.z;
+  const vertical = bh > Math.max(bw, bd);
+  const alongX = bw >= bd;
   for (let i = 0; i < n; i++) {
     let t = (p.getY(i) - y0) / Math.max(1e-4, y1 - y0);
     t = t < 0 ? 0 : t > 1 ? 1 : t;
-    let k = s0 + (s1 - s0) * t;
-    k *= 1 + (rng() - .5) * jit * 2;
+    let k = (s0 + (s1 - s0) * t) * tone;
+    if (nrm) k *= 1 + up * nrm.getY(i);
+    if (grain) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+      let gv;
+      if (vertical) {
+        const ang = Math.atan2(z - cz, x - cx);
+        gv = Math.sin(ang * 7 + y * 0.5) * 0.62 + Math.sin(ang * 19) * 0.38;
+      } else {
+        const a = alongX ? (x - cx) : (z - cz);
+        gv = Math.sin(a * 9 + y * 1.1) * 0.62 + Math.sin(a * 23) * 0.38;
+      }
+      k *= 1 + grain * gv;
+    }
     arr[i * 3] = rgb[0] * k;
     arr[i * 3 + 1] = rgb[1] * k;
     arr[i * 3 + 2] = rgb[2] * k;
@@ -748,9 +825,14 @@ function bucketMaterial(key) {
   m.vertexColors = true;
   m.name = 'mat-props-' + key;
   if (key === 'paper') { m.map = MAT.paper.map; m.needsUpdate = true; }
-  if (key === 'glaze') m.color = new THREE.Color(0x241f1c);   // 乌篷：近黑的桐油竹篾
-  if (key === 'jar') m.color = new THREE.Color(0x4a2a18);     // 酱缸：深褐釉面
-  if (key === 'bamboo') m.color = new THREE.Color(0x9a8b4e);  // 竹青偏黄
+  if (key === 'glaze') { m.color = new THREE.Color(0x2b2522); m.roughness = .62; }  // 乌篷：近黑的桐油竹篾
+  if (key === 'jar') { m.color = new THREE.Color(0x6d3f24); m.roughness = .46; }     // 酱缸：深褐釉面
+  if (key === 'bamboo') m.color = new THREE.Color(0xa89a68);  // 竹青偏黄（压得住，别发白）
+  if (key === 'wood') m.color = new THREE.Color(0xb08a63);    // 木料：贴图自带褐，color 只能压到这里
+  if (key === 'stone') m.color = new THREE.Color(0xbdb8ab);   // 石：冷灰，靠顶点色压出明暗
+  /* 铜件 / 铁箍：吃环境反射（金属度高、粗糙度低），
+     天空一照就有高光，不再是"贴上去的塑料环" */
+  if (key === 'metal') { m.color = new THREE.Color(0xc9a463); m.metalness = .92; m.roughness = .24; }
   /* 井壁 / 船壳 / 乌篷都有"从里往外看"的一面 */
   if (key === 'dark' || key === 'glaze' || key === 'wood') m.side = THREE.DoubleSide;
   return m;
@@ -812,10 +894,20 @@ export function build(layout) {
   for (const b of BUCKETS) buckets[b.key] = [];
   const mats = {};
   for (const b of BUCKETS) mats[b.key] = bucketMaterial(b.key);
+  /* 木料 / 石料：贴图自带深色，材质色别再压深 —— 不然木头成一团黑漆 */
+  mats.wood.color.setRGB(1.34, 1.14, 0.86);
+  mats.stone.color.setRGB(1.06, 1.03, 0.94);
 
   const props = (layout && layout.props) ? layout.props : [];
   const spins = [];
   const byKind = {};
+  const aoSpecs = [];                        // 接地阴影贴片清单
+
+  /* 每件道具脚下的软影：半径按实际占地，强度 .40~.55 */
+  const AO_OF = {
+    well: [1.30, .54], dryingrack: [1.60, .46], jar: [0.68, .50],
+    lamp: [0.62, .44], lantern: [0.62, .44], pen: [1.10, .46], fence: [1.30, .40],
+  };
 
   for (const pr of props) {
     if (!pr) continue;
@@ -843,12 +935,31 @@ export function build(layout) {
       default: break;
     }
     const rot = prot;
+
+    /* ── 接地阴影 ── */
+    if (kind === 'boat') {
+      /* 船在水上：影要落在水面（-0.16 略上），而且是细长的椭圆，强度很淡 */
+      aoSpecs.push({ x: px, z: pz, rx: 1.95, rz: 0.86, s: .25, y: -0.125, rot });
+    } else if (kind === 'waterwheel') {
+      /* 筒车立在河里：水里一圈很淡的影 + 岸上一圈落地影 */
+      aoSpecs.push({ x: px, z: pz, rx: 1.25, rz: 1.05, s: .22, y: -0.125, rot });
+      const bank = 2.15;                       /* 岸在轮心的 +Z 方向 1.2m 之外 */
+      aoSpecs.push({
+        x: px + Math.sin(rot) * bank, z: pz + Math.cos(rot) * bank,
+        rx: 1.05, rz: 0.95, s: .36, y: 0.02,
+      });
+    } else if (AO_OF[kind]) {
+      const [r, s] = AO_OF[kind];
+      aoSpecs.push({ x: px, z: pz, rx: r, rz: r * .92, s, y: 0.04 });
+    }
     /* 静态件：转 → 移位 → 上色 → 进桶 */
     for (const it of PENDING) {
       const g = norm(it.geo);
       g.rotateY(rot);
       g.translate(px, baseY, pz);
-      tint(g, it.rgb, rng, it.opt);
+      /* 木料件自动带木纹色带：不是一根纯色圆柱 */
+      const opt = it.bucket === 'wood' ? Object.assign({ grain: .10 }, it.opt) : it.opt;
+      tint(g, it.rgb, rng, opt);
       buckets[it.bucket].push(g);
     }
     /* 筒车：转动件单独成组（轴心 = 局部 Z）
@@ -887,6 +998,29 @@ export function build(layout) {
   }
   for (const root of group.children) {
     if (root.name === 'props-waterwheel') drawCalls += root.children[0].children.length;
+  }
+
+  /* 接地阴影：全部贴片合成一个 mesh（只多 1 个 draw call）
+     放在最后加，renderOrder 2 保证压在地面之后、道具之前混合 */
+  if (aoSpecs.length) {
+    /* 圆贴片走 core/ao.js 的 aoBatch（共享贴图 + 共享材质）；
+       椭圆/水面上的（船、筒车）保留自绘贴片。 */
+    const geos = [];
+    const round = aoSpecs.filter(a => a.y >= 0.03);
+    const odd = aoSpecs.filter(a => a.y < 0.03);
+    if (round.length) {
+      const pts = round.map(a => ({ x: a.x, z: a.z, r: a.rx, s: a.s }));
+      for (const g of aoBatch(pts, aoMaterial())) { g.translate(0, 0.02, 0); geos.push(g); }
+    }
+    for (const a of odd) geos.push(aoDisc(a.x, a.z, a.rx, a.rz, a.s, a.y, a.rot || 0));
+    const aoMesh = new THREE.Mesh(mergeGeometries(geos, false), aoMaterial());
+    aoMesh.name = 'props-ao';
+    aoMesh.renderOrder = 2;
+    aoMesh.castShadow = false;
+    aoMesh.receiveShadow = false;
+    aoMesh.matrixAutoUpdate = false;
+    group.add(aoMesh);
+    drawCalls++;
   }
 
   /* 筒车转动：main.js 每帧遍历调用 */

@@ -232,10 +232,28 @@ export function build(layout) {
       if (a1 - a0 < 0.5) continue;
       const len = a1 - a0;
       const mid = (a0 + a1) / 2;
+      /* 横向切 8 段，好做"近岸浅、中心深"的水色渐层 */
       const g = it.horiz
-        ? new THREE.PlaneGeometry(len, it.w)
-        : new THREE.PlaneGeometry(it.w, len);
+        ? new THREE.PlaneGeometry(len, it.w, 1, 8)
+        : new THREE.PlaneGeometry(it.w, len, 8, 1);
       g.rotateX(-Math.PI / 2);
+      {
+        /* 顶点色：中心深（青墨）、近岸浅（泛土黄绿），最外一圈是白沫 */
+        const p = g.attributes.position;
+        const col = new Float32Array(p.count * 3);
+        const half = it.w / 2;
+        for (let i = 0; i < p.count; i++) {
+          const lat = it.horiz ? p.getZ(i) : p.getX(i);   /* 横向偏移 */
+          const t = Math.min(1, Math.abs(lat) / half);      /* 0 中心 → 1 岸 */
+          const deep = 0.62 + 0.30 * Math.pow(t, 1.8);
+          const foam = t > 0.93 ? (t - 0.93) / 0.07 * 0.55 : 0;
+          const r = Math.min(1.25, deep + foam * 1.1);
+          const gg = Math.min(1.25, deep * 1.02 + foam);
+          const bb = Math.min(1.25, deep * 1.06 + foam * .92);
+          col[i * 3] = r; col[i * 3 + 1] = gg; col[i * 3 + 2] = bb;
+        }
+        g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      }
       const su = (it.horiz ? len : it.w) / TILE;
       const sv = (it.horiz ? it.w : len) / TILE;
       const uv = g.attributes.uv;

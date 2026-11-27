@@ -27,3 +27,6 @@ shots/
 
 # Remotion 拼接中间产物
 tour-remotion/.alltmp/
+
+# 本地验收截图（不入库）
+jn-shots/

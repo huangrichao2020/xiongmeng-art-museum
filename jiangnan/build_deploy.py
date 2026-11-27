@@ -4,7 +4,7 @@
 import os, shutil, sys, re, hashlib, time
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(ROOT, '.deploy-jiangnan')
+OUT = os.environ.get('JN_OUT') or os.path.join(ROOT, '.deploy-jiangnan')
 SRC = os.path.join(ROOT, 'src')
 MAIN_DEPLOY = os.path.join(os.path.dirname(ROOT), '.deploy')   # 主站的 three 运行时
 
@@ -46,11 +46,17 @@ for base, _, files in os.walk(os.path.join(OUT, 'src')):
 # three 运行时（只拷需要的）
 shutil.copy2(os.path.join(MAIN_DEPLOY, 'three.module.js'), os.path.join(OUT, 'three.module.js'))
 addons_dst = os.path.join(OUT, 'addons')
-for sub in ('controls', 'utils'):
-    os.makedirs(os.path.join(addons_dst, sub), exist_ok=True)
-    for f in os.listdir(os.path.join(MAIN_DEPLOY, 'addons', sub)):
-        if f.endswith('.js'):
-            shutil.copy2(os.path.join(MAIN_DEPLOY, 'addons', sub, f), os.path.join(addons_dst, sub, f))
+# 主站 .deploy 里有 controls / utils；objects（Sky）只在本工程里，两处都找
+for sub in ('controls', 'utils', 'objects', 'postprocessing', 'shaders', 'math'):
+    dst = os.path.join(addons_dst, sub)
+    os.makedirs(dst, exist_ok=True)
+    for base in (MAIN_DEPLOY, ROOT):
+        src = os.path.join(base, 'addons', sub)
+        if not os.path.isdir(src):
+            continue
+        for f in os.listdir(src):
+            if f.endswith('.js'):
+                shutil.copy2(os.path.join(src, f), os.path.join(dst, f))
 
 # 构建标记
 html = open(os.path.join(OUT, 'index.html'), encoding='utf-8').read()

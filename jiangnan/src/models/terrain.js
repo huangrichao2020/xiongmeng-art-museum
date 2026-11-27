@@ -361,11 +361,16 @@ function groundColor(x, z, ctx) {
   /* 村内夯土：近路、近房。村子里的地是被踩出来的土，不是草坪。 */
   const cf = ctx.coreFlat(x, z);
   const roadNear = 1 - smoothstep(1.3, 6.5, ctx.dRoad(x, z));
-  const structNear = 1 - smoothstep(1.6, 9.0, ctx.distAt(ctx.dStruct, x, z));
-  let earth = clamp01(0.72 * roadNear + 0.68 * structNear);
+  const structNear = 1 - smoothstep(1.2, 5.0, ctx.distAt(ctx.dStruct, x, z));
+  let earth = clamp01(0.62 * roadNear + 0.42 * structNear);
   /* 村内（coreFlat==1）整体是土场 + 草皮混杂，噪声决定哪块是草、哪块是土 */
-  if (cf >= 1) earth = Math.max(earth, 0.34 + 0.52 * t2);
-  r = lerp(r, 1.46, earth); g = lerp(g, 1.04, earth); b = lerp(b, 0.44, earth);
+  if (cf >= 1) earth = Math.max(earth, 0.16 + 0.34 * t2);
+  /* 用一层高频噪声把土/草的边界打碎 —— 原来是"以房子为心的完美圆形红土斑"，
+     一眼假。现在边界是碎的、过渡是渐的。 */
+  const grit = ctx.noise2(x / 2.3 + 77.1, z / 2.3 + 41.9);
+  earth = clamp01(earth * (0.72 + 0.56 * grit));
+  /* 夯土是黄褐不是砖红：原来 r 乘到 1.46、b 压到 0.44，整村像撒了红漆 */
+  r = lerp(r, 1.26, earth); g = lerp(g, 1.10, earth); b = lerp(b, 0.74, earth);
   /* 村外：碎石/裸土的冷灰调 */
   const wild = clamp01(1 - cf) * clamp01((blot - 0.50) * 3.0);
   r = lerp(r, 1.22, wild); g = lerp(g, 1.08, wild); b = lerp(b, 0.84, wild);
@@ -541,9 +546,11 @@ export function build(layout) {
         const el = Math.sin(a) * hl * (0.82 + 0.24 * ctx.noise2(Math.cos(a) * 3.1 + 7, Math.sin(a) * 3.1 + h.z));
         /* 局部坐标：ex 沿横向，el 沿门方向 */
         const wx2 = fx + px * ex + dv[0] * el, wz2 = fz + pz * ex + dv[1] * el;
-        ring.push(dirtVert(wx2, ctx.height(wx2, wz2) + 0.005, wz2, 1.30, 1.05, 0.68));
+        /* 边缘顶点取接近草色的值 —— 硬边红斑就是这么消掉的：
+           扇形从中心的土色线性过渡到边缘的草色，边界自然化开。 */
+        ring.push(dirtVert(wx2, ctx.height(wx2, wz2) + 0.005, wz2, 1.06, 1.02, 0.80));
       }
-      const cen = dirtVert(fx, ctx.height(fx, fz) + 0.005, fz, 1.34, 1.06, 0.66);
+      const cen = dirtVert(fx, ctx.height(fx, fz) + 0.005, fz, 1.24, 1.07, 0.78);
       /* 局部基是镜像（行列式 -1），绕序要反过来才是朝上 */
       for (let i = 0; i < N; i++) dirtIdx.push(cen, ring[i], ring[(i + 1) % N]);
       /* 房侧再来一小块：房子不是孤零零站在土上，得有墙根的印子 */
@@ -556,9 +563,9 @@ export function build(layout) {
           const ex = Math.cos(a) * 2.5 * (0.8 + 0.3 * ctx.noise2(a + h.x, h.z));
           const el = Math.sin(a) * 1.9 * (0.8 + 0.3 * ctx.noise2(a * 2 + h.z, h.x));
           const wx2 = sx + px * ex + dv[0] * el, wz2 = sz + pz * ex + dv[1] * el;
-          r2.push(dirtVert(wx2, ctx.height(wx2, wz2) + 0.004, wz2, 1.22, 1.02, 0.72));
+          r2.push(dirtVert(wx2, ctx.height(wx2, wz2) + 0.004, wz2, 1.04, 1.01, 0.80));
         }
-        const c2 = dirtVert(sx, ctx.height(sx, sz) + 0.004, sz, 1.26, 1.04, 0.70);
+        const c2 = dirtVert(sx, ctx.height(sx, sz) + 0.004, sz, 1.18, 1.05, 0.78);
         for (let i = 0; i < N2; i++) dirtIdx.push(c2, r2[i], r2[(i + 1) % N2]);
       }
     }

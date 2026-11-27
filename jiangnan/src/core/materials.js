@@ -1,6 +1,7 @@
 /* 江南古村 · 共享调色板 + 程序化贴图
    所有模型模块都用这里的材质，保证整张图是一套颜色/一套质感。 */
 import * as THREE from 'three';
+import { patchWind, patchBacklight } from './patch.js';
 
 function cv(w, h) {
   const c = document.createElement('canvas');
@@ -174,11 +175,11 @@ export function initMaterials() {
 
   const std = (o) => new THREE.MeshStandardMaterial(o);
 
-  MAT.wall = std({ color: 0xe7e0d2, map: plasterMap, bumpMap: plasterBump, bumpScale: .012, roughness: .92, metalness: 0 });
-  MAT.wall2 = std({ color: 0xdcd4c4, map: plasterMap, bumpMap: plasterBump, bumpScale: .012, roughness: .94 });
+  MAT.wall = std({ color: 0xcfc4ae, map: plasterMap, bumpMap: plasterBump, bumpScale: .012, roughness: .92, metalness: 0 });
+  MAT.wall2 = std({ color: 0xc2b79f, map: plasterMap, bumpMap: plasterBump, bumpScale: .012, roughness: .94 });
   /* 瓦贴图自带明暗，颜色给中性，只做两档深浅区分 */
-  MAT.tile = std({ color: 0xb4bac2, map: tileMap, bumpMap: tileBump, bumpScale: .03, roughness: .82, metalness: .02 });
-  MAT.tile2 = std({ color: 0x98a0a9, map: tileMap, bumpMap: tileBump, bumpScale: .03, roughness: .86 });
+  MAT.tile = std({ color: 0x9aa1a8, map: tileMap, bumpMap: tileBump, bumpScale: .03, roughness: .82, metalness: .02 });
+  MAT.tile2 = std({ color: 0x848b92, map: tileMap, bumpMap: tileBump, bumpScale: .03, roughness: .86 });
   MAT.wood = std({ color: 0x6b4b34, map: woodMap, roughness: .84, metalness: .02 });
   MAT.woodDark = std({ color: 0x4a3223, map: woodMap, roughness: .88 });
   MAT.woodRed = std({ color: 0x8a3a2a, map: woodMap, roughness: .7 });
@@ -186,26 +187,44 @@ export function initMaterials() {
   MAT.stoneDark = std({ color: 0x6b6a63, map: stoneMap, bumpMap: stoneBump, bumpScale: .02, roughness: .95 });
   MAT.rock = std({ color: 0x7d7a72, roughness: .96, flatShading: true });
   /* 草地往黄绿偏：纯饱和草绿是"高尔夫球场"，江南是带土色的草 */
-  MAT.ground = std({ color: 0x8a8a63, map: tex(groundCanvas('#7b7a53', '#a09a6d', 1400), 8, 8), roughness: .96 });
-  MAT.dirt = std({ color: 0x8a7454, map: tex(groundCanvas('#7d6a4c', '#a08a63', 1200), 4, 4), roughness: .97 });
+  /* 地面和夯土**共用同一张贴图**（原来各用各的，土块边界一眼就看出来 ——
+     两套噪点的颗粒和 repeat 都不同，接缝是硬的）。共用之后只靠顶点色区分，
+     接地缝自然化开。 */
+  const _groundTex = tex(groundCanvas('#7b7a53', '#a09a6d', 1400), 8, 8);
+  MAT.ground = std({ color: 0x8a8a63, map: _groundTex, roughness: .96 });
+  MAT.dirt = std({ color: 0x8a7454, map: _groundTex, roughness: .97 });
   MAT.paddy = std({ color: 0x8fa07c, map: tex(groundCanvas('#7d8f6b', '#a3b184', 1000), 3, 3), roughness: .95 });
   MAT.paddyWet = std({ color: 0x6f8f86, roughness: .22, metalness: .18 });
+  /* 水是介电体：metalness 必须接近 0 —— 给高了反射会被水色染掉，
+     天空反射就消失了（原来 .28 → 看着是一块死蓝塑料）。
+     roughness 压到 .07，掠射角才有菲涅尔高光；normalScale 加大，涟漪才看得出。 */
   MAT.water = new THREE.MeshStandardMaterial({
-    color: 0x2f6b7a, roughness: .16, metalness: .28,
-    normalMap: waterNormal, normalScale: new THREE.Vector2(.35, .35),
-    transparent: true, opacity: .92
+    color: 0x24545f, roughness: .07, metalness: .02,
+    normalMap: waterNormal, normalScale: new THREE.Vector2(.85, .85),
+    envMapIntensity: 1.8,
+    vertexColors: true,        /* 近岸浅/中心深/岸线白沫，全靠顶点色 */
+    transparent: true, opacity: .90
   });
   MAT.waterNormal = waterNormal;
   MAT.leaf = std({ color: 0x4e7a42, map: leafMap, roughness: .9, side: THREE.DoubleSide });
   MAT.leafDark = std({ color: 0x365c33, map: leafMap, roughness: .92, side: THREE.DoubleSide });
   MAT.leafPine = std({ color: 0x2f5c3c, map: leafMap, roughness: .9, side: THREE.DoubleSide });
   MAT.leafBamboo = std({ color: 0x7fa24e, map: leafMap, roughness: .85, side: THREE.DoubleSide });
+  /* 叶子：风摆 + 逆光透光。少了这两样，树就是一堆贴地的绿色球团。 */
+  patchWind(MAT.leaf, { strength: .085, freq: 1.0 });
+  patchWind(MAT.leafDark, { strength: .07, freq: .9 });
+  patchWind(MAT.leafPine, { strength: .05, freq: .8 });
+  patchWind(MAT.leafBamboo, { strength: .14, freq: 1.35 });
+  patchBacklight(MAT.leaf, { color: 0x9ec46a, strength: .85, power: 3.0 });
+  patchBacklight(MAT.leafDark, { color: 0x86b45a, strength: .7, power: 3.0 });
+  patchBacklight(MAT.leafPine, { color: 0x7fb05a, strength: .6, power: 3.0 });
+  patchBacklight(MAT.leafBamboo, { color: 0xb6d97a, strength: .95, power: 2.6 });
   MAT.bark = std({ color: 0x5a4632, map: woodMap, roughness: .95 });
-  MAT.paper = std({ color: 0xf6dfa8, map: paperMap, roughness: .9, emissive: 0xffca70, emissiveIntensity: .55 });
-  MAT.lantern = std({ color: 0xd8452f, roughness: .7, emissive: 0xd8452f, emissiveIntensity: .9 });
+  MAT.paper = std({ color: 0xf6dfa8, map: paperMap, roughness: .9, emissive: 0xffca70, emissiveIntensity: .85 });
+  MAT.lantern = std({ color: 0xd8452f, roughness: .7, emissive: 0xd8452f, emissiveIntensity: 1.5 });
   MAT.gold = std({ color: 0xc8a44a, roughness: .38, metalness: .78, emissive: 0x6a4d12, emissiveIntensity: .22 });
   MAT.brass = std({ color: 0xa8874a, roughness: .42, metalness: .7 });
-  MAT.window = std({ color: 0x2a2f36, roughness: .4, metalness: .1, emissive: 0xffb765, emissiveIntensity: .7 });
+  MAT.window = std({ color: 0x2a2f36, roughness: .4, metalness: .1, emissive: 0xffb765, emissiveIntensity: 1.35 });
   MAT.thatch = std({ color: 0xa8935f, roughness: .96 });
   MAT.glass = new THREE.MeshPhysicalMaterial({ color: 0xdfeef2, roughness: .08, transmission: .82, thickness: .04, transparent: true, opacity: .5 });
   MAT.snow = std({ color: 0xf2f5f8, roughness: .85 });
