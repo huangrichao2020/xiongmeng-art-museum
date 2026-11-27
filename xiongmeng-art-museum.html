@@ -546,75 +546,32 @@
 
   /* ---------- 圣诞观光小火车 HUD ---------- */
   #train-hud{
-    position:fixed;bottom:74px;left:50%;transform:translateX(-50%);z-index:28;
+    position:fixed;right:14px;bottom:190px;z-index:28;
     display:none;align-items:center;gap:10px;padding:7px 14px;border-radius:20px;
     background:rgba(16,26,40,.9);border:1px solid rgba(244,197,106,.6);
     backdrop-filter:blur(6px);color:#fff3d1;font-size:12px;font-family:var(--han);
     box-shadow:0 8px 24px rgba(0,0,0,.5);
-    max-width:min(88vw,520px);animation:trainhudIn .16s ease-out;
+    max-width:min(70vw,420px);animation:trainhudIn .16s ease-out;
   }
-  @keyframes trainhudIn{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+  @keyframes trainhudIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
   #train-msg{line-height:1.35}
   #train-hud button{white-space:nowrap;flex:none}
   #train-hud.show{display:flex}
 
-  /* ---------- 雪币：收进右上「个人」面板里 ---------- */
-  .mp-coin{
-    display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:11px;flex:none;
-    background:linear-gradient(180deg,#ffe6a8,#f4c56a);color:#5a3d12;
-    font-family:var(--mono);font-size:11px;font-weight:800;letter-spacing:.02em;
-    box-shadow:0 2px 0 rgba(150,105,30,.35);
-  }
-  .mp-coin::before{content:'';width:7px;height:7px;border-radius:50%;background:#fff3d0;flex:none;
-    box-shadow:0 0 0 2px rgba(255,255,255,.45)}
-  /* 还没登录（个人面板没出现）时，单独挂在左上角，不跟 ≡ 圆钮打架 */
-  #mp-coin.float{
-    position:fixed;left:12px;top:14px;z-index:29;padding:5px 11px;font-size:12px;
-    background:rgba(9,16,24,.84);border:1px solid var(--line);color:var(--accent);
-    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  }
-  #mp-coin.float::before{background:var(--accent);box-shadow:0 0 8px rgba(244,197,106,.9)}
-  body.wallet-float #rail{top:52px}
   /* 手机端：交互提示条上的按钮做大，拇指点得中 */
-  body.touch #train-hud{padding:10px 13px;bottom:162px;font-size:12.5px;line-height:1.35}
-  body.touch #train-hud button{padding:11px 18px;font-size:13px;border-radius:16px}
-  /* 手机端：摄影摊的快门按钮（手机上没有空格键） */
-  #ph-shoot{
-    position:fixed;right:max(18px,env(safe-area-inset-right));bottom:200px;z-index:28;
-    display:none;width:78px;height:78px;border-radius:50%;
-    background:rgba(244,197,106,.92);border:2px solid rgba(255,255,255,.75);
-    color:#241704;font-family:var(--han);font-size:14px;font-weight:800;letter-spacing:.06em;
-    box-shadow:0 6px 20px rgba(0,0,0,.5);touch-action:none;cursor:pointer;
-  }
-  #ph-shoot.on{display:block}
-  #ph-shoot:active{transform:scale(.94)}
-  /* ---------- 摄影取景框 ---------- */
-  #photo-hud{position:fixed;inset:0;z-index:27;display:none;pointer-events:none}
-  #photo-hud.show{display:block}
-  #ph-frame{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-    width:min(48vw,340px);height:min(36vw,250px);
-    border:1px solid rgba(255,255,255,.20);border-radius:3px;
-    box-shadow:0 0 0 1px rgba(0,0,0,.30),0 20px 60px rgba(0,0,0,.45)}
-  #ph-frame s{position:absolute;width:26px;height:26px;border:2px solid var(--accent);display:block}
-  #ph-frame s:nth-child(1){left:-2px;top:-2px;border-right:0;border-bottom:0}
-  #ph-frame s:nth-child(2){right:-2px;top:-2px;border-left:0;border-bottom:0}
-  #ph-frame s:nth-child(3){left:-2px;bottom:-2px;border-right:0;border-top:0}
-  #ph-frame s:nth-child(4){right:-2px;bottom:-2px;border-left:0;border-top:0}
-  #ph-dot{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;
-    border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
-  #ph-bar{position:absolute;left:50%;bottom:118px;transform:translateX(-50%);display:flex;gap:14px;
-    align-items:center;padding:8px 16px;border-radius:20px;background:rgba(10,18,26,.84);
-    border:1px solid var(--line-strong);font-family:var(--han);font-size:12px;color:#eaf4ff;
-    white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.45)}
-  #ph-key{color:var(--muted);font-size:11px}
-  #photo-flash{position:fixed;inset:0;z-index:60;pointer-events:none;background:#fff;opacity:0}
-  #photo-flash.on{animation:phflash .34s ease-out}
-  @keyframes phflash{0%{opacity:.92}100%{opacity:0}}
+  body.touch #train-hud{right:max(14px,env(safe-area-inset-right));
+    bottom:max(190px,calc(env(safe-area-inset-bottom) + 180px));padding:8px 10px;font-size:12.5px;line-height:1.35}
+  body.touch #train-hud button{padding:13px 24px;font-size:16px;border-radius:18px}
   /* 乘坐中：按用户要求不显示任何说明文案，提示条里只留一个下车按钮 */
   #train-hud.bare #train-msg{display:none}
-  #train-hud.bare{padding:5px 7px;gap:0}
-  /* 文案去掉后按钮就是唯一的下车入口（手机上没有 E 键），按钮放大一档好点 */
-  #train-hud.bare #train-btn{padding:9px 22px;font-size:14px;border-radius:16px}
+  #train-hud.bare{padding:6px 8px;gap:0}
+  /* 文案去掉后按钮就是唯一的入口（手机上没有 E 键），按钮放大一档好点 */
+  #train-hud.bare #train-btn{
+    padding:12px 26px;font-size:15px;border-radius:18px;font-weight:800;letter-spacing:.08em;
+    background:linear-gradient(180deg,#ffd27a,#e8b653);color:#241704;
+    box-shadow:0 6px 18px rgba(232,182,83,.34),inset 0 1px 0 rgba(255,255,255,.45);
+  }
+  #train-hud.bare #train-btn:active{transform:scale(.96)}
   #train-btn{
     padding:4px 11px;border-radius:12px;border:none;background:#e8b653;color:#1a1104;
     font-weight:700;font-size:12px;cursor:pointer;
@@ -937,9 +894,6 @@
     <button class="fpv-btn exit" id="fpv-exit-btn">✕ 退出 (F)</button>
   </div>
 </div>
-<div id="photo-hud"><div id="ph-frame"><s></s><s></s><s></s><s></s><span id="ph-dot"></span></div><div id="ph-bar"><span id="ph-state">等客人站好…</span><span id="ph-key">空格 拍照 · E 收摊</span></div></div>
-<button id="ph-shoot" data-label="拍照">拍照</button>
-<div id="photo-flash"></div>
 <div id="train-hud"><span id="train-msg">走近设施才会上车</span><button id="train-btn">上车</button></div>
 <div id="hand-hud"><span id="hand-name"></span><span id="hand-btns"><button id="hand-yes">同意</button><button id="hand-no">拒绝</button></span><button id="hand-act"></button></div>
 <div id="gift-modal" aria-hidden="true">
@@ -9596,7 +9550,7 @@ function updateBalloonRide(dt){
       fp.x=b.x;fp.z=b.z;fp.y=b.y;
       camera.position.set(b.x,b.y+2.45,b.z);   // 站进篮口上方，视线越过篮沿直接看出去
       camera.rotation.set(fp.pitch,fp.yaw,0,'YXZ');
-      hudShow('','下车 (E)',stopBalloonRide,true);
+      hudShow('',IS_TOUCH_DEV?'下车':'下车 (E)',stopBalloonRide,true);
       b.hud=true;
     }else{
       /* 没人乘坐时：缓缓回到微微悬浮的状态 */
@@ -14030,8 +13984,7 @@ const PANELS={
       ['圣诞树','13 米巨型圣诞树缠满彩灯，顶上金星星，树下堆着礼物；园中另有 18 棵小雪松'],
       ['小吃一条街','爆米花 / 棉花糖 / 热巧克力 / 烤香肠 / 圣诞糖果 / 热红酒，六摊连排挂灯串'],
       ['人','十几只维尼小熊在排队、围观圣诞树、吃小吃、在园子里溜达'],
-      ['雪币经济','每个设施都收门票钱：摩天轮 25 / 云霄飞车 40 / 直升机 60 / 热气球 50；站到发光上车点才让上'],
-      ['打工挣钱','售票处上岗卖票，一张 +6；摄影摊上岗等小熊站好、对准了按空格拍照，一张 +14~25']
+      ['怎么玩','每个设施门口有一圈发光上车点，走进去就能上，全部免费，随便玩']
     ]}
 };
 const info=document.getElementById('info');
@@ -14939,7 +14892,7 @@ function fpUpdate(dt){
     }
   }
   // 第一人称轻跳跃物理（冰面起跳触发 360° 阿克塞尔花样旋转跳！）
-  if(fp.keys['Space']&&fp.jumpY<=0.001&&!photoSys.on){
+  if(fp.keys['Space']&&fp.jumpY<=0.001){
     fp.jumpVy=onIce?5.8:4.6;
     if(onIce)fp.skateSpin=Math.PI*2;
     sfx.blip(onIce?660:520,.08,.04);
@@ -15447,7 +15400,7 @@ addEventListener('pointercancel',e=>{
 /* 起摇杆：左半屏（沉浸模式）任何位置按下都能起 ——
    手指落在盘子以外也照样有反应，不再只有盘那一小块能用。
    放在 window 捕获阶段：压在浮层/提示条上时也能操作，不会被挡。 */
-const JOY_BLOCK='button,#rail,#info,#dock,#panel,#gift-modal,#recpv,#fpv-osd,#photo-hud,#mp-login';
+const JOY_BLOCK='button,#rail,#info,#dock,#panel,#gift-modal,#recpv,#fpv-osd,#mp-login';
 addEventListener('pointerdown',e=>{
   if(e.pointerType==='mouse')return;
   const onPad=joyOnPad(e.clientX,e.clientY);
@@ -16486,7 +16439,7 @@ function updateAerialHaze(dt,t){
         if (m.build) checkBuild(m.build);
         /* 服务端下发的纪元（时间基准），用它覆盖本地默认值 */
         if (m.epoch) TIME_EPOCH = m.epoch;
-        /* 雪币钱包以服务器存档为准：刷新页面、重登、换设备都还在 */
+        /* 雪币钱包已下线，服务器下发的钱包数据直接忽略 */
         if (m.wallet) econSetWallet(m.wallet);
         MP.clearPeers();
         (m.players || []).forEach(pl => {
@@ -17498,7 +17451,6 @@ function updateAerialHaze(dt,t){
       <button id="mp-me-btn" title="个人信息">
         <span class="mp-avatar" id="mp-me-av">?</span>
         <span>个人</span>
-        <span class="mp-coin" id="mp-coin">0</span>
         <span class="mp-cnt" id="mp-cnt"></span>
       </button>
       <div class="mp-body">
@@ -17508,8 +17460,6 @@ function updateAerialHaze(dt,t){
         </div>
         <div class="mp-field"><b>账号</b><span id="mp-acc-t">-</span></div>
         <div class="mp-field"><b>ID</b><span id="mp-id-t">-</span></div>
-        <div class="mp-field"><b>雪币</b><span id="mp-coin-t">0</span></div>
-        <div class="mp-field"><b>打工</b><span id="mp-earn-t">0</span></div>
         <div class="mp-peers" id="mp-peers"></div>
         <div class="mp-edit">
           <input id="mp-name" type="text" maxlength="16" placeholder="换个名字">
@@ -18504,7 +18454,6 @@ function animate(){
   updateHelis(dt);
   updateFireworks(dt);
   econUpdate(dt);
-  if(JN_PORTAL.userData.update)JN_PORTAL.userData.update(t,dt);
   updateAerialHaze(dt,t);
   const ridingFast=fpvSys.active||(wheelSys.riding&&wheelSys.kind==='coaster')||trainSys.riding||heliSys.riding;
   if(!ridingFast||(_reflTick&1)===0)updateOuterCrowd(ridingFast?dt*2:dt,t);
@@ -19847,8 +19796,8 @@ function hudShow(msg,btn,fn,riding){
 function hudHide(){trainHud.classList.remove('show','bare');}
 
 /* 观光小火车改成纯景观：只在自己跑，不再上车/下车。
-   之前它既能点车厢上车、又能按 E 下车，还会抢底部提示条的按钮，
-   在打工（工位提示条常驻）的时候两边互相打架，触发出一堆莫名其妙的上车/下车。 */
+   之前它既能点车厢上车、又能按 E 下车，还会抢提示条的按钮，
+   跟别的提示条打架，触发出一堆莫名其妙的上车/下车。 */
 function toggleRideTrain(){
   if(trainSys.riding){
     trainSys.riding=false;
@@ -20529,7 +20478,7 @@ function updateWheelRide(dt){
       co.sampleTrackUp(co.t%1,co._camU);
       camera.up.copy(co._camU);
       camera.lookAt(co._camL.copy(wp).addScaledVector(co._camDirS,8));
-      hudShow('','下车 (E)',stopFacilityRide,true);
+      hudShow('',IS_TOUCH_DEV?'下车':'下车 (E)',stopFacilityRide,true);
       return;
     }else if(wheelSys.kind==='bumper'&&(wheelSys.car||amusement.bumper.length)){
       const car=wheelSys.car||amusement.bumper[0];
@@ -20548,7 +20497,7 @@ function updateWheelRide(dt){
         camera.position.z+=R(-.055,.055)*sh;
       }
       camera.rotation.set(fp.pitch+(sh?R(-.05,.05)*sh:0),ang+Math.PI+look,sh?R(-.07,.07)*sh:0,'YXZ');
-      hudShow('','下车 (E)',stopFacilityRide,true);
+      hudShow('',IS_TOUCH_DEV?'下车':'下车 (E)',stopFacilityRide,true);
       return;
     }else if(wheelSys.kind==='sleigh'){
       // 坐在圣诞老人后面的高处礼物堆上：居高临下俯瞰圣诞老人背影、三只驯鹿与雪夜全城
@@ -20559,7 +20508,7 @@ function updateWheelRide(dt){
     fp.x=wp.x;fp.z=wp.z;fp.y=wp.y-FP_EYE;
     camera.position.copy(wp);
     camera.rotation.set(fp.pitch,fp.yaw,0,'YXZ');
-    hudShow('','下车 (E)',stopFacilityRide,true);
+    hudShow('',IS_TOUCH_DEV?'下车':'下车 (E)',stopFacilityRide,true);
     return;
   }
   trainBtnEl.onclick=()=>toggleRideTrain(null);
@@ -20576,18 +20525,10 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyE'){
     if(heliSys.riding){heliSys.fast=true;return;}
     if(balloonSys.riding){stopBalloonRide();return;}
-    if(photoSys.on){
-      /* 走到别的工位就直接去那边干活；站在摄影摊前按 E 才是收摊。
-         下班要满一分钟，不满会被拒。 */
-      const _j=econNearestJob();
-      if(_j&&_j.id!=='photo'){if(!econJobStop())return;}
-      else{econJobStop();return;}
-    }
     if(wheelSys.riding){toggleRideWheel(null);return;}
-    /* 设施必须站到固定的上车光点才让上；打工位在光点里按 E 开工 */
+    /* 设施必须站到固定的上车光点才让上 */
     if(econInteract())return;
   }
-  if(e.code==='Space'&&photoSys.on){e.preventDefault();econPhotoShoot();return;}
 });
 
 function updateTrain(dt){
@@ -20671,7 +20612,7 @@ function updateTrain(dt){
 
   /* 小火车不再载人，这里没有乘车视角分支。
      注意：不要 hudHide() —— 提示条是全局共用的，
-     每帧清一次会把经济系统的上车/上岗提示清得只剩一帧。 */
+     每帧清一次会把上车点的提示清得只剩一帧。 */
 }
 
 /* ══ Saltline 级真实法线贴图（NormalMap）+ 粗糙度贴图 + 材质对比度调优 ══ */
@@ -21130,103 +21071,25 @@ const fwSys=(()=>{
 const updateFireworks=fwSys;
 
 /* ══════════════════════════════════════════════════════════════════════
-   游乐场经济系统
-   ── 雪币钱包：每个设施都收票价，钱不够上不去
-   ── 固定上车光点：每个设施门口一圈发光光点，站进去才让上
-   ── 打工：售票处卖票 / 摄影摊给小熊拍照
+   游乐场上车系统
+   ── 固定上车光点：每个设施门口一圈发光光点，站进去就能上
+   ── 全部免费：不收费、不打工，想玩就玩
    ══════════════════════════════════════════════════════════════════════ */
-const ECON={coin:60,earned:0,spent:0,shots:0,good:0,jobCd:0,ticketBuyer:null};
-/* 设施表：id / 名字 / 票价 / 上车光点坐标 / 光点颜色 */
+const ECON={};
+/* 设施表：id / 名字 / 按钮短名 / 上车光点坐标 / 光点颜色 */
 const ECON_RIDES=[
-  {id:'wheel',   name:'敞篷观景摩天轮',price:25,x:27.0,z:43.8,color:0x74e2ff},
-  {id:'carousel',name:'皇家圣诞旋转木马',price:15,x:4.2,z:38.4,color:0xffc36a},
-  {id:'bumper',  name:'沥青场地碰碰车',  price:20,x:-10.6,z:45.0,color:0x9dff8a},
-  {id:'coaster', name:'星夜极光云霄飞车',price:40,x:-8.4,z:19.8,color:0xc49dff},
-  {id:'launch',  name:'圣诞高空弹射跳伞',price:30,x:33.8,z:52.2,color:0x8ad8ff},
-  {id:'heli',    name:'园区观光直升机',  price:60,x:45.4,z:50.5,color:0xffd08a},
-  {id:'balloon', name:'大号热气球',      price:50,x:-49.0,z:51.0,color:0xff9fb8},
+  {id:'wheel',   name:'敞篷观景摩天轮',short:'摩天轮',  x:27.0,z:43.8,color:0x74e2ff},
+  {id:'carousel',name:'皇家圣诞旋转木马',short:'旋转木马',x:4.2,z:38.4,color:0xffc36a},
+  {id:'bumper',  name:'沥青场地碰碰车',  short:'碰碰车',  x:-10.6,z:45.0,color:0x9dff8a},
+  {id:'coaster', name:'星夜极光云霄飞车',short:'云霄飞车',x:-8.4,z:19.8,color:0xc49dff},
+  {id:'launch',  name:'圣诞高空弹射跳伞',short:'弹射跳伞',x:33.8,z:52.2,color:0x8ad8ff},
+  {id:'heli',    name:'园区观光直升机',  short:'直升机',  x:45.4,z:50.5,color:0xffd08a},
+  {id:'balloon', name:'大号热气球',      short:'热气球',  x:-49.0,z:51.0,color:0xff9fb8},
 ];
-/* 打工位：bx/bz = 摊位位置；gx/gz = 玩家站的工位光点（摊位正前方） */
-const ECON_JOBS=[
-  {id:'ticket',name:'游乐园售票处',pay:6,bx:13.6,bz:27.8,gx:13.6,gz:25.2,color:0xffd27a,tip:'卖一张门票'},
-  {id:'photo', name:'圣诞摄影摊',  pay:25,bx:19.8,bz:30.8,gx:19.8,gz:28.0,color:0xffb0d0,tip:'开张，给小熊拍照'},
-];
-const ECON_PAD_R=2.55;          // 光点触发半径（米）
-const ECON_JOB_R=3.30;          // 工位触发半径
-const ECON_PHOTO_SPOT=[19.8,25.2];  // 摄影位：客人站的地方
+const ECON_PAD_R=1.45;          // 光点触发半径（米）
 
-/* ── 钱包 UI ───────────────────────────────────────────── */
-const econCoinEl=document.getElementById('mp-coin');
-const econCoinTxtEl=document.getElementById('mp-coin-t');
-const econEarnEl=document.getElementById('mp-earn-t');
-const phShootBtn=document.getElementById('ph-shoot');
-const phKeyEl=document.getElementById('ph-key');
-if(phShootBtn)phShootBtn.onclick=()=>econPhotoShoot();
-const photoHudEl=document.getElementById('photo-hud');
-const phStateEl=document.getElementById('ph-state');
-const phFlashEl=document.getElementById('photo-flash');
-function econPaint(){
-  if(econCoinEl)econCoinEl.textContent=String(ECON.coin);
-  if(econCoinTxtEl)econCoinTxtEl.textContent=String(ECON.coin)+' 枚';
-  if(econEarnEl)econEarnEl.textContent='+'+ECON.earned+' 雪币';
-  econMountCoin();
-}
-/* 雪币挂哪：个人面板出现了就塞进「个人」按钮当角标；
-   还没登录（面板隐藏）就单独浮在左上角，跟 ≡ 圆钮错开。 */
-function econMountCoin(){
-  const el=document.getElementById('mp-coin');
-  if(!el)return;
-  const panel=document.getElementById('mp-panel');
-  const btn=document.getElementById('mp-me-btn');
-  const shown=!!(panel&&panel.style.display!=='none');
-  if(shown&&btn){
-    if(el.parentElement!==btn)btn.appendChild(el);
-    el.classList.remove('float');
-    document.body.classList.remove('wallet-float');
-  }else{
-    if(el.parentElement!==document.body)document.body.appendChild(el);
-    el.classList.add('float');
-    document.body.classList.add('wallet-float');
-  }
-}
-function econPay(n){ECON.coin-=n;ECON.spent+=n;econPaint();econSync();}
-/* 余额上报服务器：刷新页面、换设备、重新登录都还在 */
-function econSync(){
-  if(!window.MP||!MP.connected)return;
-  try{MP.send({t:'wallet',coin:ECON.coin,earned:ECON.earned,spent:ECON.spent});}catch(e){}
-}
-/* 服务器下发为准 */
-function econSetWallet(w){
-  if(!w||typeof w.coin!=='number')return;
-  ECON.coin=Math.max(0,Math.floor(w.coin));
-  if(typeof w.earned==='number')ECON.earned=Math.max(0,Math.floor(w.earned));
-  if(typeof w.spent==='number')ECON.spent=Math.max(0,Math.floor(w.spent));
-  econPaint();
-}
-
-/* ── 飘字（+N 雪币）──────────────────────────────────────── */
-const econFloats=[];
-function econFloat(txt,color){
-  const c=document.createElement('canvas');c.width=256;c.height=96;
-  const x=c.getContext('2d');
-  x.font='800 52px "PingFang SC",system-ui,sans-serif';
-  x.textAlign='center';x.textBaseline='middle';
-  x.shadowColor='rgba(0,0,0,.8)';x.shadowBlur=16;
-  x.fillStyle='#'+color.toString(16).padStart(6,'0');
-  x.fillText(txt,128,48);
-  const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;
-  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));
-  sp.scale.set(1.7,.64,1);sp.renderOrder=999;
-  sp.position.set(fp.x+(Math.random()-.5)*.6,(fp.on?fp.y:0)+1.9,fp.z);
-  scene.add(sp);
-  econFloats.push({sp,life:0});
-}
-function econGain(n,why){
-  ECON.coin+=n;ECON.earned+=n;econPaint();econSync();
-  econFloat('+'+n,0xffd98a);
-  sfx.blip(1180,.10,.07);
-  if(why)_recMsg(why+'  +'+n+' 雪币',2000);
-}
+/* 雪币钱包已下线：服务器下发的钱包数据直接忽略，留个空函数给联机模块调用 */
+function econSetWallet(w){}
 
 /* ── 圆角矩形（canvas 通用）──────────────────────────────── */
 function econRoundRect(x,px,py,w,h,r){
@@ -21236,191 +21099,84 @@ function econRoundRect(x,px,py,w,h,r){
   x.lineTo(px+r,py+h);x.arcTo(px,py+h,px,py+h-r,r);
   x.lineTo(px,py+r);x.arcTo(px,py,px+r,py,r);x.closePath();
 }
-/* 标牌：设施名 + 票价 / 工位名 + 报酬 */
-function econSign(title,sub,color){
-  const W=512,H=176;
+/* 标牌：只写设施名。字号自动收缩，保证一行放得下 */
+function econSign(title,color){
+  const W=512,H=128;
   const c=document.createElement('canvas');c.width=W;c.height=H;
   const x=c.getContext('2d');
   x.fillStyle='rgba(8,16,24,.88)';
   econRoundRect(x,6,6,W-12,H-12,26);x.fill();
-  x.strokeStyle='rgba(244,197,106,.8)';x.lineWidth=5;x.stroke();
-  x.textAlign='center';x.textBaseline='alphabetic';
-  x.fillStyle='#eaf4ff';x.font='700 50px "PingFang SC",system-ui,sans-serif';
-  x.fillText(title,W/2,70);
-  x.fillStyle='#f4c56a';
-  x.font='800 46px "PingFang SC",system-ui,sans-serif';
-  x.fillText(sub,W/2,130);
+  x.strokeStyle='#'+color.toString(16).padStart(6,'0');x.lineWidth=5;x.stroke();
+  x.textAlign='center';x.textBaseline='middle';
+  x.fillStyle='#eaf4ff';
+  let fs=60;
+  x.font='700 '+fs+'px "PingFang SC",system-ui,sans-serif';
+  while(fs>26&&x.measureText(title).width>W-56){fs-=2;x.font='700 '+fs+'px "PingFang SC",system-ui,sans-serif';}
+  x.fillText(title,W/2,H/2+2);
   const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=4;
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:true,transparent:true}));
-  sp.scale.set(2.25,.78,1);
+  sp.scale.set(1.5,.375,1);
   sp.userData.keep=true;
   return sp;
 }
 
-/* ── 光点几何：地面环 + 光池 + 竖向光柱 + 标牌 ─────────── */
+/* ── 光点几何：地面细环 + 小光斑 + 矮光柱 + 小标牌 ─────────── */
 const ECON_PADS=[];
-function econMakePad(x,z,title,sub,color,radius,isJob){
-  const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
-  const ring=new THREE.Mesh(new THREE.RingGeometry(radius*.66,radius*.84,44),
-    new THREE.MeshBasicMaterial({color,transparent:true,opacity:.5,
-      blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
-  ring.rotation.x=-Math.PI/2;ring.position.y=.035;ring.renderOrder=3;ring.castShadow=false;
+/* 探这块地的实际高度：游乐园雪地表面在 y≈0.09，光点画在固定高度会被雪埋掉，
+   整圈环看不见（玩家只看到一根光柱和一块牌子）。
+   所以每个上车点先向下打一条射线找到地面，再把整组东西贴到地面上。 */
+function econGroundY(x,z){
+  try{
+    const ray=new THREE.Raycaster(new THREE.Vector3(x,8,z),new THREE.Vector3(0,-1,0));
+    ray.camera=camera;
+    const hits=ray.intersectObjects(scene.children,true);
+    for(const h of hits){
+      if(h.object&&h.object.isSprite)continue;
+      if(h.point.y<3.2&&h.point.y>-1.5)return h.point.y;
+    }
+  }catch(e){}
+  return 0;
+}
+function econMakePad(x,z,title,color,radius){
+  const gy=econGroundY(x,z);
+  const g=new THREE.Group();g.position.set(x,gy,z);scene.add(g);
+  /* 环画得细一点、亮一点：远远一眼就知道这是个上车点。
+     叠加混合在雪地上会被冲没，所以改成「深色描边 + 亮色实环」：
+     垫在雪地、沥青两种地面上都能看清。 */
+  const ringBase=new THREE.Mesh(new THREE.RingGeometry(radius*.72,radius*.98,48),
+    new THREE.MeshBasicMaterial({color:0x0b1620,transparent:true,opacity:.55,depthWrite:false,fog:false}));
+  ringBase.rotation.x=-Math.PI/2;ringBase.position.y=.032;ringBase.renderOrder=3;ringBase.castShadow=false;
+  g.add(ringBase);
+  const ring=new THREE.Mesh(new THREE.RingGeometry(radius*.74,radius*.90,48),
+    new THREE.MeshBasicMaterial({color,transparent:true,opacity:.95,depthWrite:false,fog:false}));
+  ring.rotation.x=-Math.PI/2;ring.position.y=.036;ring.renderOrder=4;ring.castShadow=false;
   g.add(ring);
-  let pool=null;
-  if(!isJob){
-    /* 雪地上加色光斑会糊成一块白斑（像贴纸），只有深色地面上才留一小片 */
-    pool=new THREE.Mesh(new THREE.PlaneGeometry(radius*1.6,radius*1.6),
-      new THREE.MeshBasicMaterial({map:glowTex,color,transparent:true,opacity:.08,
-        blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
-    pool.rotation.x=-Math.PI/2;pool.position.y=.022;pool.renderOrder=2;pool.castShadow=false;
-    g.add(pool);
-  }
-  /* 光柱：细、低透明度，只用来在远处提示「这里能上车」，不做大面积泛光 */
-  const beam=new THREE.Mesh(new THREE.CylinderGeometry(radius*.48,radius*.48,3.2,18,1,true),
-    new THREE.MeshBasicMaterial({color,transparent:true,opacity:.09,
+  /* 光斑压小：雪地上加色容易糊成一块白斑 */
+  const pool=new THREE.Mesh(new THREE.PlaneGeometry(radius*1.35,radius*1.35),
+    new THREE.MeshBasicMaterial({map:glowTex,color,transparent:true,opacity:.09,
+      blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+  pool.rotation.x=-Math.PI/2;pool.position.y=.022;pool.renderOrder=2;pool.castShadow=false;
+  g.add(pool);
+  /* 光柱：又细又矮，只当远处的一个方向提示 */
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(radius*.26,radius*.26,1.8,16,1,true),
+    new THREE.MeshBasicMaterial({color,transparent:true,opacity:.16,
       blending:THREE.AdditiveBlending,depthWrite:false,fog:false,side:THREE.DoubleSide}));
-  beam.position.y=1.6;beam.renderOrder=3;beam.castShadow=false;
+  beam.position.y=.9;beam.renderOrder=3;beam.castShadow=false;
   g.add(beam);
-  const sign=econSign(title,sub,color);
-  sign.position.set(0,isJob?3.20:3.05,0);
+  const sign=econSign(title,color);
+  sign.position.set(0,2.05,0);
   g.add(sign);
-  const p={g,ring,pool,beam,sign,x,z,isJob};
+  const p={g,ring,ringBase,pool,beam,sign,x,z};
   ECON_PADS.push(p);
   return p;
 }
 
-/* ── 建摊位（复用场内木构摊的做法，跟小吃街同一套标准）── */
-function econBuildStall(o){
-  const g=SK.stallHouse(fair,{x:o.bx,z:o.bz,rot:Math.PI,cn:o.name,en:'XM',
-    h:o.h,w:o.w,d:o.d,goods:o.goods||null,fab:o.fab,accent:o.accent,hang:null});
-  OUTDOOR_OBS.push([o.bx,o.bz,1.9]);
-  return g;
-}
-/* 极光雪山背景板：给来拍照的小熊当背景 */
-function econBackdrop(x,z){
-  const c=document.createElement('canvas');c.width=512;c.height=384;
-  const x2=c.getContext('2d');
-  const sky=x2.createLinearGradient(0,0,0,384);
-  sky.addColorStop(0,'#0b1a33');sky.addColorStop(.55,'#16325c');sky.addColorStop(1,'#2a4a78');
-  x2.fillStyle=sky;x2.fillRect(0,0,512,384);
-  for(let i=0;i<5;i++){
-    const ax=40+i*110+R(-20,20),ay=R(70,190);
-    x2.strokeStyle='rgba(120,240,210,'+(.16+R(.08,.18)).toFixed(2)+')';
-    x2.lineWidth=R(14,34);x2.beginPath();
-    x2.moveTo(ax-90,ay+70);x2.quadraticCurveTo(ax,ay-50,ax+90,ay+70);x2.stroke();
-  }
-  x2.fillStyle='rgba(235,245,255,.92)';
-  x2.beginPath();x2.moveTo(0,384);
-  x2.lineTo(120,236);x2.lineTo(214,318);x2.lineTo(300,258);x2.lineTo(512,384);x2.closePath();x2.fill();
-  x2.fillStyle='rgba(180,205,235,.9)';
-  x2.beginPath();x2.moveTo(0,384);x2.lineTo(96,286);x2.lineTo(206,352);x2.lineTo(330,300);x2.lineTo(512,384);x2.closePath();x2.fill();
-  x2.fillStyle='rgba(255,235,190,.95)';
-  for(let i=0;i<26;i++){const sx=R(10,502),sy=R(20,200);x2.beginPath();x2.arc(sx,sy,R(1,2.6),0,6.3);x2.fill();}
-  x2.fillStyle='rgba(255,255,255,.88)';
-  x2.font='700 30px "PingFang SC",system-ui,sans-serif';x2.textAlign='center';
-  x2.fillText('CHRISTMAS 2026',256,60);
-  const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=4;
-  const p=new THREE.Mesh(new THREE.PlaneGeometry(3.2,2.4),
-    new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide}));
-  p.position.set(x,1.55,z);
-  scene.add(p);
-  /* 背板支架 */
-  for(const sx of [-1,1]){
-    const leg=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,2.3,8),
-      new THREE.MeshStandardMaterial({color:0x8a6a44,roughness:.8}));
-    leg.position.set(x+sx*1.4,1.1,z+.12);scene.add(leg);
-  }
-  return p;
-}
-/* 三脚架 + 相机 */
-function econCameraProp(x,z){
-  const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=Math.PI;scene.add(g);
-  const bodyM=new THREE.MeshStandardMaterial({color:0x2b323b,roughness:.42,metalness:.5});
-  const chromeM=new THREE.MeshStandardMaterial({color:0xc8d2dc,roughness:.22,metalness:.88});
-  const legM=new THREE.MeshStandardMaterial({color:0x3d4753,roughness:.5,metalness:.45});
-  const hubY=1.30,footR=.48;
-  const up=new THREE.Vector3(0,1,0);
-  /* 三条腿：每条从云台轴心连到地面脚垫，用向量定向，长度按实际距离算 */
-  for(let i=0;i<3;i++){
-    const a=(i/3)*Math.PI*2+.5;
-    const foot=new THREE.Vector3(Math.cos(a)*footR,.035,Math.sin(a)*footR);
-    const hub=new THREE.Vector3(0,hubY,0);
-    const dir=foot.clone().sub(hub);
-    const len=dir.length();
-    const leg=new THREE.Mesh(new THREE.CylinderGeometry(.032,.048,len,8),legM);
-    leg.position.copy(hub).addScaledVector(dir,.5);
-    leg.quaternion.setFromUnitVectors(up,dir.clone().normalize());
-    g.add(leg);
-    const tip=new THREE.Mesh(new THREE.CylinderGeometry(.07,.06,.05,10),bodyM);
-    tip.position.copy(foot);g.add(tip);
-  }
-  /* 中轴 + 云台 */
-  const col=new THREE.Mesh(new THREE.CylinderGeometry(.055,.07,.34,10),legM);
-  col.position.set(0,hubY+.16,0);g.add(col);
-  const head=new THREE.Mesh(new THREE.BoxGeometry(.16,.14,.16),bodyM);
-  head.position.set(0,hubY+.38,0);g.add(head);
-  /* 相机机身 + 镜头 + 遮光罩 + 红色录制灯 */
-  const body=new THREE.Mesh(new THREE.BoxGeometry(.42,.28,.24),bodyM);
-  body.position.set(0,hubY+.58,0);g.add(body);
-  const grip=new THREE.Mesh(new THREE.BoxGeometry(.10,.30,.26),bodyM);
-  grip.position.set(-.22,hubY+.58,0);g.add(grip);
-  const lens=new THREE.Mesh(new THREE.CylinderGeometry(.125,.145,.26,16),chromeM);
-  lens.rotation.x=Math.PI/2;lens.position.set(.02,hubY+.58,.23);g.add(lens);
-  const hood=new THREE.Mesh(new THREE.BoxGeometry(.38,.09,.30),bodyM);
-  hood.position.set(.02,hubY+.72,.19);g.add(hood);
-  const led=new THREE.Mesh(new THREE.SphereGeometry(.032,8,6),
-    new THREE.MeshBasicMaterial({color:0xff5a4a}));
-  led.position.set(.16,hubY+.70,-.10);g.add(led);
-  /* 挂机小包 */
-  const bag=new THREE.Mesh(new THREE.BoxGeometry(.26,.30,.14),
-    new THREE.MeshStandardMaterial({color:0x8a4a3a,roughness:.8}));
-  bag.position.set(-.28,hubY+.30,-.06);g.add(bag);
-  return g;
-}
-
 /* ── 建全部设施 ─────────────────────────────────────────── */
+
 function econBuildAll(){
   for(const R of ECON_RIDES){
-    econMakePad(R.x,R.z,R.name,R.price+' 雪币',R.color,ECON_PAD_R,false);
+    econMakePad(R.x,R.z,R.name,R.color,ECON_PAD_R);
   }
-  /* 打工摊位 */
-  const stalls=[];
-  stalls.push(econBuildStall({bx:ECON_JOBS[0].bx,bz:ECON_JOBS[0].bz,name:'游乐园售票处',
-    h:3.05,w:3.9,d:2.6,fab:9,accent:'#2f6b8a'}));
-  /* 售票亭：柜台上放一摞票 + 钱匣 */
-  {
-    const g=stalls[0];
-    const paperM=new THREE.MeshStandardMaterial({color:0xf6f1e2,roughness:.85});
-    for(let i=0;i<6;i++){
-      const t=new THREE.Mesh(new THREE.BoxGeometry(.34,.02,.22),paperM);
-      t.position.set(-.9+i*.05,1.08+i*.022,.44);t.rotation.y=.2-i*.05;g.add(t);
-    }
-    const boxM=new THREE.MeshStandardMaterial({color:0x6b4a2e,roughness:.7});
-    const box=new THREE.Mesh(new THREE.BoxGeometry(.52,.22,.36),boxM);
-    box.position.set(.85,1.15,.44);g.add(box);
-    const slot=new THREE.Mesh(new THREE.BoxGeometry(.30,.03,.05),
-      new THREE.MeshBasicMaterial({color:0x111820}));
-    slot.position.set(.85,1.27,.44);g.add(slot);
-  }
-  /* 摄影摊 */
-  stalls.push(econBuildStall({bx:ECON_JOBS[1].bx,bz:ECON_JOBS[1].bz,name:'圣诞摄影摊',
-    h:2.95,w:3.6,d:2.5,fab:11,accent:'#3f6ba8'}));
-  {
-    const g=stalls[1];
-    const rollM=new THREE.MeshStandardMaterial({color:0x22262c,roughness:.6,metalness:.3});
-    const roll=new THREE.Mesh(new THREE.CylinderGeometry(.11,.11,.26,14),rollM);
-    roll.rotation.z=Math.PI/2;roll.position.set(-.85,1.14,.42);g.add(roll);
-    const fl=new THREE.Mesh(new THREE.BoxGeometry(.30,.02,.26),
-      new THREE.MeshStandardMaterial({color:0xf2f0e6,roughness:.9}));
-    fl.position.set(-.85,1.13,.62);fl.rotation.x=.3;g.add(fl);
-  }
-  econCameraProp(ECON_JOBS[1].gx+1.5,ECON_JOBS[1].gz-.4);
-  econBackdrop(ECON_PHOTO_SPOT[0],ECON_PHOTO_SPOT[1]-1.35);
-  /* 工位光点 */
-  for(const J of ECON_JOBS){
-    econMakePad(J.gx,J.gz,J.name,'打工 +'+J.pay,J.color,2.35,true);
-  }
-  econPaint();
 }
 
 /* ── 查询 ───────────────────────────────────────────────── */
@@ -21433,7 +21189,7 @@ function econRideByKind(kind){
   if(kind==='launch')return econRideById('launch');
   if(kind==='heli')return econRideById('heli');
   if(kind==='balloon')return econRideById('balloon');
-  if(kind==='sleigh')return {id:'sleigh',name:'空中圣诞驯鹿雪橇',price:30,color:0xffd08a};
+  if(kind==='sleigh')return {id:'sleigh',name:'空中圣诞驯鹿雪橇',short:'驯鹿雪橇',color:0xffd08a};
   return null;
 }
 function econAtPad(id){
@@ -21443,8 +21199,8 @@ function econAtPad(id){
   return Math.hypot(fp.x-R.x,fp.z-R.z)<ECON_PAD_R+1.1;
 }
 /* 进出范围加滞回：站在光点边缘时提示不会一闪一闪 */
-const ECON_HYST=2.0;
-let econLastPadId=null,econLastJobId=null;
+const ECON_HYST=1.1;
+let econLastPadId=null;
 function econNearestPad(){
   if(!fp.on){econLastPadId=null;return null;}
   let best=null,bd=1e9;
@@ -21456,27 +21212,10 @@ function econNearestPad(){
   econLastPadId=best?best.id:null;
   return best;
 }
-function econNearestJob(){
-  if(!fp.on){econLastJobId=null;return null;}
-  let best=null,bd=1e9;
-  for(const J of ECON_JOBS){
-    const d=Math.hypot(fp.x-J.gx,fp.z-J.gz);
-    const lim=(econLastJobId===J.id)?ECON_JOB_R+ECON_HYST:ECON_JOB_R;
-    if(d<lim&&d<bd){bd=d;best=J;}
-  }
-  econLastJobId=best?best.id:null;
-  return best;
-}
-
-/* ── 上车（扣钱 + 真的坐上去）───────────────────────────── */
+/* ── 上车（免费，直接坐上去）────────────────────────────── */
 function econBoard(id){
   const R=econRideById(id);
   if(!R)return false;
-  if(ECON.coin<R.price){
-    _recMsg('雪币不够：'+R.name+' 票价 '+R.price+' 雪币，还差 '+(R.price-ECON.coin)+' 枚',2800);
-    sfx.blip(300,.16,.09);return false;
-  }
-  econPay(R.price);
   switch(id){
     case 'wheel':toggleRideWheel(null);break;
     case 'carousel':toggleRideFacility({kind:'carousel',label:'皇家圣诞旋转木马'});break;
@@ -21493,294 +21232,28 @@ function econBoard(id){
     }
     case 'train':toggleRideTrain();break;
   }
-  _recMsg(R.name+' · 已付 '+R.price+' 雪币',1900);
   return true;
 }
 
-/* ── NPC 调度：叫一个小熊过来排队 / 站到摄影位 ─────────── */
-function econPickNpc(cx,cz,minD,maxD){
-  let best=null,bs=-1;
-  for(const n of npcs){
-    if(n.indoor||n.job)continue;
-    const d=Math.hypot(n.p.position.x-cx,n.p.position.z-cz);
-    if(d<minD||d>maxD)continue;
-    const s=1/(1+d*0.06);
-    if(s>bs){bs=s;best=n;}
-  }
-  return best;
-}
-function econSendNpc(n,x,z){
-  n._oldPath=n.path;n._oldI=n.i;n._oldSpeed=n.speed;
-  n.path=[[x,n.baseY,z]];n.i=0;n.wait=0;n.look=null;n.speed=1.45;
-}
-function econFreeNpc(n){
-  if(n._oldPath){n.path=n._oldPath;n.i=n._oldI;}
-  if(n._oldSpeed)n.speed=n._oldSpeed;
-  n._oldPath=null;n.job=null;n.wait=R(.2,1.4);
-}
-
-/* ── 上岗：站到工位按 E 开始干活，客人自己会过来 ────────── */
-const ECON_SHIFT={id:null,t:0,next:0};
-/* 最短在岗时长：一分钟。不满一分钟不让下岗 —— 免得点了两下就下班，
-   打工变成点一下按钮拿一次钱。 */
-const ECON_SHIFT_MIN=60;
-let econShiftStart=0;
-function econShiftId(){
-  if(photoSys.on)return 'photo';
-  return ECON_SHIFT.id;
-}
-function econShiftLeft(){return ECON_SHIFT_MIN-(performance.now()-econShiftStart)/1000;}
-function econJobStart(id){
-  const J=ECON_JOBS.find(j=>j.id===id);
-  if(!J)return;
-  if(id==='photo'){econPhotoStart();return;}
-  ECON_SHIFT.id=id;ECON_SHIFT.t=0;ECON_SHIFT.next=.6;
-  econShiftStart=performance.now();
-  econLastPrompt='';
-  _recMsg(J.name+' · 开始上岗，客人会自己过来找你（站满 1 分钟才能下岗）',3400);
-  sfx.blip(760,.10,.07);
-}
-function econJobStop(force){
-  const shift=econShiftId();
-  if(!shift)return false;
-  const left=econShiftLeft();
-  if(left>0&&!force){
-    /* 没到时间不让下：提示别连着刷屏 */
-    const now=performance.now();
-    if(!ECON._stopCd||now-ECON._stopCd>1500){
-      ECON._stopCd=now;
-      _recMsg('还在上班，再站 '+Math.ceil(left)+' 秒才能下岗',2200);
-      sfx.blip(420,.12,.07);
-    }
-    return false;
-  }
-  if(photoSys.on){econPhotoStop();econLastPrompt='';return true;}
-  ECON_SHIFT.id=null;
-  if(ECON.ticketBuyer){econFreeNpc(ECON.ticketBuyer);ECON.ticketBuyer=null;}
-  econLastPrompt='';
-  _recMsg('已下班',1600);
-  hudHide();
-  return true;
-}
-
-/* ── 打工 ②：摄影摊 ───────────────────────────────────── */
-const photoSys={on:false,npc:null,cool:0,wait:0,aimed:false,shots:0};
-function econPhotoStart(){
-  if(photoSys.on){econPhotoStop();return;}
-  if(!fp.on)enterWalk();
-  photoSys.on=true;photoSys.npc=null;photoSys.cool=0;photoSys.wait=0;photoSys.aimed=false;
-  econShiftStart=performance.now();
-  if(photoHudEl)photoHudEl.classList.add('show');
-  if(phShootBtn)phShootBtn.classList.add('on');
-  if(phKeyEl)phKeyEl.textContent=IS_TOUCH_DEV?'点右下角快门拍照':'空格 拍照 · E 收摊';
-  if(phStateEl)phStateEl.textContent='等客人走过来…';
-  _recMsg('摄影摊开张：等小熊站到位置上，把视线对准他，按 空格 拍照',3600);
-  sfx.blip(880,.12,.07);
-}
-function econPhotoStop(){
-  if(!photoSys.on)return;
-  if(photoSys.npc)econFreeNpc(photoSys.npc);
-  photoSys.on=false;photoSys.npc=null;photoSys.aimed=false;
-  if(photoHudEl)photoHudEl.classList.remove('show');
-  if(phShootBtn)phShootBtn.classList.remove('on');
-  hudHide();
-}
-function econPhotoShoot(){
-  if(!photoSys.on||photoSys.cool>0)return;
-  const n=photoSys.npc;
-  if(!n){_recMsg('还没有客人站到位置上，再等等',2000);return;}
-  const dx=n.p.position.x-camera.position.x, dz=n.p.position.z-camera.position.z;
-  const dist=Math.hypot(dx,dz);
-  const cy=camera.rotation.y;
-  const fx=-Math.sin(cy), fz=-Math.cos(cy);
-  const dot=(dx*fx+dz*fz)/Math.max(.001,dist);
-  const ang=Math.acos(Math.min(1,Math.max(-1,dot)));
-  photoSys.cool=.8;
-  /* 闪光 */
-  if(phFlashEl){phFlashEl.classList.remove('on');void phFlashEl.offsetWidth;phFlashEl.classList.add('on');}
-  sfx.blip(1560,.09,.10);
-  if(ang<.44&&dist<16){
-    const good=(dist>2.4&&dist<11);
-    const pay=good?25:14;
-    ECON.shots++;if(good)ECON.good++;
-    n.happyT=1.8;n.vy=3.0;n.squash=-.22;
-    econGain(pay,good?'构图完美，客人很满意':'照片有点歪，但客人还是笑了');
-    photoSys.shots++;
-    econFreeNpc(n);photoSys.npc=null;photoSys.wait=1.2;
-    if(phStateEl)phStateEl.textContent='拍好一张，等下一位客人…';
-  }else{
-    /* 没对准：别立刻把客人赶走 —— 玩家多半只是没转准，
-       给一次补拍机会（客人站着等你）；补不上才放人走。 */
-    const nj=n.job||(n.job={type:'photo',x:ECON_PHOTO_SPOT[0],z:ECON_PHOTO_SPOT[1],t:0});
-    nj.miss=(nj.miss||0)+1;
-    if(nj.miss>=2){
-      econFreeNpc(n);photoSys.npc=null;photoSys.wait=1.2;
-      _recMsg('没对准，小熊笑着跑开了，再来一次',2200);
-      if(phStateEl)phStateEl.textContent='没对准，等下一位客人…';
-    }else{
-      nj.t=0;
-      _recMsg('没对准，小熊还在等你 · 转过来再拍一次',2200);
-      if(phStateEl)phStateEl.textContent='没对准 · 客人还在，把视线移过去';
-    }
-  }
-}
-
-/* ── 每帧更新 ───────────────────────────────────────────── */
-let econLastPrompt='',econLastMsg='';
+let econLastPrompt='',econOwnHud=false;
 function econUpdate(dt){
-  ECON.jobCd=Math.max(0,ECON.jobCd-dt);
-  /* 快门冷却原来没人递减 —— 第一次按过之后 cool 永远是 0.8，
-     后面每次按快门都在第一行 return，表现为"拍不了第二张"。 */
-  photoSys.cool=Math.max(0,photoSys.cool-dt);
-  /* 「个人」面板是联机模块后建的，雪币角标要定期重新挂一次 */
-  if(((ECON._tick=(ECON._tick|0)+1)%30)===0)econPaint();
-  /* 飘字 */
-  for(let i=econFloats.length-1;i>=0;i--){
-    const f=econFloats[i];f.life+=dt;
-    f.sp.position.y+=dt*.85;
-    f.sp.material.opacity=Math.max(0,1-f.life/1.3);
-    if(f.life>1.3){
-      scene.remove(f.sp);
-      if(f.sp.material.map)f.sp.material.map.dispose();
-      f.sp.material.dispose();econFloats.splice(i,1);
-    }
-  }
   /* 光点呼吸：夜里最亮，白天压暗 */
   const night=Math.sin(((state.hour-6)/12)*Math.PI)<=0.03;
   const k=night?1:.32;
   for(const p of ECON_PADS){
-    p.ring.material.opacity=(p.isJob?.46:.30)+.13*Math.sin(t*2.3+p.x)*(night?1:.42);
-    p.beam.material.opacity=(.055+.025*Math.sin(t*1.6+p.z))*(night?1:.4);
-    if(p.pool)p.pool.material.opacity=(.05+.02*Math.sin(t*2.0+p.x))*k;
-  }
-  /* 上岗中：客人自己过来 */
-  const _shift=econShiftId();
-  if(_shift&&fp.on){
-    const J=ECON_JOBS.find(j=>j.id===_shift);
-    if(J&&Math.hypot(fp.x-J.gx,fp.z-J.gz)>9){
-      econJobStop(true);      // 离开工位＝中断，不吃"站满 1 分钟"
-    }else if(J){
-      ECON_SHIFT.t+=dt;
-      if(_shift==='ticket'&&!ECON.ticketBuyer&&ECON_SHIFT.t>ECON_SHIFT.next){
-        const n=econPickNpc(J.bx,J.bz,7,30);
-        if(n){
-          econSendNpc(n,J.gx,J.gz+.4);
-          n.job={type:'ticket',x:J.gx,z:J.gz+.4,t:0};
-          ECON.ticketBuyer=n;
-        }
-        ECON_SHIFT.next=ECON_SHIFT.t+R(3.0,5.4);
-      }
-    }
-  }
-  /* 买票的客人走到窗口就成交 */
-  if(ECON.ticketBuyer){
-    const n=ECON.ticketBuyer;
-    n.job.t+=dt;
-    const d=Math.hypot(n.p.position.x-n.job.x,n.p.position.z-n.job.z);
-    if(d<1.5){
-      ECON.ticketBuyer=null;
-      n.happyT=1.6;n.vy=2.8;n.squash=-.22;
-      econGain(ECON_JOBS[0].pay,'卖出 1 张门票');
-      econFreeNpc(n);
-    }else if(n.job.t>26){
-      ECON.ticketBuyer=null;econFreeNpc(n);
-      _recMsg('客人等太久走了，改天再来',2000);
-    }
+    p.ring.material.opacity=.82+.13*Math.sin(t*2.3+p.x)*(night?1:.42);
+    p.ringBase.material.opacity=.45+.10*Math.sin(t*2.3+p.x+1.2);
+    p.beam.material.opacity=(.10+.04*Math.sin(t*1.6+p.z))*(night?1:.4);
+    if(p.pool)p.pool.material.opacity=(.07+.025*Math.sin(t*2.0+p.x))*k;
   }
   if(!fp.on)return;
-  if(photoSys.on){
-    /* 摄影模式：找客人 + 判断有没有对准 */
-    if(photoSys.npc){
-      const n=photoSys.npc;
-      n.look=[fp.x,fp.z];
-      /* 客人站着等太久了就放走，别让一个人占着摄影位不走 */
-      let gone=false;
-      if(n.job){n.job.t=(n.job.t||0)+dt;
-        if(n.job.t>22){econFreeNpc(n);photoSys.npc=null;photoSys.wait=1.2;gone=true;
-          if(phStateEl)phStateEl.textContent='客人等太久走了，等下一位…';}}
-      if(!gone){
-        const dx=n.p.position.x-camera.position.x, dz=n.p.position.z-camera.position.z;
-        const dist=Math.hypot(dx,dz);
-        const cy=camera.rotation.y;
-        const dot=(dx*(-Math.sin(cy))+dz*(-Math.cos(cy)))/Math.max(.001,dist);
-        const ang=Math.acos(Math.min(1,Math.max(-1,dot)));
-        photoSys.aimed=(ang<.44&&dist<16);
-        if(phStateEl)phStateEl.textContent=photoSys.aimed
-          ?'对准了！'+(IS_TOUCH_DEV?'点右下角快门':'按 空格 拍照')+'（'+dist.toFixed(1)+'m）'
-          :'客人站好了 · 把视线移过去对准他';
-      }
-    }else{
-      photoSys.wait-=dt;
-      if(photoSys.wait<=0&&!ECON.ticketBuyer){
-        const n=econPickNpc(fp.x,fp.z,8,32);
-        if(n){
-          econSendNpc(n,ECON_PHOTO_SPOT[0],ECON_PHOTO_SPOT[1]);
-          n.job={type:'photo',x:ECON_PHOTO_SPOT[0],z:ECON_PHOTO_SPOT[1],t:0};
-          photoSys.npc=n;
-          photoSys.wait=3;
-          if(phStateEl)phStateEl.textContent='客人正朝摄影位走过来…';
-        }else{
-          photoSys.wait=2;
-          if(phStateEl)phStateEl.textContent='附近没人，等一会儿…';
-        }
-      }
-    }
-    /* 走远了就收摊（离开工位＝中断，不吃"站满 1 分钟"那一套） */
-    if(Math.hypot(fp.x-ECON_JOBS[1].gx,fp.z-ECON_JOBS[1].gz)>9)econPhotoStop();
-    /* 在岗提示：上岗以后提示条必须换成「上岗中 / 下班」。
-       原来这里直接 return，提示条一直挂着上岗前的「上岗」按钮，
-       玩家看��还是"让我上岗"，再点一下就把自己的摊子关了。 */
-    if(photoSys.on){
-      const J=ECON_JOBS[1];
-      const left=Math.max(0,Math.ceil(econShiftLeft()));
-      const TOUCH=IS_TOUCH_DEV;
-      econSetPrompt('shift:photo',
-        J.name+' · 上岗中 · '+(TOUCH?'客人站好了就点右下角快门':'客人站好了就按 空格 拍照')+
-        (left>0?' · 还差 '+left+' 秒才能下岗':' · 可以下岗了'),
-        left>0?'上班中':(TOUCH?'下班':'下班 (E)'),
-        ()=>econJobStop());
-    }
-    return;
-  }
   if(wheelSys.riding||trainSys.riding||launchSys.active||heliSys.riding||balloonSys.riding)return;
-  /* 传送门：站在江南古村门楼前，提示条切成"进村"。
-     优先级放在工位/上车点之后 —— 打工和上车是主站玩法，传送门是支线。 */
-  if(jnPortalNear()){
-    const TOUCH=IS_TOUCH_DEV;
-    econSetPrompt('portal:jn',
-      '江南古村 · 门楼里的水墨门还开着'+(TOUCH?' · 点按钮进村':' · 按 E 进村'),
-      TOUCH?'进村':'进村 (E)',
-      ()=>jnPortalGo());
-    return;
-  }
-  /* 提示：工位优先，其次上车光点 */
-  const job=econNearestJob();
+  /* 站到上车光点 → 只亮一个按钮，按钮上写设施名。别的什么都不说。 */
   const pad=econNearestPad();
-  const shift=econShiftId();
-  const TOUCH=IS_TOUCH_DEV;
-  let key='',msg='',btn='',fn=null;
-  if(shift){
-    const J=ECON_JOBS.find(j=>j.id===shift);
-    const left=Math.max(0,Math.ceil(econShiftLeft()));
-    key='shift:'+shift;
-    msg=J.name+' · 上岗中'+(shift==='photo'
-      ?(TOUCH?' · 客人站好了就点右下角快门':' · 客人站好了就按 空格 拍照')
-      :' · 客人正在赶来')+(left>0?' · 还差 '+left+' 秒才能下岗':' · 可以下岗了');
-    btn=left>0?'上班中':(TOUCH?'下班':'下班 (E)');
-    fn=()=>econJobStop();
-  }else if(job){
-    key='job:'+job.id;
-    msg=job.name+' · '+job.tip+'（'+job.pay+' 雪币）'+(TOUCH?' · 点按钮上岗':' · 按 E 上岗');
-    btn=TOUCH?'上岗':'上岗 (E)';
-    fn=()=>econJobDo(job.id);
-  }else if(pad){
-    key='pad:'+pad.id;
-    msg=pad.name+' · 票价 '+pad.price+' 雪币 · '+(TOUCH?'点按钮上车':'按 E 上车');
-    btn='上车 ('+pad.price+')';
-    fn=()=>econBoard(pad.id);
-  }
-  econSetPrompt(key,msg,btn,fn);
+  if(pad)econSetPrompt('pad:'+pad.id,'',pad.short,()=>econBoard(pad.id));
+  else econSetPrompt('','','');
 }
+
 /* 提示条是全局共用的（钢琴 / 马戏团 / 溜冰场也在用）。
    只有「提示条上还是我自己那条」时才收走，别把别人的提示抹掉。 */
 function econSetPrompt(key,msg,btn,fn){
@@ -21788,20 +21261,27 @@ function econSetPrompt(key,msg,btn,fn){
     /* 提示条是全局共用的，小火车 / 溜冰场每帧会调 hudHide()，
        所以这里必须每帧把提示重新挂上，否则它只闪一帧就没了。 */
     if(key){
-      if(trainMsgEl.textContent!==msg)trainMsgEl.textContent=msg;
       if(trainBtnEl.textContent!==btn)trainBtnEl.textContent=btn;
-      trainHud.classList.remove('bare');   /* 上车/上岗提示要带说明文字 */
+      trainHud.classList.add('bare');
       trainHud.classList.add('show');
       if(fn)trainBtnEl.onclick=fn;
     }
     return;
   }
-  const prevMsg=econLastMsg;
-  econLastPrompt=key;econLastMsg=msg;
-  if(key){hudShow(msg,btn,fn);}
-  else if(trainMsgEl.textContent===prevMsg){hudHide();}
+  econLastPrompt=key;
+  if(key){
+    /* 一律 bare：只留按钮，说明文字一个字都不给。按钮本身就是全部信息。 */
+    trainHud.classList.add('bare');
+    trainHud.classList.add('show');
+    trainMsgEl.textContent='';
+    if(trainBtnEl.textContent!==btn)trainBtnEl.textContent=btn;
+    trainBtnEl.onclick=fn;
+    econOwnHud=true;
+  }else if(econOwnHud){
+    econOwnHud=false;
+    hudHide();
+  }
 }
-function econJobDo(id){econJobStart(id);}
 
 /* ── 经济系统：点设施时的引导（没站到光点就告诉你去哪儿）── */
 function econClickRide(kind){
@@ -21815,164 +21295,26 @@ function econClickRide(kind){
     return;
   }
   if(R.id==='sleigh'){
-    if(ECON.coin<R.price){_recMsg('雪币不够：驯鹿雪橇票价 '+R.price+' 雪币',2400);sfx.blip(300,.16,.09);return;}
-    econPay(R.price);
     toggleRideFacility({kind:'sleigh',label:'空中圣诞驯鹿雪橇'});
     return;
   }
   econBoard(R.id);
 }
-/* ── 经济系统：E 键统一入口（上车点 / 工位）── */
+/* ── E 键统一入口（上车点）── */
 function econInteract(){
   if(!fp.on)return false;
-  /* 江南古村传送门：在门楼前按 E 直接进村（优先级最高，站在门口就是要走） */
-  if(jnPortalNear()){jnPortalGo();return true;}
-  const shift=econShiftId();
-  if(shift){
-    /* 站在别的工位旁边 → 直接换班；否则按 E 下班 */
-    const jb=econNearestJob();
-    if(jb&&jb.id!==shift){econJobStop(true);econJobStart(jb.id);return true;}
-    econJobStop();
-    return true;
-  }
-  const job=econNearestJob();
-  if(job){econJobDo(job.id);return true;}
   const pad=econNearestPad();
   if(pad){econBoard(pad.id);return true;}
   return false;
 }
 
 
-/* ════════════════════════════════════════════════════════════
-   江南古村 · 传送门（主站 → 古村地图）
-   放在艺术馆正门正南的空雪地上（x=-2, z=26，实测净空 7.7m，不压马路也不压游乐园）
-   ════════════════════════════════════════════════════════════ */
-const JN_GATE={x:-2,z:26,r:3.2,target:'https://preview.ai10088.com/jiangnan/'};
-const JN_PORTAL=new THREE.Group();JN_PORTAL.name='jn-portal';scene.add(JN_PORTAL);
-(function buildJnPortal(){
-  /* 门楼：两根石柱 + 一道黛瓦门楣 + 匾额（"江南古村"），
-     做成国风小门洞，别用纯色方块 —— 每根柱都有柱础、柱身收分、柱头斗块。 */
-  const stoneM=M(0xcfd6de,{roughness:.86,metalness:.04});
-  const stoneDarkM=M(0x9aa4ae,{roughness:.9,metalness:.03});
-  const tileM=M(0x2f3944,{roughness:.72,metalness:.12});
-  const woodM=M(0x6b4a33,{roughness:.78,metalness:.05});
-  const H=4.6, SPAN=5.0, PX=SPAN/2;
-  for(const s of[-1,1]){
-    const cx=s*PX;
-    /* 柱础 */
-    add(JN_PORTAL,BX(.92,.28,.92),stoneDarkM,cx,.14,0);
-    add(JN_PORTAL,BX(.78,.16,.78),stoneM,cx,.36,0);
-    /* 柱身：两段收分 */
-    add(JN_PORTAL,BX(.60,2.05,.60),stoneM,cx,1.46,0);
-    add(JN_PORTAL,BX(.52,1.05,.52),stoneM,cx,3.01,0);
-    /* 柱头斗块 */
-    add(JN_PORTAL,BX(.72,.26,.72),stoneDarkM,cx,3.66,0);
-    /* 瓦当小挑檐 */
-    add(JN_PORTAL,BX(.96,.13,.96),tileM,cx,3.86,0);
-  }
-  /* 门楣横梁（两根，中间抬高） */
-  add(JN_PORTAL,BX(SPAN+.9,.42,.62),woodM,0,4.06,0);
-  add(JN_PORTAL,BX(SPAN+1.5,.20,.86),tileM,0,4.36,0);
-  /* 门楣上小瓦垄：8 条 */
-  for(let i=0;i<8;i++){
-    const x=(i-3.5)*(SPAN+1.3)/8;
-    add(JN_PORTAL,BX(.16,.16,.92),tileM,x,4.50,0);
-  }
-  /* 匾额 */
-  {
-    const[c,ctx]=cv(512,128);
-    const g=ctx.createLinearGradient(0,0,0,128);
-    g.addColorStop(0,'#3a2417');g.addColorStop(1,'#241309');
-    ctx.fillStyle=g;ctx.fillRect(0,0,512,128);
-    ctx.strokeStyle='#e8c884';ctx.lineWidth=5;ctx.strokeRect(10,10,492,108);
-    ctx.fillStyle='#ffeab8';ctx.font='700 58px '+HK;ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText('江 南 古 村',256,62);
-    const tex=ctex(c);
-    const pm=new THREE.Mesh(new THREE.PlaneGeometry(2.6,.65),new THREE.MeshBasicMaterial({map:tex}));
-    pm.position.set(0,4.06,.33);JN_PORTAL.add(pm);
-    const pm2=pm.clone();pm2.position.z=-.33;pm2.rotation.y=Math.PI;JN_PORTAL.add(pm2);
-  }
-  /* 门内：发光的江南水墨门（半透明波纹 + 一圈刻纹） */
-  const gateMat=new THREE.MeshBasicMaterial({
-    color:0x8fd8e8,transparent:true,opacity:.34,side:THREE.DoubleSide,
-    blending:THREE.AdditiveBlending,depthWrite:false});
-  const gate=new THREE.Mesh(new THREE.PlaneGeometry(SPAN-.5,H-.5),gateMat);
-  gate.position.set(0,2.5,0);JN_PORTAL.add(gate);
-  /* 水墨纹路：同心圈 + 放射线，贴在门面上 */
-  {
-    const[c,ctx]=cv(512,512);
-    ctx.clearRect(0,0,512,512);
-    ctx.strokeStyle='rgba(190,240,255,.85)';ctx.lineWidth=2.5;
-    for(const r of[70,110,150,190]){ctx.beginPath();ctx.arc(256,256,r,0,Math.PI*2);ctx.stroke();}
-    ctx.lineWidth=1.6;ctx.strokeStyle='rgba(210,245,255,.6)';
-    for(let i=0;i<16;i++){const a=i*Math.PI/8;ctx.beginPath();
-      ctx.moveTo(256+Math.cos(a)*46,256+Math.sin(a)*46);
-      ctx.lineTo(256+Math.cos(a)*205,256+Math.sin(a)*205);ctx.stroke();}
-    /* 中央一个"古"字 */
-    ctx.fillStyle='rgba(230,250,255,.9)';ctx.font='700 96px '+HK;ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText('古',256,256);
-    const tex=ctex(c);
-    const m=new THREE.Mesh(new THREE.PlaneGeometry(SPAN-.5,H-.5),new THREE.MeshBasicMaterial({
-      map:tex,transparent:true,opacity:.9,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
-    m.position.set(0,2.5,0);JN_PORTAL.add(m);
-    /* 慢慢转 + 呼吸 */
-    m.userData.update=(t)=>{m.rotation.z=t*.14;gateMat.opacity=.22+.14*Math.sin(t*1.7);};
-  }
-  /* 门柱上两盏红灯笼 */
-  for(const s of[-1,1]){
-    const lx=s*(PX+.05);
-    const lant=new THREE.Mesh(new THREE.SphereGeometry(.30,12,10),
-      new THREE.MeshStandardMaterial({color:0xd8322f,emissive:0xb02020,emissiveIntensity:.9,roughness:.6}));
-    lant.scale.set(1,1.18,1);lant.position.set(lx,3.62,.42);lant.castShadow=true;JN_PORTAL.add(lant);
-    add(JN_PORTAL,BX(.04,.34,.04),woodM,lx,3.96,.42);
-    add(JN_PORTAL,BX(.20,.05,.20),stoneDarkM,lx,3.30,.42);
-  }
-  /* 门前石板 + 雪堆（别让门悬空） */
-  add(JN_PORTAL,BX(SPAN+1.6,.10,3.4),stoneDarkM,0,.05,0);
-  add(JN_PORTAL,BX(SPAN+1.2,.06,2.2),stoneM,0,.13,0);
-  for(const s of[-1,1]){
-    const sn=new THREE.Mesh(new THREE.SphereGeometry(.62,14,10),M(0xf2f6fb,{roughness:.95}));
-    sn.scale.set(1,.36,.7);sn.position.set(s*(PX+1.0),.10,.9);sn.castShadow=true;sn.receiveShadow=true;JN_PORTAL.add(sn);
-  }
-  JN_PORTAL.position.set(JN_GATE.x,0,JN_GATE.z);
-  JN_PORTAL.rotation.y=Math.PI;   /* 正面朝南（面向从正门走过来的人） */
-  /* 门柱挡人，但门口留出通道（法阵要能走进去） */
-  OUTDOOR_OBS.push([JN_GATE.x-2.5,JN_GATE.z,0.85],[JN_GATE.x+2.5,JN_GATE.z,0.85]);
-  /* 门两侧各一盏暖光，夜里能看见 */
-  for(const s of[-1,1]){
-    const pl=new THREE.PointLight(0xffcf90,26,16,1.6);
-    pl.position.set(s*PX,3.4,.6);JN_PORTAL.add(pl);
-  }
-  /* 门口光池 */
-  const pool=new THREE.Mesh(new THREE.CircleGeometry(2.1,32),
-    new THREE.MeshBasicMaterial({color:0x6fd0e0,transparent:true,opacity:.22,blending:THREE.AdditiveBlending,depthWrite:false}));
-  pool.rotation.x=-Math.PI/2;pool.position.set(0,.03,0);JN_PORTAL.add(pool);
-})();
-
-/* 传送门触发：走到跟前，提示条出现"进入江南古村"，按 E / 点按钮跳转 */
-function jnPortalNear(){
-  if(!fp.on)return false;
-  return Math.hypot(fp.x-JN_GATE.x,fp.z-JN_GATE.z)<JN_GATE.r+1.4;
-}
-function jnPortalGo(){
-  const u=new URL(JN_GATE.target);
-  u.searchParams.set('from','alex-garage');
-  location.href=u.toString();
-}
-JN_PORTAL.userData.update=(t)=>{
-  /* 只遍历子节点 —— 遍历自己会无限递归 */
-  for(const o of JN_PORTAL.children){
-    if(o.userData&&o.userData.update)o.userData.update(t);
-    else o.children.forEach(c=>{if(c.userData&&c.userData.update)c.userData.update(t);});
-  }
-};
-
 econBuildAll();
-/* 调试出口：探针和联机面板要看钱包 / 上车点 / 打工状态 */
-window.ECON=ECON;window.ECON_RIDES=ECON_RIDES;window.ECON_JOBS=ECON_JOBS;
+/* 调试出口：探针要看上车点状态 */
+window.ECON=ECON;window.ECON_RIDES=ECON_RIDES;
 window.__fp=fp;
-window.photoSys=photoSys;window.econBoard=econBoard;window.econInteract=econInteract;
-window.econNearestPad=econNearestPad;window.econNearestJob=econNearestJob;
+window.econBoard=econBoard;window.econInteract=econInteract;
+window.econNearestPad=econNearestPad;
 window.XM_TOUR={
   /* 外部导览拍摄接口：这些对象都在模块作用域里，页面外拿不到，
      这里开一个只读 + 少量控制的出口，供录宣传片时驱动相机 / 时间 / 设施。

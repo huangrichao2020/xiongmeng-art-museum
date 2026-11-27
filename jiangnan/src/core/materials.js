@@ -228,7 +228,6 @@ export function initMaterials() {
   MAT.thatch = std({ color: 0xa8935f, roughness: .96 });
   MAT.glass = new THREE.MeshPhysicalMaterial({ color: 0xdfeef2, roughness: .08, transmission: .82, thickness: .04, transparent: true, opacity: .5 });
   MAT.snow = std({ color: 0xf2f5f8, roughness: .85 });
-  MAT.portal = std({ color: 0x5fd6c0, roughness: .3, metalness: .2, emissive: 0x2ea78f, emissiveIntensity: 1.1, transparent: true, opacity: .85 });
   MAT.ready = true;
   return MAT;
 }

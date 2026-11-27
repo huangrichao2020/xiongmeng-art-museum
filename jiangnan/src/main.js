@@ -137,11 +137,10 @@ function syncRemotes() {
 }
 
 /* ── 状态 ── */
-const MODEL_MODULES = ['terrain', 'water', 'roads', 'farmland', 'houses', 'trees', 'pagoda', 'paifang', 'props', 'people', 'portal', 'remotes'];
+const MODEL_MODULES = ['terrain', 'water', 'roads', 'farmland', 'houses', 'trees', 'pagoda', 'paifang', 'props', 'people', 'remotes'];
 let layout = null;
 let world = new THREE.Group();
 scene.add(world);
-let portals = [];
 let effects = null;
 let mode = 'over';
 let walk = null;               // 沉浸模式状态
@@ -151,13 +150,11 @@ const _sunDir = new THREE.Vector3();
 /* ── 生成一座村 ── */
 async function buildVillage(seed) {
   world.clear();
-  portals = [];
   layout = generateLayout(seed);
   initMaterials();
   for (const name of MODEL_MODULES) {
     try {
       const mod = await import(`./models/${name}.js`);
-      if (name === 'portal' && Array.isArray(mod.PORTALS)) portals = mod.PORTALS;
       const g = mod.build(layout);
       if (g) { g.name = 'model-' + name; world.add(g); }
     } catch (e) {
@@ -301,29 +298,8 @@ addEventListener('pointercancel', e => { lookPts.delete(e.pointerId); if (joy.ac
 addEventListener('keydown', e => {
   if (!walk) return;
   walk.keys[e.code] = true;
-  if (e.code === 'KeyE') tryPortal();
 });
 addEventListener('keyup', e => { if (walk) walk.keys[e.code] = false; });
-
-/* ── 传送门 ── */
-const PORTAL_R = 2.6;          /* 触发半径（米） */
-function portalNear() {
-  if (!walk || !portals.length) return null;
-  for (const p of portals) {
-    if (Math.hypot(walk.x - p.x, walk.z - p.z) < PORTAL_R) return p;
-  }
-  return null;
-}
-function tryPortal() {
-  const p = portalNear();
-  if (!p) return;
-  const u = new URL(p.target);
-  u.searchParams.set('from', 'jiangnan');
-  location.href = u.toString();
-}
-/* 手机上没有 E 键 —— 靠近法阵时在右下角亮一个按钮 */
-const portalBtn = document.getElementById('wb-portal');
-if (portalBtn) portalBtn.onclick = (e) => { e.stopPropagation(); tryPortal(); };
 
 /* ── UI ── */
 const statEl = document.getElementById('stats');
@@ -431,18 +407,8 @@ function tick() {
     walk.z = Math.max(layout.originZ + 2, Math.min(-layout.originZ - 2, walk.z));
     camera.position.set(walk.x, walk.y, walk.z);
     camera.rotation.set(walk.pitch, walk.yaw, 0, 'YXZ');
-    /* 这里不要自动 tryPortal —— 走近法阵就被弹走的话，
-       手机上根本没机会看清那扇水墨门。改成亮出右下角的按钮，由玩家主动点。 */
   } else {
     controls.update();
-  }
-  if (portalBtn) {
-    const pn = portalNear();
-    if (pn) {
-      portalBtn.hidden = false;
-      /* 64px 圆钮塞不下 6 个字，'回熊萌艺术馆' 会折成两行 */
-      portalBtn.textContent = '回' + String(pn.label || '上一处').replace('熊萌', '');
-    } else portalBtn.hidden = true;
   }
   sky.update(dt);
   /* 共享 uniforms：全场一棵树的摆动方向、透光方向都从这里来 */
@@ -483,7 +449,6 @@ addEventListener('resize', () => {
   window.__jnControls = controls;
   window.__jnSky = sky;
   window.__jnSetHour = (h) => sky.setHour(h, true);
-  window.__jnPortals = () => portals;
   window.__jnWalk = () => walk;
   window.__jnMode = (m) => applyMode(m);
   window.__jnStats = () => ({
